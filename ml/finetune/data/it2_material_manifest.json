@@ -1,0 +1,11 @@
+{
+ "sources": "/home/clutch/Downloads/material (32 csvs)",
+ "unique_pairs": 10628,
+ "train_pairs": 9566,
+ "dev_pairs": 531,
+ "test_pairs": 531,
+ "train_rows_bidi": 19132,
+ "dev_rows_bidi": 1062,
+ "seed": 42,
+ "note": "test split held out, never trained. flores-derived rows may overlap public eval sets; use held-out test + IN22 separately in morning."
+}
