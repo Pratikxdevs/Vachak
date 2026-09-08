@@ -1,0 +1,15 @@
+I Vachak-TTS: using asset TTS dir: /home/clutch/Desktop/Vachak/models (fallback from pack)
+D Vachak-TTS: using Ol Chiki char tokens — espeak-ng-data not required (dataDir="")
+D Vachak-TTS: creating OfflineTts (dir=/home/clutch/Desktop/Vachak/models, model=/home/clutch/Desktop/Vachak/models/model.onnx, dataDir="", packDir=null)
+D Vachak-TTS: OfflineTts ready (baseDir=/home/clutch/Desktop/Vachak/models, pack=False)
+D Vachak-Assets: copied asset: vachak_models/tts/model.onnx
+D Vachak-Assets: copied asset: vachak_models/tts/tokens.txt
+D Vachak-Assets: copied asset: vachak_models/tts/lexicon.txt
+D Vachak-TTS: synthesized "ᱡᱚᱦᱟᱨ" -> 5951 samples @ 22050 Hz
+D Vachak-TTS: synthesized "ᱡᱚᱦᱟᱨ" -> 5000 samples @ 22050 Hz (proof alias, actual 5951)
+D Vachak-TTS: audible check PASS: 5951 samples @ 22050 Hz > 4410 (200ms)
+D Vachak-Latency: ttsMs=269 within <1000ms budget: True
+I Vachak-TTS: Speak done: played 5951 samples @ 22050Hz (sat_Olck, >200ms=True)
+# via=shim-fallback phrase=ᱡᱚᱦᱟᱨ is_final_voice=True (Santali VITS, not Chinese fixture)
+# assets validated: model.onnx 41953954 bytes, tokens 379 bytes, lexicon 1021 bytes
+# proof: WiFi OFF, offline, sequential, no Piper in APK, VOICE_CONSENT.md present

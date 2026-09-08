@@ -1,0 +1,9 @@
+# ml/tts — Python dependencies (scaffolding).
+# Light: only stdlib (wave) is required for the fallback fixture. eSpeak NG is a
+# system binary; sherpa-onnx is referenced from the already-cloned repo.
+# --- referenced only, do NOT re-clone ---
+# torch>=2.0
+# onnx>=1.16
+# onnxruntime>=1.17
+# sherpa-onnx  (from ../sherpa-onnx, Apache-2.0)
+# soundfile    (optional, for real WAV IO)

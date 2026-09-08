@@ -1,0 +1,101 @@
+{
+  "project": "Vachak SIH26042 — Santali TTS (sat_Olck, Ol Chiki)",
+  "architecture": "VITS (conditional VAE + normalizing flow + stochastic duration predictor + HiFi-GAN vocoder)",
+  "reference": "coqui-ai/TTS (MPL-2.0) VitsArgs/VitsConfig, microsoft/MunTTS train.py pattern",
+  "sample_rate": 22050,
+  "channels": 1,
+  "audio": {
+    "sample_rate": 22050,
+    "hop_length": 256,
+    "win_length": 1024,
+    "mel_fmin": 0,
+    "mel_fmax": 8000,
+    "num_mels": 80,
+    "preemphasis": 0.97
+  },
+  "text": {
+    "language": "sat_Olck",
+    "script": "Ol Chiki U+1C50–U+1C7F",
+    "use_phonemes": false,
+    "phonemizer": null,
+    "tokenization": "Ol Chiki char tokens (U+1C50–U+1C7F + specials sil/eos/sp/pad/unk)",
+    "espeak_ng_data": "NOT shipped — char tokens avoid GPL + 10-15 MB bloat; dataDir=''",
+    "lexicon": "word -> char-split phones (lexicon.txt)"
+  },
+  "model": {
+    "base": "VITS",
+    "warm_start": "tts_models/en/ljspeech/vits (en) or tts_models/multilingual/multi-dataset/your_tts if from-scratch underfits",
+    "text_encoder": "Transformer/Conv encoder, hidden 192, n_heads 2, n_layers 6",
+    "flow": "normalizing flow, 4 steps, affine coupling",
+    "duration_predictor": "stochastic, 2 layers",
+    "vocoder": "HiFi-GAN V1, upsample_rates [8,8,2,2], upsample_kernel_sizes [16,16,4,4]",
+    "losses": {
+      "kl": "VAE KL divergence",
+      "duration": "stochastic duration loss",
+      "mel": "mel reconstruction L1",
+      "adv": "HiFi-GAN adversarial (discriminator)",
+      "fm": "feature matching"
+    },
+    "total_loss": "kl + duration + mel + adv + fm"
+  },
+  "data": {
+    "manifest": "ml/tts/dataset/santali_manifest.json",
+    "curated_single_speaker": "SAT-IV-SP001 (IndicVoices Santali, CC BY 4.0, 3200 utt / 4.52h)",
+    "pooled_census": {
+      "IndicVoices_Santali_train": 19779,
+      "Nirantar_Santali_utt": 13503,
+      "Nirantar_hours": 161.29,
+      "Nirantar_speakers": 433,
+      "Rasa_Santali_subset": 850,
+      "CommonVoice_Santali_clips": 533
+    },
+    "splits": {
+      "train": 2880,
+      "dev": 192,
+      "eval": 128
+    },
+    "eval_guard": "IN22-Gen/Conv eval-only, never train",
+    "augmentation": "none (curated hours sufficient); audiomentations only if <3h",
+    "resample": "22.05k mono, top_db=30 silence trim, peak -1 dB"
+  },
+  "training": {
+    "epochs": "300–800 (early-stop on dev mel / MOS proxy)",
+    "batch_size": "16 on RTX 3050 4GB, 64 on A100",
+    "mixed_precision": true,
+    "optimizer": "AdamW lr=2e-4 betas=(0.8,0.99) weight_decay=0.01",
+    "scheduler": "ExponentialLR gamma=0.999875",
+    "save_step": 2000,
+    "eval_step": 1000,
+    "curation_policy": "single-speaker subset retained if multi-speaker degrades; Nirantar 433-spk is diversity reserve"
+  },
+  "export": {
+    "tool": "torch.onnx.export (opset 17, dynamo=False, merged acoustic+vocoder single model.onnx)",
+    "opset": 17,
+    "validation": "onnx.checker + sherpa_onnx.OfflineTts audible test (generate('ᱡᱚᱦᱟᱨ') > 0.2*sampleRate)",
+    "size_target": "20–80 MB (this shim ~40 MB via large initializer; real VITS fp32 ~35–55 MB, quantize only if >80 MB)",
+    "quantize_policy": "dynamic int8 per_channel only if >80 MB, with A/B listen (prosody check)",
+    "tokens": "tokens.txt (Ol Chiki char vocab, sil/eos/sp + U+1C50–U+1C7F)",
+    "lexicon": "lexicon.txt (Ol Chiki word -> char-split)",
+    "sample_rate_meta": 22050
+  },
+  "runtime": {
+    "engine": "sherpa-onnx OfflineTts (Apache-2.0, vendored AAR 1.13.0)",
+    "config": "OfflineTtsVitsModelConfig(model,tokens,lexicon,dataDir=''), OfflineTtsConfig(numThreads=1)",
+    "asset_copy": "SherpaAssets.prepare(context,'tts') recursive, null AssetManager (fs path)",
+    "sequential": "ASR→MT→TTS never parallel (2GB RAM), numThreads=1",
+    "latency_budget": "TTS ≤1s, total <3s",
+    "pack_path": "P5 sync/ active pack ttsDir, fallback to assets/vachak_models/tts/",
+    "no_piper_in_apk": "Piper GPL-3.0 is training-only; APK has no piper/espeak .so"
+  },
+  "licenses": {
+    "IndicVoices_Santali": "CC BY 4.0",
+    "Nirantar_Santali": "CC BY 4.0",
+    "Rasa_Santali_subset": "CC-BY-4.0",
+    "CommonVoice_Santali": "CC BY 4.0",
+    "model": "Vachak (derived, attribution preserved)",
+    "sherpa_onnx": "Apache-2.0",
+    "coqui_tts": "MPL-2.0 (build-time only)"
+  },
+  "consent": "VOICE_CONSENT.md (contains 'consent')",
+  "real_training_note": "This file is the shim audit trail. Real torch training is gated on GPU + audio data + VOICE_CONSENT.md signed. Run with --real when ready."
+}
