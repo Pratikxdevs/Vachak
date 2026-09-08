@@ -1,0 +1,24 @@
+/home/clutch/Desktop/Vachak/IndicTrans2/.venv/lib/python3.10/site-packages/transformers/utils/generic.py:441: FutureWarning: `torch.utils._pytree._register_pytree_node` is deprecated. Please use `torch.utils._pytree.register_pytree_node` instead.
+  _torch_pytree._register_pytree_node(
+/home/clutch/Desktop/Vachak/IndicTrans2/.venv/lib/python3.10/site-packages/huggingface_hub/file_download.py:949: FutureWarning: `resume_download` is deprecated and will be removed in version 1.0.0. Downloads always resume when possible. If you want to force a new download, use `force_download=True`.
+  warnings.warn(
+/home/clutch/Desktop/Vachak/IndicTrans2/.venv/lib/python3.10/site-packages/transformers/utils/generic.py:309: FutureWarning: `torch.utils._pytree._register_pytree_node` is deprecated. Please use `torch.utils._pytree.register_pytree_node` instead.
+  _torch_pytree._register_pytree_node(
+/home/clutch/Desktop/Vachak/IndicTrans2/.venv/lib/python3.10/site-packages/transformers/utils/generic.py:309: FutureWarning: `torch.utils._pytree._register_pytree_node` is deprecated. Please use `torch.utils._pytree.register_pytree_node` instead.
+  _torch_pytree._register_pytree_node(
+/home/clutch/Desktop/Vachak/IndicTrans2/.venv/lib/python3.10/site-packages/huggingface_hub/file_download.py:949: FutureWarning: `resume_download` is deprecated and will be removed in version 1.0.0. Downloads always resume when possible. If you want to force a new download, use `force_download=True`.
+  warnings.warn(
+embed_positions type: IndicTransSinusoidalPositionalEmbedding
+offset attr: 2 padding_idx: 1
+weights shape: (258, 512)
+Traceback (most recent call last):
+  File "<stdin>", line 10, in <module>
+  File "/home/clutch/Desktop/Vachak/IndicTrans2/.venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/clutch/Desktop/Vachak/IndicTrans2/.venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/clutch/Desktop/Vachak/IndicTrans2/.venv/lib/python3.10/site-packages/torch/utils/_contextlib.py", line 116, in decorate_context
+    return func(*args, **kwargs)
+  File "/home/clutch/.cache/huggingface/modules/transformers_modules/ai4bharat/indictrans2-indic-indic-dist-320M/ffb7582b6d43791f1fb26b2153fc065f2e9ea575/modeling_indictrans.py", line 173, in forward
+    bsz, seq_len = input_ids.size()
+ValueError: not enough values to unpack (expected 2, got 1)
