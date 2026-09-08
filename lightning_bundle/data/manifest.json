@@ -1,0 +1,17 @@
+{
+ "kept": 10623,
+ "dropped": {
+  "empty": 0,
+  "same": 0,
+  "no_olchiki": 1,
+  "no_devanagari": 0,
+  "dup": 10,
+  "toolong": 4
+ },
+ "train_pairs": 9423,
+ "dev_pairs": 600,
+ "test_classroom": 300,
+ "test_general": 300,
+ "seed": 42,
+ "note": "held-out tests never trained; classroom=test on short/edu Hindi rows"
+}
