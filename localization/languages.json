@@ -1,0 +1,22 @@
+{
+  "target_language_code": "sat",
+  "target_language_name": "Santali (Ol Chiki)",
+  "target_script_note": "Default target is Santali (Ol Chiki) to stay consistent with the rest of the Vachak repo (IndicTrans2 pipeline, sherpa-onnx TTS). The task brief names Mundari; to target Mundari instead, set target_language_code to 'unr' (Mundari Bani) and re-run the seed + worksheet/flashcard generators with Mundari content. No code changes required.",
+  "languages": {
+    "hi": {
+      "label": "Hindi",
+      "script": "Devanagari",
+      "note": "Medium of instruction (teacher-facing)."
+    },
+    "target": {
+      "label": "Santali (Ol Chiki)",
+      "script": "Ol Chiki",
+      "note": "Learner-facing target language."
+    },
+    "bilingual": {
+      "label": "Hindi + Target",
+      "script": "Dual",
+      "note": "Side-by-side for scaffolding."
+    }
+  }
+}
