@@ -1,0 +1,11 @@
+{
+  "id": "L1",
+  "title": "DEV-FIXTURE: Counting Animals",
+  "grade": 1,
+  "source_text_hi": "छः हाथी",
+  "translated_text": "[DEV-FIXTURE-mund] ᱛᱩᱨᱩᱭ ᱜᱚᱴᱟᱝ ᱦᱟᱛᱤ",
+  "precomputed": true,
+  "outcomes": [
+    { "id": "O1", "description": "DEV-FIXTURE: recognize number 6", "nipun_mapped": true }
+  ]
+}

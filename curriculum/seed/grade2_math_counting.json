@@ -1,0 +1,306 @@
+{
+  "meta": {
+    "generated_by": "curriculum/seed/author_seed.py (deterministic, no LLM)",
+    "seed_version": "1.0.0",
+    "content_status": "DEV FIXTURE — author-draft aligned to NIPUN Bharat FLN outcomes. NOT yet verified by a subject-matter expert (SME). Do not ship as approved pedagogy until SME sign-off. Per AGENTS.md, machine/author-generated content is not approved pedagogy.",
+    "target_language_default": "sat (Santali Ol Chiki). Task brief names Mundari; set localization target to 'unr' and re-seed for Mundari.",
+    "source_basis": "Authored from public NIPUN Bharat / FLN foundational numeracy competency descriptors (counting, number sequence, place value, comparison). No gated dataset was pulled."
+  },
+  "grades": [
+    {
+      "grade_id": "G2",
+      "grade_number": 2,
+      "name_hi": "कक्षा 2",
+      "name_target": "ᱠᱞᱟᱥ 2",
+      "name_en": "Grade 2"
+    }
+  ],
+  "subjects": [
+    {
+      "subject_id": "SUBJ-MATH-G2",
+      "grade_id": "G2",
+      "name_hi": "गणित",
+      "name_target": "ᱮᱞᱮᱠᱷ ᱥᱟᱧᱟ",
+      "name_en": "Mathematics"
+    }
+  ],
+  "chapters": [
+    {
+      "chapter_id": "CH-COUNT-G2",
+      "subject_id": "SUBJ-MATH-G2",
+      "name_hi": "गिनती",
+      "name_target": "ᱞᱮᱠᱷᱟ",
+      "name_en": "Counting",
+      "sequence": 1
+    }
+  ],
+  "lessons": [
+    {
+      "lesson_id": "L-COUNT-G2",
+      "chapter_id": "CH-COUNT-G2",
+      "title_hi": "वस्तुओं और संख्याओं की गिनती (1 से 100)",
+      "title_target": "ᱡᱤᱱᱤᱥ ᱟᱨ ᱞᱮᱠᱷᱟ ᱞᱮᱠᱷᱟ (᱑ ᱠᱷᱚᱱ ᱑᱐᱐)",
+      "title_en": "Counting Objects and Numbers (1 to 100)",
+      "sequence": 1,
+      "estimated_minutes": 40
+    }
+  ],
+  "learning_outcomes": [
+    {
+      "outcome_id": "LO-COUNT-1",
+      "lesson_id": "L-COUNT-G2",
+      "code": "G2-M-CNT-01",
+      "description_hi": "छात्र 20 तक की वस्तुओं को एक-एक करके ठीक से गिन सकेंगे।",
+      "description_target": "ᱯᱟᱹᱴᱷᱣᱟᱹ ᱒᱐ ᱫᱷᱟᱹᱵᱤᱡ ᱡᱤᱱᱤᱥ ᱢᱤᱫ ᱢᱤᱫ ᱛᱮ ᱡᱚᱛᱚᱱ ᱞᱮᱠᱷᱟ ᱫᱟᱲᱮᱭᱟᱜ-ᱟ ᱾",
+      "description_en": "Student can count objects up to 20 accurately, one by one.",
+      "sequence": 1
+    },
+    {
+      "outcome_id": "LO-COUNT-2",
+      "lesson_id": "L-COUNT-G2",
+      "code": "G2-M-CNT-02",
+      "description_hi": "छात्र 1 से 100 तक की संख्याएँ पढ़ और लिख सकेंगे।",
+      "description_target": "ᱯᱟᱹᱴᱷᱣᱟᱹ ᱑ ᱠᱷᱚᱱ ᱑᱐᱐ ᱫᱷᱟᱹᱵᱤᱡ ᱞᱮᱠᱷᱟ ᱯᱟᱲᱦᱟᱣ ᱟᱨ ᱚᱞ ᱫᱟᱲᱮᱭᱟᱜ-ᱟ ᱾",
+      "description_en": "Student can read and write numbers from 1 to 100.",
+      "sequence": 2
+    },
+    {
+      "outcome_id": "LO-COUNT-3",
+      "lesson_id": "L-COUNT-G2",
+      "code": "G2-M-CNT-03",
+      "description_hi": "छात्र 2, 5 और 10 के स्टेप में गिन सकेंगे (छलांग गिनती)।",
+      "description_target": "ᱯᱟᱹᱴᱷᱣᱟᱹ ᱒, ᱕ ᱟᱨ ᱑᱐ ᱛᱮ ᱞᱮᱠᱷᱟ ᱫᱟᱲᱮᱭᱟᱜ-ᱟ (ᱡᱟᱸᱯ ᱞᱮᱠᱷᱟ) ᱾",
+      "description_en": "Student can skip-count by 2, 5 and 10.",
+      "sequence": 3
+    },
+    {
+      "outcome_id": "LO-COUNT-4",
+      "lesson_id": "L-COUNT-G2",
+      "code": "G2-M-CNT-04",
+      "description_hi": "छात्र किसी संख्या से पहले, बाद और बीच की संख्या बता सकेंगे।",
+      "description_target": "ᱯᱟᱹᱴᱷᱣᱟᱹ ᱢᱤᱫ ᱞᱮᱠᱷᱟ ᱠᱷᱚᱱ ᱟᱨᱡᱚ, ᱛᱟᱭᱚᱢ ᱟᱨ ᱛᱟᱞᱟ ᱨᱮᱭᱟᱜ ᱞᱮᱠᱷᱟ ᱞᱟᱹᱭ ᱫᱟᱲᱮᱭᱟᱜ-ᱟ ᱾",
+      "description_en": "Student can state the number before, after and between a given number.",
+      "sequence": 4
+    },
+    {
+      "outcome_id": "LO-COUNT-5",
+      "lesson_id": "L-COUNT-G2",
+      "code": "G2-M-CNT-05",
+      "description_hi": "छात्र दो संख्याओं में बड़ी और छोटी संख्या पहचान सकेंगे।",
+      "description_target": "ᱯᱟᱹᱴᱷᱣᱟᱹ ᱵᱟᱨᱭᱟ ᱞᱮᱠᱷᱟ ᱠᱷᱚᱱ ᱢᱟᱨᱟᱝ ᱟᱨ ᱦᱟᱢᱟᱞ ᱞᱮᱠᱷᱟ ᱪᱤᱱᱦᱟᱹ ᱫᱟᱲᱮᱭᱟᱜ-ᱟ ᱾",
+      "description_en": "Student can identify the greater and smaller of two numbers.",
+      "sequence": 5
+    }
+  ],
+  "teacher_instructions": [
+    {
+      "instruction_id": "TI-COUNT-1",
+      "lesson_id": "L-COUNT-G2",
+      "text_hi": "सबसे पहले छात्रों को वास्तविक वस्तुओं (मिट्टी के बर्तन, पेन्सिल) से गिनना सिखाएं। गिनती के समय छात्रों को आवाज़ में गिनने के लिए प्रोत्साहित करें।",
+      "text_target": "ᱟᱹᱢᱟᱹᱞᱤ ᱯᱟᱹᱴᱷᱣᱟᱹ ᱠᱚᱭ ᱟᱥᱚᱞ ᱡᱤᱱᱤᱥ (ᱠᱷᱟᱫᱟᱱ ᱵᱚᱨᱛᱚᱱ, ᱯᱮᱱᱥᱤᱞ) ᱛᱮ ᱞᱮᱠᱷᱟ ᱯᱟᱲᱦᱟᱣ ᱢᱟᱲᱟᱝ ᱠᱟᱹᱢᱤ ᱦᱚᱪᱚᱭ ᱢᱟ। ᱞᱮᱠᱷᱟ ᱚᱠᱛᱚ ᱯᱟᱹᱴᱷᱣᱟᱹ ᱠᱚ ᱟᱲᱟᱝ ᱛᱮ ᱞᱮᱠᱷᱟ ᱞᱟᱹᱜᱤᱫ ᱦᱩᱥᱟᱹᱨ ᱦᱚᱪᱚᱭ ᱢᱟ।",
+      "text_en": "First teach counting with real objects (clay pots, pencils). Encourage students to count aloud.",
+      "sequence": 1
+    },
+    {
+      "instruction_id": "TI-COUNT-2",
+      "lesson_id": "L-COUNT-G2",
+      "text_hi": "गिनती के बाद छात्रों को संख्या लिखने का अभ्यास कराएं। गलती होने पर सुधारें, डांटें नहीं।",
+      "text_target": "ᱞᱮᱠᱷᱟ ᱛᱟᱭᱚᱢ ᱯᱟᱹᱴᱷᱣᱟᱹ ᱠᱚᱭ ᱞᱮᱠᱷᱟ ᱚᱞ ᱞᱟᱹᱜᱤᱫ ᱪᱟᱹᱞᱤ ᱦᱚᱪᱚᱭ ᱢᱟ। ᱵᱷᱟᱹᱲ ᱦᱩᱭ ᱞᱮᱱ ᱠᱷᱟᱱ ᱥᱚᱫᱚᱥ ᱢᱟ, ᱵᱚᱛᱚᱨ ᱢᱤᱫ ᱢᱤᱫ ᱛᱮ ᱵᱟᱭ ᱢᱟ।",
+      "text_en": "After counting, have students practice writing numbers. Correct mistakes gently, do not scold.",
+      "sequence": 2
+    }
+  ],
+  "activities": [
+    {
+      "activity_id": "ACT-COUNT-1A",
+      "outcome_id": "LO-COUNT-1",
+      "title_hi": "मेज़ पर 20 तक गिनती",
+      "title_target": "ᱴᱮᱵᱚᱞ ᱪᱮᱛᱟᱱ ᱒᱐ ᱫᱷᱟᱹᱵᱤᱡ ᱞᱮᱠᱷᱟ",
+      "title_en": "Count to 20 on the table",
+      "activity_type": "hands_on",
+      "instructions_hi": "मेज़ पर 20 कंचे रखें। छात्र एक-एक करके गिने और आवाज़ में बोले।",
+      "instructions_target": "ᱴᱮᱵᱚᱞ ᱪᱮᱛᱟᱱ ᱒᱐ ᱜᱚᱴᱟᱝ ᱜᱩᱴᱤ ᱫᱚᱦᱚ ᱢᱟ। ᱯᱟᱹᱴᱷᱣᱟᱹ ᱢᱤᱫ ᱢᱤᱫ ᱛᱮ ᱞᱮᱠᱷᱟ ᱟᱨ ᱟᱲᱟᱝ ᱛᱮ ᱞᱟᱹᱭ ᱢᱟ।",
+      "instructions_en": "Place 20 marbles on the table. Students count one by one and say aloud.",
+      "sequence": 1
+    },
+    {
+      "activity_id": "ACT-COUNT-2A",
+      "outcome_id": "LO-COUNT-2",
+      "title_hi": "संख्या पहेली कार्ड",
+      "title_target": "ᱞᱮᱠᱷᱟ ᱯᱟᱧᱡᱤ ᱠᱟᱨᱰ",
+      "title_en": "Number puzzle cards",
+      "activity_type": "individual_practice",
+      "instructions_hi": "छात्रों को 1 से 50 तक के कार्ड सही क्रम में लगाने हैं।",
+      "instructions_target": "ᱯᱟᱹᱴᱷᱣᱟᱹ ᱠᱚ ᱑ ᱠᱷᱚᱱ ᱕᱐ ᱫᱷᱟᱹᱵᱤᱡ ᱠᱟᱨᱰ ᱡᱚᱛᱚᱱ ᱦᱚᱨᱚᱜ ᱨᱮ ᱫᱚᱦᱚ ᱦᱩᱭᱟᱜ-ᱟ।",
+      "instructions_en": "Students arrange cards 1 to 50 in correct order.",
+      "sequence": 1
+    },
+    {
+      "activity_id": "ACT-COUNT-3A",
+      "outcome_id": "LO-COUNT-3",
+      "title_hi": "छलांग गिनती गेम",
+      "title_target": "ᱡᱟᱸᱯ ᱞᱮᱠᱷᱟ ᱠᱷᱮᱞ",
+      "title_en": "Skip-count game",
+      "activity_type": "group_game",
+      "instructions_hi": "गोले में खड़े होकर 2-2 करके गिनें: 2, 4, 6...। फिर 5-5 और 10-10।",
+      "instructions_target": "ᱜᱚᱞ ᱛᱮ ᱡᱤᱞᱤᱫ ᱠᱟᱛᱮ ᱒-᱒ ᱛᱮ ᱞᱮᱠᱷᱟ: ᱒, ᱔, ᱖...। ᱛᱟᱭᱚᱢ ᱕-᱕ ᱟᱨ ᱑᱐-᱑᱐ ᱛᱮ।",
+      "instructions_en": "Stand in a circle and skip-count by 2: 2,4,6... Then by 5 and 10.",
+      "sequence": 1
+    },
+    {
+      "activity_id": "ACT-COUNT-4A",
+      "outcome_id": "LO-COUNT-4",
+      "title_hi": "पहले-बाद-बीच का खेल",
+      "title_target": "ᱟᱨᱡᱚ-ᱛᱟᱭᱚᱢ-ᱛᱟᱞᱟ ᱮᱱᱮᱡ",
+      "title_en": "Before-after-between game",
+      "activity_type": "pair_work",
+      "instructions_hi": "एक छात्र संख्या बोलता है, दूसरा उससे पहले और बाद वाली संख्या बताता है।",
+      "instructions_target": "ᱢᱤᱫ ᱯᱟᱹᱴᱷᱣᱟᱹ ᱞᱮᱠᱷᱟ ᱞᱟᱹᱭ ᱢᱟ, ᱫᱚᱥᱟᱨ ᱦᱚᱲ ᱚᱱᱟ ᱠᱷᱚᱱ ᱟᱨᱡᱚ ᱟᱨ ᱛᱟᱭᱚᱢ ᱨᱮᱭᱟᱜ ᱞᱮᱠᱷᱟ ᱞᱟᱹᱭ ᱢᱟ।",
+      "instructions_en": "One student says a number; the other states the one before and after.",
+      "sequence": 1
+    },
+    {
+      "activity_id": "ACT-COUNT-5A",
+      "outcome_id": "LO-COUNT-5",
+      "title_hi": "बड़ा-छोटा चुनो",
+      "title_target": "ᱢᱟᱨᱟᱝ-ᱦᱟᱢᱟᱞ ᱵᱟᱪᱷᱟᱣ",
+      "title_en": "Pick greater-smaller",
+      "activity_type": "pair_work",
+      "instructions_hi": "दो कार्ड दिखाएं; छात्र बताए कौन बड़ा है।",
+      "instructions_target": "ᱵᱟᱨᱭᱟ ᱠᱟᱨᱰ ᱩᱫᱩᱜ ᱢᱟ; ᱯᱟᱹᱴᱷᱣᱟᱹ ᱞᱟᱹᱭ ᱢᱟ ᱟᱱᱟᱜ ᱫᱚ ᱢᱟᱨᱟᱝ ᱠᱟᱱᱟ।",
+      "instructions_en": "Show two cards; student says which is greater.",
+      "sequence": 1
+    }
+  ],
+  "assessments": [
+    {
+      "assessment_id": "AS-COUNT-1",
+      "outcome_id": "LO-COUNT-1",
+      "type": "observation",
+      "prompt_hi": "छात्र को 15 कंचे गिनकर दिखाने हैं।",
+      "prompt_target": "ᱯᱟᱹᱴᱷᱣᱟᱹ ᱑᱕ ᱜᱚᱴᱟᱝ ᱜᱩᱴᱤ ᱞᱮᱠᱷᱟ ᱠᱟᱛᱮ ᱩᱫᱩᱜ ᱦᱩᱭᱟᱜ-ᱟ।",
+      "prompt_en": "Student must count and show 15 marbles.",
+      "answer_key": "Correct oral/physical count to 15 with no skipped objects.",
+      "difficulty": "easy",
+      "sequence": 1
+    },
+    {
+      "assessment_id": "AS-COUNT-2",
+      "outcome_id": "LO-COUNT-2",
+      "type": "written",
+      "prompt_hi": "रिक्त स्थान भरें: 47 के बाद ____ आता है।",
+      "prompt_target": "ᱫᱟᱹᱵᱤ ᱯᱩᱨᱟᱹᱣ: ᱔᱗ ᱛᱟᱭᱚᱢ ____ ᱦᱤᱡᱩᱜ-ᱟ।",
+      "prompt_en": "Fill the blank: after 47 comes ____.",
+      "answer_key": "48",
+      "difficulty": "easy",
+      "sequence": 1
+    },
+    {
+      "assessment_id": "AS-COUNT-3",
+      "outcome_id": "LO-COUNT-3",
+      "type": "oral",
+      "prompt_hi": "5-5 करके गिनें: 5, 10, __, __, 25।",
+      "prompt_target": "᱕-᱕ ᱛᱮ ᱞᱮᱠᱷᱟ: ᱕, ᱑᱐, __, __, ᱒᱕।",
+      "prompt_en": "Skip-count by 5: 5, 10, __, __, 25.",
+      "answer_key": "15, 20",
+      "difficulty": "medium",
+      "sequence": 1
+    },
+    {
+      "assessment_id": "AS-COUNT-4",
+      "outcome_id": "LO-COUNT-4",
+      "type": "written",
+      "prompt_hi": "39 और 41 के बीच कौन सी संख्या है?",
+      "prompt_target": "᱓᱙ ᱟᱨ ᱔᱑ ᱛᱟᱞᱟ ᱨᱮ ᱟᱱᱟᱜ ᱞᱮᱠᱷᱟ ᱠᱟᱱᱟ?",
+      "prompt_en": "Which number is between 39 and 41?",
+      "answer_key": "40",
+      "difficulty": "easy",
+      "sequence": 1
+    },
+    {
+      "assessment_id": "AS-COUNT-5",
+      "outcome_id": "LO-COUNT-5",
+      "type": "written",
+      "prompt_hi": "इन दो संख्याओं में बड़ी कौन है: 63 या 36?",
+      "prompt_target": "ᱵᱟᱨᱭᱟ ᱞᱮᱠᱷᱟ ᱠᱷᱚᱱ ᱢᱟᱨᱟᱝ ᱟᱱᱟᱜ ᱠᱟᱱᱟ: ᱖᱓ ᱱᱚᱝᱠᱟ ᱓᱖?",
+      "prompt_en": "Which is greater: 63 or 36?",
+      "answer_key": "63",
+      "difficulty": "easy",
+      "sequence": 1
+    }
+  ],
+  "vocabulary_terms": [
+    {
+      "term_id": "VOC-COUNT-1",
+      "lesson_id": "L-COUNT-G2",
+      "term_hi": "गिनती",
+      "term_target": "ᱞᱮᱠᱷᱟ",
+      "term_en": "counting",
+      "definition_hi": "वस्तुओं को एक-एक कर गिनना।",
+      "definition_target": "ᱡᱤᱱᱤᱥ ᱢᱤᱫ ᱢᱤᱫ ᱛᱮ ᱞᱮᱠᱷᱟ ᱠᱟᱛᱮ ᱞᱮᱠᱷᱟ ᱾",
+      "definition_en": "Counting objects one by one."
+    },
+    {
+      "term_id": "VOC-COUNT-2",
+      "lesson_id": "L-COUNT-G2",
+      "term_hi": "संख्या",
+      "term_target": "ᱞᱮᱠᱷᱟ",
+      "term_en": "number",
+      "definition_hi": "गिनती का नाम (जैसे ५)।",
+      "definition_target": "ᱞᱮᱠᱷᱟ ᱨᱮᱭᱟᱜ ᱧᱩᱛᱩᱢ (ᱡᱮᱞᱮᱠᱟ ᱕)।",
+      "definition_en": "Name of a count (e.g. 5)."
+    },
+    {
+      "term_id": "VOC-COUNT-3",
+      "lesson_id": "L-COUNT-G2",
+      "term_hi": "अधिक",
+      "term_target": "ᱵᱟᱹᱲᱛᱤ",
+      "term_en": "more",
+      "definition_hi": "संख्या बड़ी होना।",
+      "definition_target": "ᱞᱮᱠᱷᱟ ᱢᱟᱨᱟᱝ ᱦᱩᱭᱩᱜ ᱾",
+      "definition_en": "Greater in quantity."
+    },
+    {
+      "term_id": "VOC-COUNT-4",
+      "lesson_id": "L-COUNT-G2",
+      "term_hi": "कम",
+      "term_target": "ᱠᱚᱢ",
+      "term_en": "less",
+      "definition_hi": "संख्या छोटी होना।",
+      "definition_target": "ᱞᱮᱠᱷᱟ ᱦᱟᱢᱟᱞ ᱦᱩᱭᱩᱜ ᱾",
+      "definition_en": "Smaller in quantity."
+    },
+    {
+      "term_id": "VOC-COUNT-5",
+      "lesson_id": "L-COUNT-G2",
+      "term_hi": "दहाई",
+      "term_target": "ᱜᱮᱞ",
+      "term_en": "ten",
+      "definition_hi": "10 की संख्या।",
+      "definition_target": "᱑᱐ ᱞᱮᱠᱷᱟ ᱾",
+      "definition_en": "The number 10."
+    },
+    {
+      "term_id": "VOC-COUNT-6",
+      "lesson_id": "L-COUNT-G2",
+      "term_hi": "सौ",
+      "term_target": "ᱥᱟᱭ",
+      "term_en": "hundred",
+      "definition_hi": "100 की संख्या।",
+      "definition_target": "᱑᱐᱐ ᱞᱮᱠᱷᱟ ᱾",
+      "definition_en": "The number 100."
+    }
+  ],
+  "flashcard_concepts": [
+    {"card_id": "FC-1",  "lesson_id": "L-COUNT-G2", "concept_hi": "१", "concept_target": "᱑", "concept_en": "1",  "image_ref": "assets/flashcards/number_1.png",  "audio_ref": "assets/audio/sat/number_1.wav",  "sequence": 1},
+    {"card_id": "FC-2",  "lesson_id": "L-COUNT-G2", "concept_hi": "२", "concept_target": "᱒", "concept_en": "2",  "image_ref": "assets/flashcards/number_2.png",  "audio_ref": "assets/audio/sat/number_2.wav",  "sequence": 2},
+    {"card_id": "FC-3",  "lesson_id": "L-COUNT-G2", "concept_hi": "३", "concept_target": "᱓", "concept_en": "3",  "image_ref": "assets/flashcards/number_3.png",  "audio_ref": "assets/audio/sat/number_3.wav",  "sequence": 3},
+    {"card_id": "FC-4",  "lesson_id": "L-COUNT-G2", "concept_hi": "४", "concept_target": "᱔", "concept_en": "4",  "image_ref": "assets/flashcards/number_4.png",  "audio_ref": "assets/audio/sat/number_4.wav",  "sequence": 4},
+    {"card_id": "FC-5",  "lesson_id": "L-COUNT-G2", "concept_hi": "५", "concept_target": "᱕", "concept_en": "5",  "image_ref": "assets/flashcards/number_5.png",  "audio_ref": "assets/audio/sat/number_5.wav",  "sequence": 5},
+    {"card_id": "FC-6",  "lesson_id": "L-COUNT-G2", "concept_hi": "६", "concept_target": "᱖", "concept_en": "6",  "image_ref": "assets/flashcards/number_6.png",  "audio_ref": "assets/audio/sat/number_6.wav",  "sequence": 6},
+    {"card_id": "FC-7",  "lesson_id": "L-COUNT-G2", "concept_hi": "७", "concept_target": "᱗", "concept_en": "7",  "image_ref": "assets/flashcards/number_7.png",  "audio_ref": "assets/audio/sat/number_7.wav",  "sequence": 7},
+    {"card_id": "FC-8",  "lesson_id": "L-COUNT-G2", "concept_hi": "८", "concept_target": "᱘", "concept_en": "8",  "image_ref": "assets/flashcards/number_8.png",  "audio_ref": "assets/audio/sat/number_8.wav",  "sequence": 8},
+    {"card_id": "FC-9",  "lesson_id": "L-COUNT-G2", "concept_hi": "९", "concept_target": "᱙", "concept_en": "9",  "image_ref": "assets/flashcards/number_9.png",  "audio_ref": "assets/audio/sat/number_9.wav",  "sequence": 9},
+    {"card_id": "FC-10", "lesson_id": "L-COUNT-G2", "concept_hi": "१०", "concept_target": "᱑᱐", "concept_en": "10", "image_ref": "assets/flashcards/number_10.png", "audio_ref": "assets/audio/sat/number_10.wav", "sequence": 10}
+  ]
+}
