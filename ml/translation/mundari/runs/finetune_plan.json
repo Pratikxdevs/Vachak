@@ -1,0 +1,11 @@
+{
+  "stage": "finetune",
+  "status": "TODO",
+  "base_model": "ai4bharat/indictrans2-indic-indic-dist-320M",
+  "tgt_lang": "mun_Deva",
+  "train_pairs": 3,
+  "dev_pairs": 0,
+  "method": "LoRA q/k/v/out, greedy decode, rep_penalty=1.2, no_repeat_ngram=3",
+  "reason": "DATA ACCESS PENDING: gated Karya Hindi-Mundari not available",
+  "produces": "ml/finetune/it2_mundari_lora/ (drop-in adapter, NOT shipped yet)"
+}

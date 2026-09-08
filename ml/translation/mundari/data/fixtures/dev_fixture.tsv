@@ -1,0 +1,8 @@
+# DEV FIXTURE — synthetic Hindi/Mundari stand-in pairs for pipeline unit tests ONLY.
+# NOT real Mundari. NOT derived from the gated Karya Hindi-Mundari corpus.
+# These lines exist solely so pipeline unit tests can run without gated data.
+# DATA ACCESS PENDING: replace with licensed Karya Hindi-Mundari splits.
+लाल रंग क्या है?	⟦MOCK-MUNDARI⟧ लाल रंग क्या है?
+पाँच आम गिनो।	⟦MOCK-MUNDARI⟧ पाँच आम गिनो।
+यह कितना है?	⟦MOCK-MUNDARI⟧ यह कितना है?
+ਬੱਚਿਆਂ ਨੂੰ ਪੜ੍ਹਾਓ।	⟦MOCK-MUNDARI⟧ ਬੱਚਿਆਂ ਨੂੰ ਪੜ੍ਹਾਓ।

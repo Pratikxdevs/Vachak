@@ -1,0 +1,13 @@
+# Mundari NMT pipeline configuration (scaffolding).
+# NOTE: target language/script and corpus are placeholders until the gated
+# Karya Hindi-Mundari dataset is licensed. See docs/MODEL_AND_DATA_PROVENANCE.md.
+src_lang: hin_Deva
+tgt_lang: mun_Deva          # Mundari (Devanagari / Mundari Bani TBD)
+base_model: ai4bharat/indictrans2-indic-indic-dist-320M
+adapter_kind: mock         # mock | baseline | final (final not available)
+seed: 26042
+train_frac: 0.8
+dev_frac: 0.1
+test_frac: 0.1
+onnx_dir: null
+out_dir: ml/translation/mundari/runs

@@ -1,0 +1,11 @@
+# ml/translation/mundari — Python dependencies (scaffolding).
+# Light: only sacrebleu is required for automatic eval. Heavy ML libs are
+# referenced from the already-cloned repos and loaded lazily (see _it2_baseline.py).
+sacrebleu>=2.3
+# --- referenced only, install in the IndicTrans2 venv, do NOT re-clone ---
+# torch>=2.0
+# transformers>=4.36
+# onnxruntime>=1.17
+# onnx>=1.16
+# peft
+# IndicTransToolkit  (from ../IndicTrans2)
