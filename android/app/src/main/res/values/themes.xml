@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- DayNight parent so system uiMode (light/dark) is respected before Compose draws.
+         Compose VachakTheme (isSystemInDarkTheme) then provides the actual colors.
+         Status/nav colors are set dynamically in MainActivity via SideEffect, not hardcoded here,
+         so we keep them transparent to avoid flashing on theme switch. -->
+    <style name="Theme.Vachak" parent="@android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:windowBackground">#FAF9FF</item>
+        <item name="android:windowIsTranslucent">false</item>
+        <item name="android:windowContentTransitions">false</item>
+        <item name="android:windowOptOutEdgeToEdgeEnforcement">false</item>
+    </style>
+</resources>

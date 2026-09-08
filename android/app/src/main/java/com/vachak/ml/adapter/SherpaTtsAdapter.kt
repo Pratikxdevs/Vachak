@@ -1,0 +1,124 @@
+package com.vachak.ml.adapter
+
+import android.content.Context
+import android.util.Log
+import com.vachak.engine.ActiveLanguage
+import com.vachak.engine.EngineError
+import com.vachak.engine.EngineResult
+import com.vachak.engine.TTSEngine
+import com.vachak.ml.SherpaOnnxTtsAdapter
+
+/**
+ * sherpa-onnx-backed TTS adapter (built over the vendored k2-fsa/sherpa-onnx AAR).
+ *
+ * Delegates real synthesis to [SherpaOnnxTtsAdapter] in the :ml module (Santali Ol Chiki
+ * VITS, 22.05kHz mono, sherpa-onnx OfflineTts). Keeps the same [TTSEngine] surface so UI
+ * code is untouched. When [context] is null or [useReal] is false, returns deterministic
+ * placeholder PCM (local wiring / unit tests, no model needed).
+ *
+ * Language support: Santali Ol Chiki family (`sat` etc.) + Mundari
+ * (`unr_Deva`/`unr`/`mun_Deva` Karya Flores + legacy `mund`/`mun` alias)
+ * + Hindi (`hi`/`hin_Deva`, for Play-Hindi preview) via ActiveLanguage.
+ * Pack-path aware: if [packDir] is provided and contains model.onnx, SherpaOnnxTtsAdapter
+ * loads from pack; otherwise falls back to bundled assets/vachak_models/tts/.
+ */
+class SherpaTtsAdapter(
+    private val context: Context? = null,
+    private val useReal: Boolean = true,
+    private val packDir: String? = null
+) : TTSEngine {
+
+    private val tag = "Vachak-TTS"
+    private var cachedAdapter: SherpaOnnxTtsAdapter? = null
+    private val adapterLock = Any()
+
+    override fun supports(language: String): Boolean {
+        val l = language.lowercase()
+        return l in setOf(
+            // Santali (Ol Chiki)
+            "sat", "sat_olck", "sat-olck", "olck", "ol_ck", "sat_olchiki",
+            // Mundari (Karya Flores unr_Deva + legacy aliases)
+            "unr", "unr_deva", "mun", "mun_deva", "mund", "mundari",
+            // Hindi (Play-Hindi preview routes through same VITS shim)
+            "hi", "hin", "hin_deva"
+        )
+    }
+
+    override fun loadModel(packId: String): EngineResult<Unit> {
+        if (context == null || !useReal) return EngineResult.Ok(Unit)
+        synchronized(adapterLock) {
+            if (cachedAdapter == null) {
+                return runCatching { 
+                    cachedAdapter = SherpaOnnxTtsAdapter(context!!, packDir = packDir)
+                    Log.d(tag, "loadModel packDir=$packDir -> OK"); EngineResult.Ok(Unit)
+                }.fold(
+                    onSuccess = { it },
+                    onFailure = { e -> EngineResult.Err(EngineError.MODEL_LOAD_FAILED, e.message ?: "tts load failed") }
+                )
+            }
+        }
+        return EngineResult.Ok(Unit)
+    }
+
+    override fun synthesize(text: String, language: String): EngineResult<ShortArray> {
+        // Mundari (unr_Deva family), Santali, and Hindi preview all pass through
+        // to the bundled VITS model as-is. No language is remapped away.
+        val normalizedLang = language
+        if (!supports(language)) return EngineResult.Err(EngineError.UNSUPPORTED_LANGUAGE, language)
+        if (context == null || !useReal) {
+            // Mock path: fabricate audible-length PCM (>200ms) for offline tests
+            val sr = 22050
+            val minSamples = (0.22 * sr).toInt() // 4851 > 4800 at 24k but for 22.05k
+            val n = maxOf(minSamples, (text.length * 220).coerceAtLeast(minSamples))
+            Log.d(tag, "synthesize mock \"$text\" ($language -> $normalizedLang) -> $n samples @ $sr Hz (useReal=false)")
+            return EngineResult.Ok(ShortArray(n) { i -> (kotlin.math.sin(2 * Math.PI * 220 * i / sr) * 8000).toInt().toShort() })
+        }
+
+        return runCatching {
+            val adapter = synchronized(adapterLock) {
+                cachedAdapter ?: SherpaOnnxTtsAdapter(context!!, packDir = packDir).also { cachedAdapter = it }
+            }
+            // Shim gate (permanent, crash-critical): the 55-token placeholder
+            // graph is structurally incompatible with sherpa-onnx VITS and the
+            // native layer HARD-ABORTS the process (exit 255, uncatchable) on
+            // load. Never hand it over — fail honest BEFORE any native call.
+            // The gate lifts itself the moment a real model ships (isShim false).
+            val shim = try { adapter.isShim() } catch (_: Exception) { false }
+            if (shim) {
+                Log.w(tag, "shim voice model detected — refusing native load (would abort process); text stays source of truth")
+                val lang = ActiveLanguage.label(language)
+                return EngineResult.Err(EngineError.MODEL_NOT_LOADED, "Voice model pending training — $lang text shown (Coqui VITS not yet trained)")
+            }
+            val audio = adapter.synthesize(text, normalizedLang)
+            Log.d(tag, "synthesize \"$text\" ($language -> $normalizedLang) -> ${audio.samples.size} samples @ ${audio.sampleRate} Hz via sherpa-onnx (packDir=${packDir ?: "bundled"})")
+            // Anti-blip guard (permanent): sub-200ms output is NOT speech — it is a
+            // fixture/shim artifact. Never play it as if the translation was spoken;
+            // surface an honest message so the text path stays the source of truth.
+            val minAudible = (0.2 * audio.sampleRate).toInt()
+            if (audio.samples.size < minAudible) {
+                val shim = try { adapter.isShim() } catch (_: Exception) { false }
+                val why = if (shim) "voice model is the 55-token training placeholder (real Coqui VITS pending)"
+                          else (audio.warning ?: "model returned ${audio.samples.size} samples (<200ms)")
+                Log.w(tag, "synthesize inaudible ${audio.samples.size} samples @ ${audio.sampleRate}Hz shim=$shim — $why")
+                throw IllegalStateException("TTS inaudible: $why")
+            }
+            ShortArray(audio.samples.size) {
+                (audio.samples[it] * 32768f).toInt().coerceIn(-32768, 32767).toShort()
+            }
+        }.fold(
+            onSuccess = { EngineResult.Ok(it) },
+            onFailure = { e ->
+                val shimHint = try {
+                    synchronized(adapterLock) { cachedAdapter }?.let { a ->
+                        try { a.isShim() } catch (_: Exception) { false }
+                    } ?: false
+                } catch (_: Exception) { false }
+                val msg = if (shimHint || (e.message ?: "").contains("placeholder")) {
+                    val lang = ActiveLanguage.label(language)
+                    "Voice model pending training — $lang text shown (Coqui VITS not yet trained)"
+                } else "TTS run failed: ${e.message}"
+                EngineResult.Err(EngineError.MODEL_LOAD_FAILED, msg)
+            }
+        )
+    }
+}
