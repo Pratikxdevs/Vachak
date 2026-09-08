@@ -1,0 +1,202 @@
+{
+  "deck_id": "DECK-L-COUNT-G2",
+  "meta": {
+    "language": "bilingual",
+    "language_label": "Hindi + Target",
+    "card_count": 10,
+    "generator": "flashcard/engine.py v1.0 (deterministic, offline)",
+    "fixture_note": "DEV FIXTURE — generated deck, not SME-verified."
+  },
+  "cards": [
+    {
+      "card_id": "FC-1",
+      "sequence": 1,
+      "front": "१  —  ᱑",
+      "back": "᱑  —  १",
+      "image_ref": "assets/flashcards/number_1.png",
+      "audio_ref": "assets/audio/sat/number_1.wav",
+      "language": "bilingual",
+      "raw": {
+        "concept": "1",
+        "image_ref": "assets/flashcards/number_1.png",
+        "hindi_label": "१",
+        "target_label": "᱑",
+        "audio_ref": "assets/audio/sat/number_1.wav",
+        "english_label": "1",
+        "card_id": "FC-1",
+        "sequence": 1
+      }
+    },
+    {
+      "card_id": "FC-2",
+      "sequence": 2,
+      "front": "२  —  ᱒",
+      "back": "᱒  —  २",
+      "image_ref": "assets/flashcards/number_2.png",
+      "audio_ref": "assets/audio/sat/number_2.wav",
+      "language": "bilingual",
+      "raw": {
+        "concept": "2",
+        "image_ref": "assets/flashcards/number_2.png",
+        "hindi_label": "२",
+        "target_label": "᱒",
+        "audio_ref": "assets/audio/sat/number_2.wav",
+        "english_label": "2",
+        "card_id": "FC-2",
+        "sequence": 2
+      }
+    },
+    {
+      "card_id": "FC-3",
+      "sequence": 3,
+      "front": "३  —  ᱓",
+      "back": "᱓  —  ३",
+      "image_ref": "assets/flashcards/number_3.png",
+      "audio_ref": "assets/audio/sat/number_3.wav",
+      "language": "bilingual",
+      "raw": {
+        "concept": "3",
+        "image_ref": "assets/flashcards/number_3.png",
+        "hindi_label": "३",
+        "target_label": "᱓",
+        "audio_ref": "assets/audio/sat/number_3.wav",
+        "english_label": "3",
+        "card_id": "FC-3",
+        "sequence": 3
+      }
+    },
+    {
+      "card_id": "FC-4",
+      "sequence": 4,
+      "front": "४  —  ᱔",
+      "back": "᱔  —  ४",
+      "image_ref": "assets/flashcards/number_4.png",
+      "audio_ref": "assets/audio/sat/number_4.wav",
+      "language": "bilingual",
+      "raw": {
+        "concept": "4",
+        "image_ref": "assets/flashcards/number_4.png",
+        "hindi_label": "४",
+        "target_label": "᱔",
+        "audio_ref": "assets/audio/sat/number_4.wav",
+        "english_label": "4",
+        "card_id": "FC-4",
+        "sequence": 4
+      }
+    },
+    {
+      "card_id": "FC-5",
+      "sequence": 5,
+      "front": "५  —  ᱕",
+      "back": "᱕  —  ५",
+      "image_ref": "assets/flashcards/number_5.png",
+      "audio_ref": "assets/audio/sat/number_5.wav",
+      "language": "bilingual",
+      "raw": {
+        "concept": "5",
+        "image_ref": "assets/flashcards/number_5.png",
+        "hindi_label": "५",
+        "target_label": "᱕",
+        "audio_ref": "assets/audio/sat/number_5.wav",
+        "english_label": "5",
+        "card_id": "FC-5",
+        "sequence": 5
+      }
+    },
+    {
+      "card_id": "FC-6",
+      "sequence": 6,
+      "front": "६  —  ᱖",
+      "back": "᱖  —  ६",
+      "image_ref": "assets/flashcards/number_6.png",
+      "audio_ref": "assets/audio/sat/number_6.wav",
+      "language": "bilingual",
+      "raw": {
+        "concept": "6",
+        "image_ref": "assets/flashcards/number_6.png",
+        "hindi_label": "६",
+        "target_label": "᱖",
+        "audio_ref": "assets/audio/sat/number_6.wav",
+        "english_label": "6",
+        "card_id": "FC-6",
+        "sequence": 6
+      }
+    },
+    {
+      "card_id": "FC-7",
+      "sequence": 7,
+      "front": "७  —  ᱗",
+      "back": "᱗  —  ७",
+      "image_ref": "assets/flashcards/number_7.png",
+      "audio_ref": "assets/audio/sat/number_7.wav",
+      "language": "bilingual",
+      "raw": {
+        "concept": "7",
+        "image_ref": "assets/flashcards/number_7.png",
+        "hindi_label": "७",
+        "target_label": "᱗",
+        "audio_ref": "assets/audio/sat/number_7.wav",
+        "english_label": "7",
+        "card_id": "FC-7",
+        "sequence": 7
+      }
+    },
+    {
+      "card_id": "FC-8",
+      "sequence": 8,
+      "front": "८  —  ᱘",
+      "back": "᱘  —  ८",
+      "image_ref": "assets/flashcards/number_8.png",
+      "audio_ref": "assets/audio/sat/number_8.wav",
+      "language": "bilingual",
+      "raw": {
+        "concept": "8",
+        "image_ref": "assets/flashcards/number_8.png",
+        "hindi_label": "८",
+        "target_label": "᱘",
+        "audio_ref": "assets/audio/sat/number_8.wav",
+        "english_label": "8",
+        "card_id": "FC-8",
+        "sequence": 8
+      }
+    },
+    {
+      "card_id": "FC-9",
+      "sequence": 9,
+      "front": "९  —  ᱙",
+      "back": "᱙  —  ९",
+      "image_ref": "assets/flashcards/number_9.png",
+      "audio_ref": "assets/audio/sat/number_9.wav",
+      "language": "bilingual",
+      "raw": {
+        "concept": "9",
+        "image_ref": "assets/flashcards/number_9.png",
+        "hindi_label": "९",
+        "target_label": "᱙",
+        "audio_ref": "assets/audio/sat/number_9.wav",
+        "english_label": "9",
+        "card_id": "FC-9",
+        "sequence": 9
+      }
+    },
+    {
+      "card_id": "FC-10",
+      "sequence": 10,
+      "front": "१०  —  ᱑᱐",
+      "back": "᱑᱐  —  १०",
+      "image_ref": "assets/flashcards/number_10.png",
+      "audio_ref": "assets/audio/sat/number_10.wav",
+      "language": "bilingual",
+      "raw": {
+        "concept": "10",
+        "image_ref": "assets/flashcards/number_10.png",
+        "hindi_label": "१०",
+        "target_label": "᱑᱐",
+        "audio_ref": "assets/audio/sat/number_10.wav",
+        "english_label": "10",
+        "card_id": "FC-10",
+        "sequence": 10
+      }
+    }
+  ]
+}
