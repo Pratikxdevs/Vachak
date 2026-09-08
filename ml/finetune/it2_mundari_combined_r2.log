@@ -1,0 +1,116 @@
+[ft-mun] 33907 train / 3767 dev -> unr_Deva
+/home/clutch/.local/lib/python3.14/site-packages/transformers/tokenization_utils_base.py:3953: UserWarning: `as_target_tokenizer` is deprecated and will be removed in v5 of Transformers. You can tokenize your labels by using the argument `text_target` of the regular `__call__` method (either in the same call as your input texts if you use the same keyword arguments, or in a separate call.
+  warnings.warn(
+[ft-mun] resuming adapter weights from ml/finetune/it2_mundari_combined
+/home/clutch/.local/lib/python3.14/site-packages/peft/mapping_func.py:72: UserWarning: You are trying to modify a model with PEFT for a second time. If you want to reload the model with a different config, make sure to call `.unload()` before.
+  warnings.warn(
+/home/clutch/.local/lib/python3.14/site-packages/peft/tuners/tuners_utils.py:305: UserWarning: Already found a `peft_config` attribute in the model. This will lead to having multiple adapters in the model. Make sure to know what you are doing!
+  warnings.warn(
+[ft-mun] resumed 432 LoRA tensors, continuing
+/home/clutch/Desktop/Vachak/ml/translation/scripts/finetune_mundari.py:141: FutureWarning: `torch.cuda.amp.GradScaler(args...)` is deprecated. Please use `torch.amp.GradScaler('cuda', args...)` instead.
+  scaler = torch.cuda.amp.GradScaler()
+/home/clutch/Desktop/Vachak/ml/translation/scripts/finetune_mundari.py:149: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+  with torch.cuda.amp.autocast(dtype=torch.float16):
+[W906 00:26:18.312322326 CUDACachingAllocator.cpp:3934] memory allocation failed with OOM on device 0 while trying to allocate 2097152 bytes (free: 15204352, total: 3953393664).
+[W906 00:26:18.312463178 CUDACachingAllocator.cpp:3934] memory allocation failed with OOM on device 0 while trying to allocate 2097152 bytes (free: 15204352, total: 3953393664).
+trainable params: 3,538,944 || all params: 199,050,240 || trainable%: 1.7779
+Traceback (most recent call last):
+  File "/home/clutch/Desktop/Vachak/ml/translation/scripts/finetune_mundari.py", line 177, in <module>
+    main()
+    ~~~~^^
+  File "/home/clutch/Desktop/Vachak/ml/translation/scripts/finetune_mundari.py", line 150, in main
+    out = model(**b)
+  File "/home/clutch/.local/lib/python3.14/site-packages/torch/nn/modules/module.py", line 1783, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/home/clutch/.local/lib/python3.14/site-packages/torch/nn/modules/module.py", line 1794, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/clutch/.local/lib/python3.14/site-packages/peft/peft_model.py", line 2432, in forward
+    return self.base_model(
+           ~~~~~~~~~~~~~~~^
+        input_ids=input_ids,
+        ^^^^^^^^^^^^^^^^^^^^
+    ...<9 lines>...
+        **kwargs,
+        ^^^^^^^^^
+    )
+    ^
+  File "/home/clutch/.local/lib/python3.14/site-packages/torch/nn/modules/module.py", line 1783, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/home/clutch/.local/lib/python3.14/site-packages/torch/nn/modules/module.py", line 1794, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/clutch/.local/lib/python3.14/site-packages/peft/tuners/tuners_utils.py", line 333, in forward
+    return self.model.forward(*args, **kwargs)
+           ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/home/clutch/.local/lib/python3.14/site-packages/transformers/models/mbart/modeling_mbart.py", line 1610, in forward
+    outputs = self.model(
+        input_ids,
+    ...<13 lines>...
+        return_dict=return_dict,
+    )
+  File "/home/clutch/.local/lib/python3.14/site-packages/torch/nn/modules/module.py", line 1783, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/home/clutch/.local/lib/python3.14/site-packages/torch/nn/modules/module.py", line 1794, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/clutch/.local/lib/python3.14/site-packages/transformers/models/mbart/modeling_mbart.py", line 1496, in forward
+    decoder_outputs = self.decoder(
+        input_ids=decoder_input_ids,
+    ...<10 lines>...
+        return_dict=return_dict,
+    )
+  File "/home/clutch/.local/lib/python3.14/site-packages/torch/nn/modules/module.py", line 1783, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/home/clutch/.local/lib/python3.14/site-packages/torch/nn/modules/module.py", line 1794, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/clutch/.local/lib/python3.14/site-packages/transformers/models/mbart/modeling_mbart.py", line 1355, in forward
+    layer_outputs = decoder_layer(
+        hidden_states,
+    ...<9 lines>...
+        use_cache=use_cache,
+    )
+  File "/home/clutch/.local/lib/python3.14/site-packages/torch/nn/modules/module.py", line 1783, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/home/clutch/.local/lib/python3.14/site-packages/torch/nn/modules/module.py", line 1794, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/clutch/.local/lib/python3.14/site-packages/transformers/models/mbart/modeling_mbart.py", line 684, in forward
+    hidden_states, cross_attn_weights, cross_attn_present_key_value = self.encoder_attn(
+                                                                      ~~~~~~~~~~~~~~~~~^
+        hidden_states=hidden_states,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<4 lines>...
+        output_attentions=output_attentions,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/home/clutch/.local/lib/python3.14/site-packages/torch/nn/modules/module.py", line 1783, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/home/clutch/.local/lib/python3.14/site-packages/torch/nn/modules/module.py", line 1794, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/clutch/.local/lib/python3.14/site-packages/transformers/models/mbart/modeling_mbart.py", line 183, in forward
+    query_states = self.q_proj(hidden_states) * self.scaling
+                   ~~~~~~~~~~~^^^^^^^^^^^^^^^
+  File "/home/clutch/.local/lib/python3.14/site-packages/torch/nn/modules/module.py", line 1783, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/home/clutch/.local/lib/python3.14/site-packages/torch/nn/modules/module.py", line 1794, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/clutch/.local/lib/python3.14/site-packages/peft/tuners/lora/layer.py", line 1058, in forward
+    result = result + lora_B(lora_A(dropout(x))) * scaling
+                                    ~~~~~~~^^^
+  File "/home/clutch/.local/lib/python3.14/site-packages/torch/nn/modules/module.py", line 1783, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/home/clutch/.local/lib/python3.14/site-packages/torch/nn/modules/module.py", line 1794, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/clutch/.local/lib/python3.14/site-packages/torch/nn/modules/dropout.py", line 73, in forward
+    return F.dropout(input, self.p, self.training, self.inplace)
+           ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/clutch/.local/lib/python3.14/site-packages/torch/nn/functional.py", line 1497, in dropout
+    _VF.dropout_(input, p, training) if inplace else _VF.dropout(input, p, training)
+                                                     ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 2.00 MiB. GPU 0 has a total capacity of 3.68 GiB of which 14.50 MiB is free. Process 2756 has 6.29 MiB memory in use. Process 60104 has 756.16 MiB memory in use. Process 193368 has 1.70 GiB memory in use. Including non-PyTorch memory, this process has 1.15 GiB memory in use. Of the allocated memory 1.04 GiB is allocated by PyTorch, and 16.47 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://docs.pytorch.org/docs/stable/notes/cuda.html#optimizing-memory-usage-with-pytorch-cuda-alloc-conf)

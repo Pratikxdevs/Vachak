@@ -1,0 +1,18 @@
+[overnight] 19132 train / 1062 dev -> sat_Olck bidir=True
+/home/clutch/.local/lib/python3.14/site-packages/transformers/tokenization_utils_base.py:3953: UserWarning: `as_target_tokenizer` is deprecated and will be removed in v5 of Transformers. You can tokenize your labels by using the argument `text_target` of the regular `__call__` method (either in the same call as your input texts if you use the same keyword arguments, or in a separate call.
+  warnings.warn(
+[overnight] tokenized in 11s
+/cz/Vachak/ml/translation/scripts/train_material_overnight.py:150: FutureWarning: `torch.cuda.amp.GradScaler(args...)` is deprecated. Please use `torch.amp.GradScaler('cuda', args...)` instead.
+  scaler = torch.cuda.amp.GradScaler()
+/cz/Vachak/ml/translation/scripts/train_material_overnight.py:162: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+  with torch.cuda.amp.autocast(dtype=torch.float16):
+trainable params: 12,976,128 || all params: 208,487,424 || trainable%: 6.2239
+[overnight] ep1 b0/9566 loss=12.414 elapsed=0.00h
+[overnight] ep1 b100/9566 loss=7.400 elapsed=0.01h
+[overnight] ep1 b200/9566 loss=5.913 elapsed=0.01h
+[overnight] signal 15 -> will save + exit after this batch
+/cz/Vachak/ml/translation/scripts/train_material_overnight.py:185: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+  with torch.cuda.amp.autocast(dtype=torch.float16):
+[overnight] ep1/20 train=0.181 dev=5.215 epoch_min=1.1 elapsed_h=0.02
+[overnight] stopped by signal, saved latest + state
+[overnight] DONE latest->ml/finetune/it2_material_bidi_acc best(dev=inf)->ml/finetune/it2_material_bidi_acc/best_adapter
