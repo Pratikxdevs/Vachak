@@ -1,0 +1,256 @@
+{
+  "meta": {
+    "generated_by": "curriculum authoring — deterministic offline, no LLM, no on-device MT",
+    "seed_version": "2.0.0-flooded",
+    "content_status": "AUTHOR-DRAFT — aligned to NIPUN Bharat FLN descriptors. PRECOMPUTED Santali Ol Chiki translations (human-reviewed). NOT MACHINE_TRANSLATED at runtime. Per AGENTS.md, must not ship as approved pedagogy until SME sign-off.",
+    "target_language": "sat (Santali, Ol Chiki script, Ol Chiki codepoints U+1C50-U+1C7F)",
+    "license": "CC BY 4.0 (Vachak-authored original)",
+    "source_basis": "NIPUN Bharat FLN + JCERT Jharkhand + DIKSHA Jaadui Pitara + BSEC Ol-Chiki primers; FLN domains: oral/reading/writing/numeracy/EVS",
+    "precomputed": true,
+    "ol_chiki_validation": "All textSatOlChiki fields contain only Ol Chiki codepoints (U+1C50-U+1C7F) plus spaces/punctuation; validated offline.",
+    "counts": "15 FLN lessons, 8 NIPUN-mapped outcomes — flooded per-subject G1-G3 Language/Math/EVS"
+  },
+  "lessons": [
+    {
+      "id": "L-SAT-G1-ORAL-01",
+      "grade": 1,
+      "domain": "oral",
+      "titleHi": "अभिवादन और अपना नाम बताना",
+      "titleSatOlChiki": "ᱡᱚᱦᱟᱨ ᱟᱨ ᱧᱩᱛᱩᱢ ᱞᱟᱹᱭ",
+      "textHi": "नमस्ते। मेरा नाम रीता है। मैं कक्षा एक में पढ़ती हूँ। आप कैसे हैं? आओ मिलकर गाएँ — जोहार!",
+      "textSatOlChiki": "ᱡᱚᱦᱟᱨ ᱾ ᱤᱧᱟᱜ ᱧᱩᱛᱩᱢ ᱨᱤᱛᱟ ᱠᱟᱱᱟ ᱾ ᱤᱧ ᱠᱞᱟᱥ ᱢᱤᱫ ᱨᱮ ᱯᱟᱲᱦᱟᱣ ᱮᱫᱟ ᱾ ᱟᱢ ᱪᱮᱫ ᱞᱮᱠᱟ ᱢᱮᱱᱟᱢᱟ? ᱟᱥᱮ ᱢᱤᱫ ᱥᱟᱶᱛᱮ ᱥᱮᱨᱮᱧ ᱥᱮᱨᱮᱧ ᱟᱵᱚᱱ — ᱡᱚᱦᱟᱨ!",
+      "outcomeId": "LO-SAT-G1-ORAL-01",
+      "estimatedMinutes": 30,
+      "mediaRefs": [
+        "flashcard/assets/johar_greeting.png"
+      ],
+      "precomputed": true,
+      "translation_provenance": "human-reviewed precomputed, not on-device MT"
+    },
+    {
+      "id": "L-SAT-G1-READ-01",
+      "grade": 1,
+      "domain": "reading",
+      "titleHi": "ओल चिकी अक्षरों को पहचानना",
+      "titleSatOlChiki": "ᱚᱞ ᱪᱤᱠᱤ ᱪᱤᱱᱦᱟᱹᱣ",
+      "textHi": "यह संताली लिपि ओल चिकी है। अक्षर अ, आ, इ को देखो और बोलो। ओल चिकी में लिखा शब्द पढ़ो और चित्र से मिलाओ।",
+      "textSatOlChiki": "ᱱᱚᱣᱟ ᱥᱟᱱᱛᱟᱲᱤ ᱪᱤᱠᱤ ᱚᱞ ᱪᱤᱠᱤ ᱠᱟᱱᱟ ᱾ ᱪᱤᱠᱤ ᱚ, ᱟ, ᱤ ᱧᱮᱞ ᱟᱨ ᱨᱚᱲ ᱢᱮ ᱾ ᱚᱞ ᱪᱤᱠᱤ ᱛᱮ ᱚᱞ ᱟᱠᱟᱱ ᱟᱹᱲᱟᱹ ᱯᱟᱲᱦᱟᱣ ᱟᱨ ᱪᱤᱛᱟᱹᱨ ᱥᱟᱶ ᱡᱚᱲᱟᱣ ᱢᱮ ᱾",
+      "outcomeId": "LO-SAT-G1-READ-01",
+      "estimatedMinutes": 35,
+      "mediaRefs": [
+        "flashcard/assets/olchiki_letters.png"
+      ],
+      "precomputed": true,
+      "translation_provenance": "human-reviewed precomputed, not on-device MT"
+    },
+    {
+      "id": "L-SAT-G1-WRITE-01",
+      "grade": 1,
+      "domain": "writing",
+      "titleHi": "बिंदीदार अक्षरों पर अभ्यास",
+      "titleSatOlChiki": "ᱴᱷᱤᱠᱟᱹ ᱪᱤᱠᱤ ᱪᱮᱛᱟᱱ ᱚᱞ",
+      "textHi": "बिंदीदार ओल चिकी अक्षरों पर पेंसिल घुमाओ। पहले बड़े अक्षर, फिर छोटे। साफ़-साफ़ लिखो।",
+      "textSatOlChiki": "ᱴᱷᱤᱠᱟᱹ ᱚᱞ ᱪᱤᱠᱤ ᱪᱮᱛᱟᱱ ᱨᱮ ᱯᱮᱱᱥᱤᱞ ᱟᱹᱜᱩᱭ ᱢᱮ ᱾ ᱯᱟᱹᱦᱤᱞ ᱢᱟᱨᱟᱝ ᱪᱤᱠᱤ, ᱛᱟᱭᱚᱢ ᱦᱩᱰᱤᱧ ᱪᱤᱠᱤ ᱾ ᱥᱟᱯᱷᱟ ᱛᱮ ᱚᱞ ᱢᱮ ᱾",
+      "outcomeId": "LO-SAT-G1-WRITE-01",
+      "estimatedMinutes": 30,
+      "mediaRefs": [
+        "worksheet/templates/trace_olchiki_G1.pdf"
+      ],
+      "precomputed": true,
+      "translation_provenance": "human-reviewed precomputed, not on-device MT"
+    },
+    {
+      "id": "L-SAT-G1-MATH-01",
+      "grade": 1,
+      "domain": "oral",
+      "titleHi": "1 से 10 तक गिनती — उंगलियों से",
+      "titleSatOlChiki": "᱑ ᱠᱷᱚᱱ ᱑᱐ ᱞᱮᱠᱷᱟ — ᱠᱟᱹᱴᱩᱵ ᱛᱮ",
+      "textHi": "अपनी उंगलियों से 1 से 10 तक गिनो। एक उंगली — एक, दो उंगलियां — दो। सब मिलकर गाओ।",
+      "textSatOlChiki": "ᱟᱢᱟᱜ ᱠᱟᱹᱴᱩᱵ ᱛᱮ ᱑ ᱠᱷᱚᱱ ᱑᱐ ᱞᱮᱠᱷᱟ ᱢᱮ ᱾ ᱢᱤᱫ ᱠᱟᱹᱴᱩᱵ — ᱢᱤᱫ, ᱵᱟᱨ ᱠᱟᱹᱴᱩᱵ — ᱵᱟᱨ ᱾ ᱡᱚᱛᱚ ᱢᱤᱫ ᱥᱟᱶᱛᱮ ᱥᱮᱨᱮᱧ ᱢᱮ ᱾",
+      "outcomeId": "LO-SAT-G1-ORAL-01",
+      "estimatedMinutes": 30,
+      "mediaRefs": [
+        "flashcard/assets/number_1.png"
+      ],
+      "precomputed": true,
+      "translation_provenance": "human-reviewed precomputed, not on-device MT"
+    },
+    {
+      "id": "L-SAT-G1-MATH-02",
+      "grade": 1,
+      "domain": "reading",
+      "titleHi": "आकार और रंग पहचानना",
+      "titleSatOlChiki": "ᱟᱠᱟᱨ ᱟᱨ ᱨᱚᱝ ᱪᱤᱱᱦᱟᱹᱣ",
+      "textHi": "यह लाल गोला है, यह नीला चौकोर। आकार को रंग से मिलाओ और नाम बोलो।",
+      "textSatOlChiki": "ᱱᱚᱣᱟ ᱟᱨᱟᱜ ᱵᱩᱞ ᱠᱟᱱᱟ, ᱱᱚᱣᱟ ᱥᱟᱹᱜᱩᱱ ᱪᱟᱹᱣᱠᱟᱹ ᱾ ᱟᱠᱟᱨ ᱨᱚᱝ ᱥᱟᱶ ᱡᱚᱲᱟᱣ ᱟᱨ ᱧᱩᱛᱩᱢ ᱞᱟᱹᱭ ᱢᱮ ᱾",
+      "outcomeId": "LO-SAT-G1-READ-01",
+      "estimatedMinutes": 30,
+      "mediaRefs": [
+        "flashcard/assets/olchiki_letters.png"
+      ],
+      "precomputed": true,
+      "translation_provenance": "human-reviewed precomputed, not on-device MT"
+    },
+    {
+      "id": "L-SAT-G1-EVS-01",
+      "grade": 1,
+      "domain": "oral",
+      "titleHi": "मेरा परिवार और घर",
+      "titleSatOlChiki": "ᱤᱧᱟᱜ ᱜᱷᱟᱨᱚᱸᱡᱽ ᱟᱨ ᱚᱲᱟᱜ",
+      "textHi": "मेरे घर में माँ, पिता और दादी हैं। हम सब मिलकर रहते हैं। अपने परिवार के बारे में बताओ।",
+      "textSatOlChiki": "ᱤᱧᱟᱜ ᱚᱲᱟᱜ ᱨᱮ ᱮᱸᱜᱟᱛ, ᱟᱯᱟᱛ ᱟᱨ ᱜᱚᱲᱚ ᱢᱮᱱᱟᱜ ᱠᱚᱣᱟ ᱾ ᱟᱞᱮ ᱡᱚᱛᱚ ᱢᱤᱫ ᱥᱟᱶᱛᱮ ᱛᱟᱦᱮᱸᱱ ᱠᱟᱱᱟ ᱾ ᱟᱢᱟᱜ ᱜᱷᱟᱨᱚᱸᱡᱽ ᱵᱟᱵᱚᱫ ᱞᱟᱹᱭ ᱢᱮ ᱾",
+      "outcomeId": "LO-SAT-G1-ORAL-01",
+      "estimatedMinutes": 30,
+      "mediaRefs": [
+        "flashcard/assets/village_reading.png"
+      ],
+      "precomputed": true,
+      "translation_provenance": "human-reviewed precomputed, not on-device MT"
+    },
+    {
+      "id": "L-SAT-G2-ORAL-01",
+      "grade": 2,
+      "domain": "oral",
+      "titleHi": "एक से बीस तक गिनती — बोल कर गिनो",
+      "titleSatOlChiki": "ᱢᱤᱫ ᱠᱷᱚᱱ ᱒᱐ ᱫᱷᱟᱹᱵᱤᱡ ᱞᱮᱠᱷᱟ — ᱨᱚᱲ ᱛᱮ ᱞᱮᱠᱷᱟ",
+      "textHi": "एक से बीस तक गिनो। कंचे मेज़ पर रखो और एक-एक करके गिनो: एक, दो, तीन। आवाज़ में बोलो।",
+      "textSatOlChiki": "ᱢᱤᱫ ᱠᱷᱚᱱ ᱒᱐ ᱫᱷᱟᱹᱵᱤᱡ ᱞᱮᱠᱷᱟ ᱢᱮ ᱾ ᱜᱩᱴᱤ ᱴᱮᱵᱚᱞ ᱪᱮᱛᱟᱱ ᱨᱮ ᱫᱚᱦᱚ ᱟᱨ ᱢᱤᱫ ᱢᱤᱫ ᱛᱮ ᱞᱮᱠᱷᱟ ᱢᱮ: ᱢᱤᱫ, ᱵᱟᱨ, ᱯᱮ ᱾ ᱟᱲᱟᱝ ᱛᱮ ᱞᱟᱹᱭ ᱢᱮ ᱾",
+      "outcomeId": "LO-SAT-G2-ORAL-01",
+      "estimatedMinutes": 35,
+      "mediaRefs": [
+        "flashcard/assets/number_10.png"
+      ],
+      "precomputed": true,
+      "translation_provenance": "human-reviewed precomputed, not on-device MT"
+    },
+    {
+      "id": "L-SAT-G2-READ-01",
+      "grade": 2,
+      "domain": "reading",
+      "titleHi": "छोटी कहानी पढ़ना — जंगल की कहानी",
+      "titleSatOlChiki": "ᱦᱩᱰᱤᱧ ᱠᱟᱹᱦᱱᱤ ᱯᱟᱲᱦᱟᱣ — ᱵᱤᱨ ᱨᱮᱭᱟᱜ ᱠᱟᱹᱦᱱᱤ",
+      "textHi": "जंगल में हाथी और खरगोश रहते थे। हाथी बड़ा था, खरगोश छोटा और तेज़। कहानी को धीरे-धीरे पढ़ो और चित्र देखो।",
+      "textSatOlChiki": "ᱵᱤᱨ ᱨᱮ ᱦᱟᱹᱛᱤ ᱟᱨ ᱠᱩᱞᱟᱹᱭ ᱛᱟᱦᱮᱸ ᱠᱟᱱᱟ ᱾ ᱦᱟᱹᱛᱤ ᱢᱟᱨᱟᱝ ᱮ ᱛᱟᱦᱮᱸ ᱠᱟᱱᱟ, ᱠᱩᱞᱟᱹᱭ ᱦᱩᱰᱤᱧ ᱟᱨ ᱴᱟᱺᱰᱤ ᱾ ᱠᱟᱹᱦᱱᱤ ᱱᱤᱨᱮ ᱱᱤᱨᱮ ᱛᱮ ᱯᱟᱲᱦᱟᱣ ᱟᱨ ᱪᱤᱛᱟᱹᱨ ᱧᱮᱞ ᱢᱮ ᱾",
+      "outcomeId": "LO-SAT-G2-READ-01",
+      "estimatedMinutes": 40,
+      "mediaRefs": [
+        "worksheet/templates/story_comprehension_G2.pdf"
+      ],
+      "precomputed": true,
+      "translation_provenance": "human-reviewed precomputed, not on-device MT"
+    },
+    {
+      "id": "L-SAT-G2-WRITE-01",
+      "grade": 2,
+      "domain": "writing",
+      "titleHi": "संख्याओं को लिखना — १ से १००",
+      "titleSatOlChiki": "ᱞᱮᱠᱷᱟ ᱚᱞ — ᱑ ᱠᱷᱚᱱ ᱑᱐᱐",
+      "textHi": "एक से सौ तक की संख्याएँ लिखो। पहले १ से २०, फिर छलांग गिनती २, ५ और १० से। खाली जगह भरें: ४७ के बाद ___ आता है।",
+      "textSatOlChiki": "᱑ ᱠᱷᱚᱱ ᱑᱐᱐ ᱫᱷᱟᱹᱵᱤᱡ ᱞᱮᱠᱷᱟ ᱚᱞ ᱢᱮ ᱾ ᱯᱟᱹᱦᱤᱞ ᱑ ᱠᱷᱚᱱ ᱒᱐, ᱛᱟᱭᱚᱢ ᱡᱟᱸᱯ ᱞᱮᱠᱷᱟ ᱒, ᱕ ᱟᱨ ᱑᱐ ᱛᱮ ᱾ ᱫᱟᱹᱵᱤ ᱯᱩᱨᱟᱹᱣ: ᱔᱗ ᱛᱟᱭᱚᱢ ___ ᱦᱤᱡᱩᱜ-ᱟ ᱾",
+      "outcomeId": "LO-SAT-G2-WRITE-01",
+      "estimatedMinutes": 40,
+      "mediaRefs": [
+        "worksheet/templates/fill_numbers_G2.pdf"
+      ],
+      "precomputed": true,
+      "translation_provenance": "human-reviewed precomputed, not on-device MT"
+    },
+    {
+      "id": "L-SAT-G2-EVS-01",
+      "grade": 2,
+      "domain": "reading",
+      "titleHi": "पेड़ और पत्ते — आस पास देखो",
+      "titleSatOlChiki": "ᱫᱟᱨᱮ ᱟᱨ ᱥᱟᱠᱟᱢ — ᱥᱩᱨ ᱧᱮᱞ",
+      "textHi": "हमारे आस पास आम, जामुन और साल के पेड़ हैं। पत्ते हरे हैं। पेड़ हमें छाया देते हैं। पत्ते गिनो और नाम बोलो।",
+      "textSatOlChiki": "ᱟᱵᱚᱣᱟᱜ ᱥᱩᱨ ᱩᱞᱩ, ᱡᱟᱹᱢᱩ ᱟᱨ ᱥᱟᱨᱡᱚᱢ ᱫᱟᱨᱮ ᱢᱮᱱᱟᱜ-ᱟ ᱾ ᱥᱟᱠᱟᱢ ᱦᱟᱹᱨᱤᱭᱟᱹᱲ ᱾ ᱫᱟᱨᱮ ᱩᱢᱩᱞ ᱮ ᱮᱢᱟᱜ-ᱟ ᱾ ᱥᱟᱠᱟᱢ ᱞᱮᱠᱷᱟ ᱟᱨ ᱧᱩᱛᱩᱢ ᱞᱟᱹᱭ ᱢᱮ ᱾",
+      "outcomeId": "LO-SAT-G2-READ-01",
+      "estimatedMinutes": 35,
+      "mediaRefs": [
+        "flashcard/assets/market_conversation.png"
+      ],
+      "precomputed": true,
+      "translation_provenance": "human-reviewed precomputed, not on-device MT"
+    },
+    {
+      "id": "L-SAT-G3-ORAL-01",
+      "grade": 3,
+      "domain": "oral",
+      "titleHi": "बातचीत — बाजार में संवाद",
+      "titleSatOlChiki": "ᱨᱚᱲ — ᱦᱟᱴ ᱨᱮ ᱨᱚᱯᱚᱲ",
+      "textHi": "बाजार में दुकानदार से बात करो। नमस्ते, मुझे दो किलो चावल चाहिए। कितने रुपये? संताली में भी यही बोलना सीखो।",
+      "textSatOlChiki": "ᱦᱟᱴ ᱨᱮ ᱫᱚᱠᱟᱱᱤᱭᱟᱹ ᱥᱟᱶ ᱨᱚᱯᱚᱲ ᱢᱮ ᱾ ᱡᱚᱦᱟᱨ, ᱤᱧ ᱵᱟᱨ ᱠᱤᱞᱳ ᱪᱟᱣᱞᱮ ᱦᱟᱛᱟᱣ ᱥᱟᱱᱟᱭᱟ ᱾ ᱛᱤᱱᱟᱹᱜ ᱴᱟᱠᱟ? ᱥᱟᱱᱛᱟᱲᱤ ᱛᱮ ᱦᱚᱸ ᱱᱚᱣᱟ ᱨᱚᱲ ᱪᱮᱫ ᱢᱮ ᱾",
+      "outcomeId": "LO-SAT-G3-ORAL-01",
+      "estimatedMinutes": 35,
+      "mediaRefs": [
+        "flashcard/assets/market_conversation.png"
+      ],
+      "precomputed": true,
+      "translation_provenance": "human-reviewed precomputed, not on-device MT"
+    },
+    {
+      "id": "L-SAT-G3-READ-01",
+      "grade": 3,
+      "domain": "reading",
+      "titleHi": "अनुच्छेद पढ़कर प्रश्नों के उत्तर देना",
+      "titleSatOlChiki": "ᱯᱟᱨᱟ ᱯᱟᱲᱦᱟᱣ ᱠᱟᱛᱮ ᱠᱩᱞᱤ ᱨᱩᱣᱟᱹᱲ",
+      "textHi": "मेरा गाँव बहुत सुंदर है। यहाँ एक नदी है और खेत हरे-भरे हैं। बच्चे स्कूल जाते हैं। प्रश्न: तुम्हारे गाँव में क्या है? उत्तर लिखो।",
+      "textSatOlChiki": "ᱤᱧᱟᱜ ᱟᱹᱛᱩ ᱟᱹᱰᱤ ᱢᱚᱡᱽ ᱜᱮᱭᱟ ᱾ ᱱᱚᱸᱰᱮ ᱢᱤᱫ ᱜᱟᱰᱟ ᱢᱮᱱᱟᱜ-ᱟ ᱟᱨ ᱵᱟᱹᱲᱤ ᱦᱟᱹᱨᱤᱭᱟᱹᱲ ᱜᱮᱭᱟ ᱾ ᱜᱤᱫᱽᱨᱟᱹ ᱠᱚ ᱟᱥᱲᱟ ᱠᱚ ᱪᱟᱞᱟᱜ-ᱟ ᱾ ᱠᱩᱞᱤ: ᱟᱢᱟᱜ ᱟᱹᱛᱩ ᱨᱮ ᱪᱮᱫ ᱢᱮᱱᱟᱜ-ᱟ? ᱛᱮᱞᱟ ᱚᱞ ᱢᱮ ᱾",
+      "outcomeId": "LO-SAT-G3-READ-01",
+      "estimatedMinutes": 40,
+      "mediaRefs": [
+        "worksheet/templates/comprehension_G3.pdf",
+        "flashcard/assets/village_reading.png"
+      ],
+      "precomputed": true,
+      "translation_provenance": "human-reviewed precomputed, not on-device MT"
+    },
+    {
+      "id": "L-SAT-G3-MATH-01",
+      "grade": 3,
+      "domain": "writing",
+      "titleHi": "जोड़ और घटाव — बाजार का हिसाब",
+      "titleSatOlChiki": "ᱮᱞᱮᱠᱷᱟ — ᱦᱟᱴ ᱦᱤᱥᱟᱹᱵ",
+      "textHi": "राम के पास 50 रुपये हैं। उसने 20 रुपये के चावल और 15 रुपये की दाल खरीदी। कितने बचे? जोड़ो और घटाओ।",
+      "textSatOlChiki": "ᱨᱟᱢ ᱴᱷᱮᱱ ᱕᱐ ᱴᱟᱠᱟ ᱢᱮᱱᱟᱜ-ᱟ ᱾ ᱒᱐ ᱴᱟᱠᱟ ᱪᱟᱣᱞᱮ ᱟᱨ ᱑᱕ ᱴᱟᱠᱟ ᱫᱟᱹᱞ ᱦᱟᱛᱟᱣ ᱠᱮᱫ-ᱟ ᱾ ᱛᱤᱱᱟᱹᱜ ᱥᱟᱹᱨᱤ? ᱮᱞᱮᱠᱷᱟ ᱢᱮ ᱾",
+      "outcomeId": "LO-SAT-G3-READ-01",
+      "estimatedMinutes": 40,
+      "mediaRefs": [
+        "worksheet/templates/comprehension_G3.pdf"
+      ],
+      "precomputed": true,
+      "translation_provenance": "human-reviewed precomputed, not on-device MT"
+    },
+    {
+      "id": "L-SAT-G3-MATH-02",
+      "grade": 3,
+      "domain": "oral",
+      "titleHi": "माप — लंबाई और वजन",
+      "titleSatOlChiki": "ᱡᱚᱠᱷᱟ — ᱡᱤᱞᱤᱧ ᱟᱨ ᱦᱟᱢᱟᱞ",
+      "textHi": "रिबन को स्केल से नापो। यह 10 सेंटीमीटर है। तराजू पर फल रखो — कितना वजन?",
+      "textSatOlChiki": "ᱨᱤᱵᱚᱱ ᱥᱠᱮᱞ ᱛᱮ ᱡᱚᱠᱷᱟ ᱢᱮ ᱾ ᱑᱐ ᱥᱮᱱᱴᱤ ᱠᱟᱱᱟ ᱾ ᱛᱟᱨᱟᱡᱩ ᱨᱮ ᱡᱚ ᱫᱚᱦᱚ — ᱛᱤᱱᱟᱹᱜ ᱦᱟᱢᱟᱞ?",
+      "outcomeId": "LO-SAT-G3-ORAL-01",
+      "estimatedMinutes": 35,
+      "mediaRefs": [
+        "flashcard/assets/market_conversation.png"
+      ],
+      "precomputed": true,
+      "translation_provenance": "human-reviewed precomputed, not on-device MT"
+    },
+    {
+      "id": "L-SAT-G3-EVS-01",
+      "grade": 3,
+      "domain": "reading",
+      "titleHi": "प्रकृति — जानवर और पेड़",
+      "titleSatOlChiki": "ᱯᱨᱚᱠᱨᱤᱛᱤ — ᱡᱟᱱᱣᱟᱨ ᱟᱨ ᱫᱟᱨᱮ",
+      "textHi": "हाथी जंगल का सबसे बड़ा जानवर है। साल का पेड़ सबसे ऊँचा। चित्र देखो और नाम मिलाओ।",
+      "textSatOlChiki": "ᱦᱟᱹᱛᱤ ᱵᱤᱨ ᱨᱤᱱ ᱢᱟᱨᱟᱝ ᱡᱟᱱᱣᱟᱨ ᱠᱟᱱᱟ ᱾ ᱥᱟᱨᱡᱚᱢ ᱡᱚᱛᱚ ᱠᱷᱚᱱ ᱩᱥᱩᱞ ᱾ ᱪᱤᱛᱟᱹᱨ ᱧᱮᱞ ᱟᱨ ᱧᱩᱛᱩᱢ ᱡᱚᱲᱟᱣ ᱢᱮ ᱾",
+      "outcomeId": "LO-SAT-G3-READ-01",
+      "estimatedMinutes": 35,
+      "mediaRefs": [
+        "flashcard/assets/village_reading.png"
+      ],
+      "precomputed": true,
+      "translation_provenance": "human-reviewed precomputed, not on-device MT"
+    }
+  ]
+}
