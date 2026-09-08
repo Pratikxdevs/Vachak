@@ -1,0 +1,24 @@
+{
+  "silver_total": 10245,
+  "verified": 221,
+  "review": 10024,
+  "verified_pct": 2.2,
+  "mean_hi2sat_f1": 0.397,
+  "mean_sat2hi_f1": 0.56,
+  "review_by_category": {
+    "animal": 2173,
+    "school": 2157,
+    "food": 1961,
+    "fruit": 904,
+    "family": 740,
+    "person": 738,
+    "nature": 586,
+    "object": 220,
+    "abstract": 173,
+    "body": 139,
+    "numbers": 96,
+    "health": 59,
+    "place": 58,
+    "verbs": 20
+  }
+}

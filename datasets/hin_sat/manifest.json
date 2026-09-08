@@ -1,0 +1,39 @@
+{
+  "generated_at": "2026-08-28",
+  "total_pairs": 10477,
+  "tiers": {
+    "silver": 10245,
+    "gold": 116,
+    "gold_rev": 116
+  },
+  "categories": {
+    "food": 2063,
+    "animal": 2220,
+    "school": 2220,
+    "fruit": 925,
+    "nature": 590,
+    "person": 740,
+    "greetings": 24,
+    "family": 740,
+    "place": 59,
+    "abstract": 180,
+    "numbers": 120,
+    "body": 140,
+    "language": 24,
+    "verbs": 20,
+    "time": 24,
+    "object": 220,
+    "health": 80,
+    "introductions": 16,
+    "courtesy": 24,
+    "shopping": 20,
+    "travel": 28
+  },
+  "source": {
+    "gold": "Transcribed from a published Hindi->Santali (Ol Chiki) reference phrase table.",
+    "silver": "Conservative Santali grammar templates over a curated lexicon + the regular Santali number system (1-1000)."
+  },
+  "license_note": "Gold = machine/MT-derived; verify before approved pedagogy. Silver = machine-generated; MUST be validated by a native Santali speaker. Stopgap until COILD-MT-Corpus HIN-SAT / Education_v2 are un-gated.",
+  "verification": "Run verify_corpus.py to cross-check silver pairs against the base IndicTrans2 model and split into verified / review sets.",
+  "format": "corpus.tsv = headerless hi<tab>sat; compatible with prep_finetune_data.py"
+}
