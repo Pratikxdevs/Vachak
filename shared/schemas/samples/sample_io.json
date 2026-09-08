@@ -1,0 +1,51 @@
+{
+  "note": "DEV FIXTURE sample I/O only. Not real inference. Mirrors android/app/.../engine/EngineContracts.kt.",
+  "LanguagePair": { "source": "hi", "target": "mund" },
+  "TranslationEngine.translate": {
+    "request": { "text": "छः हाथी", "pair": { "source": "hi", "target": "mund" } },
+    "response_ok": "[DEV-FIXTURE-mund] छः हाथी",
+    "response_err": { "code": "UNSUPPORTED_LANGUAGE", "message": "pair en->fr unsupported" }
+  },
+  "ASREngine.transcribe": {
+    "request": { "pcm16_bytes": "<16-bit PCM, 16kHz mono>", "sample_rate_hz": 16000 },
+    "response_ok": "[DEV-FIXTURE-asr] नमस्ते",
+    "response_err": { "code": "INVALID_INPUT", "message": "empty pcm" }
+  },
+  "TTSEngine.synthesize": {
+    "request": { "text": "[DEV-FIXTURE-mund] नमस्ते", "language": "mund" },
+    "response_ok": "<16-bit PCM bytes for AudioTrack>"
+  },
+  "CurriculumEngine.getLesson": {
+    "request": { "id": "L1" },
+    "response_ok": {
+      "id": "L1", "title": "DEV-FIXTURE", "grade": 1,
+      "source_text_hi": "हिन्दी पाठ", "translated_text": "[DEV-FIXTURE-mund] lesson", "precomputed": true
+    }
+  },
+  "WorksheetEngine.generate": {
+    "request": { "lesson_id": "L1", "template": "fill_blank" },
+    "response_ok": {
+      "id": "W_L1", "lesson_id": "L1", "template": "fill_blank",
+      "items": [{ "prompt": "DEV-FIXTURE prompt", "answer_key": "DEV-FIXTURE key" }]
+    }
+  },
+  "FlashcardEngine.listDeck": {
+    "request": { "lesson_id": "L1" },
+    "response_ok": {
+      "lesson_id": "L1",
+      "cards": [{ "front": "हाथी", "back": "[DEV-FIXTURE] elephant", "image_asset": "asset://elephant.png" }]
+    }
+  },
+  "LanguagePackManager.install": {
+    "request": { "pack_path": "modelpacks/mundari" },
+    "response_ok": { "id": "modelpacks/mundari", "language": "mund", "version": "0.1.0", "min_android": 28, "size_bytes": 0 }
+  },
+  "SyncManager.installPackage": {
+    "request": { "path": "modelpacks/mundari" },
+    "response_ok": { "pack_id": "modelpacks/mundari", "version": "0.1.0", "timestamp_ms": 0, "applied": true }
+  },
+  "BenchmarkRunner.run": {
+    "request": { "pair": { "source": "hi", "target": "mund" }, "sample": "छः हाथी" },
+    "response_ok": { "asr_ms": 200, "mt_ms": 120, "tts_ms": 300, "total_ms": 620, "within_budget": true }
+  }
+}
