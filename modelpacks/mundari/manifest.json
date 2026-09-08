@@ -1,0 +1,29 @@
+{
+  "language": "mund",
+  "version": "0.1.0",
+  "minAndroid": 28,
+  "checksum": "DEV-FIXTURE-PACK-CHECKSUM",
+  "models": [
+    {
+      "name": "asr_hi",
+      "file": "asr/model.onnx",
+      "sizeBytes": 0,
+      "checksum": "DEV-FIXTURE-ASR-CHECKSUM",
+      "kind": "asr"
+    },
+    {
+      "name": "mt_hi_mund",
+      "file": "mt/model.onnx",
+      "sizeBytes": 0,
+      "checksum": "DEV-FIXTURE-MT-CHECKSUM",
+      "kind": "mt"
+    },
+    {
+      "name": "tts_mund",
+      "file": "tts/model.onnx",
+      "sizeBytes": 0,
+      "checksum": "DEV-FIXTURE-TTS-CHECKSUM",
+      "kind": "tts"
+    }
+  ]
+}
