@@ -1,0 +1,161 @@
+/home/clutch/Desktop/Vachak/IndicTrans2/.venv/lib/python3.10/site-packages/transformers/utils/generic.py:441: FutureWarning: `torch.utils._pytree._register_pytree_node` is deprecated. Please use `torch.utils._pytree.register_pytree_node` instead.
+  _torch_pytree._register_pytree_node(
+/home/clutch/Desktop/Vachak/IndicTrans2/.venv/lib/python3.10/site-packages/transformers/utils/generic.py:309: FutureWarning: `torch.utils._pytree._register_pytree_node` is deprecated. Please use `torch.utils._pytree.register_pytree_node` instead.
+  _torch_pytree._register_pytree_node(
+[ft] 653 train / 45 dev
+/home/clutch/Desktop/Vachak/IndicTrans2/.venv/lib/python3.10/site-packages/huggingface_hub/file_download.py:949: FutureWarning: `resume_download` is deprecated and will be removed in version 1.0.0. Downloads always resume when possible. If you want to force a new download, use `force_download=True`.
+  warnings.warn(
+/home/clutch/Desktop/Vachak/IndicTrans2/.venv/lib/python3.10/site-packages/transformers/tokenization_utils_base.py:3860: UserWarning: `as_target_tokenizer` is deprecated and will be removed in v5 of Transformers. You can tokenize your labels by using the argument `text_target` of the regular `__call__` method (either in the same call as your input texts if you use the same keyword arguments, or in a separate call.
+  warnings.warn(
+/home/clutch/Desktop/Vachak/ml/translation/scripts/finetune_simple.py:109: FutureWarning: `torch.cuda.amp.GradScaler(args...)` is deprecated. Please use `torch.amp.GradScaler('cuda', args...)` instead.
+  scaler = torch.cuda.amp.GradScaler()
+/home/clutch/Desktop/Vachak/ml/translation/scripts/finetune_simple.py:117: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+  with torch.cuda.amp.autocast(dtype=torch.float16):
+trainable params: 3,538,944 || all params: 324,400,128 || trainable%: 1.0909194215854316
+[ft] ep1 b0 loss=3.792
+[ft] ep1 b10 loss=2.781
+[ft] ep1 b20 loss=3.201
+[ft] ep1 b30 loss=3.260
+[ft] ep1 b40 loss=2.544
+[ft] ep1 b50 loss=3.321
+[ft] ep1 b60 loss=3.310
+[ft] ep1 b70 loss=4.187
+[ft] ep1 b80 loss=1.699
+[ft] ep1 b90 loss=1.239
+[ft] ep1 b100 loss=2.253
+[ft] ep1 b110 loss=1.386
+[ft] ep1 b120 loss=2.116
+[ft] ep1 b130 loss=1.560
+[ft] ep1 b140 loss=2.432
+[ft] ep1 b150 loss=2.836
+[ft] ep1 b160 loss=2.136
+/home/clutch/Desktop/Vachak/ml/translation/scripts/finetune_simple.py:136: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+  with torch.cuda.amp.autocast(dtype=torch.float16):
+[ft] ep1 train_loss=2.378 dev_loss=2.192
+[ft] ep2 b0 loss=1.495
+[ft] ep2 b10 loss=2.280
+[ft] ep2 b20 loss=1.560
+[ft] ep2 b30 loss=0.697
+[ft] ep2 b40 loss=1.985
+[ft] ep2 b50 loss=1.184
+[ft] ep2 b60 loss=0.632
+[ft] ep2 b70 loss=1.876
+[ft] ep2 b80 loss=0.637
+[ft] ep2 b90 loss=1.032
+[ft] ep2 b100 loss=1.407
+[ft] ep2 b110 loss=1.288
+[ft] ep2 b120 loss=0.565
+[ft] ep2 b130 loss=0.832
+[ft] ep2 b140 loss=1.013
+[ft] ep2 b150 loss=1.986
+[ft] ep2 b160 loss=0.417
+[ft] ep2 train_loss=1.263 dev_loss=1.643
+[ft] ep3 b0 loss=1.887
+[ft] ep3 b10 loss=1.362
+[ft] ep3 b20 loss=0.666
+[ft] ep3 b30 loss=1.036
+[ft] ep3 b40 loss=1.562
+[ft] ep3 b50 loss=0.593
+[ft] ep3 b60 loss=0.266
+[ft] ep3 b70 loss=1.513
+[ft] ep3 b80 loss=0.476
+[ft] ep3 b90 loss=1.285
+[ft] ep3 b100 loss=0.984
+[ft] ep3 b110 loss=0.591
+[ft] ep3 b120 loss=1.096
+[ft] ep3 b130 loss=0.591
+[ft] ep3 b140 loss=0.297
+[ft] ep3 b150 loss=0.759
+[ft] ep3 b160 loss=1.128
+[ft] ep3 train_loss=0.959 dev_loss=1.637
+[ft] ep4 b0 loss=0.350
+[ft] ep4 b10 loss=0.965
+[ft] ep4 b20 loss=1.924
+[ft] ep4 b30 loss=0.448
+[ft] ep4 b40 loss=0.373
+[ft] ep4 b50 loss=1.375
+[ft] ep4 b60 loss=0.880
+[ft] ep4 b70 loss=1.559
+[ft] ep4 b80 loss=0.447
+[ft] ep4 b90 loss=0.300
+[ft] ep4 b100 loss=0.481
+[ft] ep4 b110 loss=0.263
+[ft] ep4 b120 loss=1.441
+[ft] ep4 b130 loss=0.255
+[ft] ep4 b140 loss=0.472
+[ft] ep4 b150 loss=0.957
+[ft] ep4 b160 loss=0.778
+[ft] ep4 train_loss=0.817 dev_loss=1.466
+[ft] ep5 b0 loss=0.622
+[ft] ep5 b10 loss=0.290
+[ft] ep5 b20 loss=0.243
+[ft] ep5 b30 loss=0.531
+[ft] ep5 b40 loss=0.221
+[ft] ep5 b50 loss=0.421
+[ft] ep5 b60 loss=0.166
+[ft] ep5 b70 loss=0.426
+[ft] ep5 b80 loss=0.164
+[ft] ep5 b90 loss=0.525
+[ft] ep5 b100 loss=0.877
+[ft] ep5 b110 loss=0.992
+[ft] ep5 b120 loss=1.587
+[ft] ep5 b130 loss=0.370
+[ft] ep5 b140 loss=1.087
+[ft] ep5 b150 loss=0.254
+[ft] ep5 b160 loss=0.548
+[ft] ep5 train_loss=0.727 dev_loss=1.321
+[ft] ep6 b0 loss=0.544
+[ft] ep6 b10 loss=0.710
+[ft] ep6 b20 loss=0.274
+[ft] ep6 b30 loss=1.274
+[ft] ep6 b40 loss=0.599
+[ft] ep6 b50 loss=0.974
+[ft] ep6 b60 loss=0.134
+[ft] ep6 b70 loss=0.817
+[ft] ep6 b80 loss=1.362
+[ft] ep6 b90 loss=0.651
+[ft] ep6 b100 loss=0.051
+[ft] ep6 b110 loss=0.612
+[ft] ep6 b120 loss=0.487
+[ft] ep6 b130 loss=0.248
+[ft] ep6 b140 loss=0.162
+[ft] ep6 b150 loss=0.835
+[ft] ep6 b160 loss=0.556
+[ft] ep6 train_loss=0.617 dev_loss=1.332
+[ft] ep7 b0 loss=0.357
+[ft] ep7 b10 loss=0.157
+[ft] ep7 b20 loss=0.685
+[ft] ep7 b30 loss=0.284
+[ft] ep7 b40 loss=0.871
+[ft] ep7 b50 loss=0.367
+[ft] ep7 b60 loss=0.693
+[ft] ep7 b70 loss=0.561
+[ft] ep7 b80 loss=0.865
+[ft] ep7 b90 loss=0.271
+[ft] ep7 b100 loss=0.242
+[ft] ep7 b110 loss=0.154
+[ft] ep7 b120 loss=0.127
+[ft] ep7 b130 loss=0.169
+[ft] ep7 b140 loss=1.109
+[ft] ep7 b150 loss=0.195
+[ft] ep7 b160 loss=0.205
+[ft] ep7 train_loss=0.530 dev_loss=1.300
+[ft] ep8 b0 loss=0.148
+[ft] ep8 b10 loss=0.317
+[ft] ep8 b20 loss=0.269
+[ft] ep8 b30 loss=0.811
+[ft] ep8 b40 loss=0.172
+[ft] ep8 b50 loss=0.618
+[ft] ep8 b60 loss=0.071
+[ft] ep8 b70 loss=1.726
+[ft] ep8 b80 loss=0.134
+[ft] ep8 b90 loss=0.865
+[ft] ep8 b100 loss=0.373
+[ft] ep8 b110 loss=0.899
+[ft] ep8 b120 loss=2.099
+[ft] ep8 b130 loss=0.382
+[ft] ep8 b140 loss=0.249
+[ft] ep8 b150 loss=0.063
+[ft] ep8 b160 loss=0.259
+[ft] ep8 train_loss=0.523 dev_loss=1.345
+[ft] saved adapter -> /home/clutch/Desktop/Vachak/ml/finetune/it2_goldnum_lora

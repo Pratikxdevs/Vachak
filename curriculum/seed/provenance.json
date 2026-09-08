@@ -1,0 +1,44 @@
+{
+  "seed_file": "grade2_math_counting.json",
+  "seed_version": "1.0.0",
+  "generated_at_note": "DEV FIXTURE — authored offline, deterministic, no LLM used.",
+  "global_status": "AUTHOR-DRAFT. Aligned to public NIPUN Bharat / FLN foundational numeracy competency descriptors. NOT yet verified by a native-speaker SME. Per AGENTS.md: author/auto-generated curriculum is not approved pedagogy and must not ship without SME sign-off.",
+  "target_language_default": "sat (Santali Ol Chiki). Task brief names Mundari; switch localization target_language_code to 'unr' and re-seed to target Mundari.",
+  "resources": [
+    {
+      "resource_id": "R-SEED-G2-COUNT",
+      "type": "curriculum_seed",
+      "title": "Grade 2 Mathematics — Counting (1 to 100)",
+      "author": "Vachak team (SIH26042) — authored in-session",
+      "license": "CC BY 4.0 (authored original)",
+      "source_basis": "Public NIPUN Bharat FLN competency descriptors for foundational numeracy (counting to 100, skip counting, number sequence, comparison). No gated/restricted dataset was pulled or copied.",
+      "verification": "Not SME-verified. Target-language (Santali) vocabulary verified against known Ol Chiki numerals 1-10; abstract terms (before/after/more/less) are best-effort and flagged for SME review.",
+      "fixture": true
+    },
+    {
+      "resource_id": "R-OLCHIKI-NUMERALS",
+      "type": "linguistic_reference",
+      "title": "Ol Chiki numerals 1-10",
+      "author": "Standard Ol Chiki orthography (public domain script)",
+      "license": "Public domain (script)",
+      "source_basis": "Well-known Ol Chiki numeral forms: ᱑ ᱢᱤᱫ, ᱒ ᱵᱟᱨ, ᱓ ᱯᱩᱱ, ᱔ ᱯᱩᱱᱭ, ᱕ ᱢᱚᱬ, ᱖ ᱛᱩᱨᱩᱭ, ᱗ ᱥᱟᱭ, ᱘ ᱟᱨᱟ, ᱙ ᱟᱨᱮ, ᱑᱐ ᱜᱮᱞ.",
+      "verification": "Standard reference; numbers 1-10 used in flashcards are reliable.",
+      "fixture": false
+    },
+    {
+      "resource_id": "R-FLN-FRAMEWORK",
+      "type": "framework_reference",
+      "title": "NIPUN Bharat / FLN foundational numeracy competencies",
+      "author": "Ministry of Education, GoI (public policy document)",
+      "license": "Public domain (government framework)",
+      "source_basis": "Foundational Literacy and Numeracy (FLN) mission competency descriptors used to structure learning outcomes and assessments.",
+      "verification": "Public framework; outcome codes (G2-M-CNT-xx) are locally assigned per this project's convention.",
+      "fixture": false
+    }
+  ],
+  "flashcard_assets": {
+    "image_ref_pattern": "assets/flashcards/number_N.png",
+    "audio_ref_pattern": "assets/audio/sat/number_N.wav",
+    "note": "image_ref and audio_ref are OFFLINE asset pointers only. The image/audio binary files are packaged separately and are NOT included in this seed (prebuilt flashcards/audio per AGENTS.md)."
+  }
+}

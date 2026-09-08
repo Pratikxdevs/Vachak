@@ -1,0 +1,57 @@
+/home/clutch/Desktop/Vachak/IndicTrans2/.venv/lib/python3.10/site-packages/transformers/utils/generic.py:441: FutureWarning: `torch.utils._pytree._register_pytree_node` is deprecated. Please use `torch.utils._pytree.register_pytree_node` instead.
+  _torch_pytree._register_pytree_node(
+/home/clutch/Desktop/Vachak/IndicTrans2/.venv/lib/python3.10/site-packages/transformers/utils/generic.py:309: FutureWarning: `torch.utils._pytree._register_pytree_node` is deprecated. Please use `torch.utils._pytree.register_pytree_node` instead.
+  _torch_pytree._register_pytree_node(
+[ft] 269 train / 29 dev
+/home/clutch/Desktop/Vachak/IndicTrans2/.venv/lib/python3.10/site-packages/huggingface_hub/file_download.py:949: FutureWarning: `resume_download` is deprecated and will be removed in version 1.0.0. Downloads always resume when possible. If you want to force a new download, use `force_download=True`.
+  warnings.warn(
+/home/clutch/Desktop/Vachak/IndicTrans2/.venv/lib/python3.10/site-packages/transformers/tokenization_utils_base.py:3860: UserWarning: `as_target_tokenizer` is deprecated and will be removed in v5 of Transformers. You can tokenize your labels by using the argument `text_target` of the regular `__call__` method (either in the same call as your input texts if you use the same keyword arguments, or in a separate call.
+  warnings.warn(
+/home/clutch/Desktop/Vachak/ml/translation/scripts/finetune_simple.py:105: FutureWarning: `torch.cuda.amp.GradScaler(args...)` is deprecated. Please use `torch.amp.GradScaler('cuda', args...)` instead.
+  scaler = torch.cuda.amp.GradScaler()
+/home/clutch/Desktop/Vachak/ml/translation/scripts/finetune_simple.py:113: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+  with torch.cuda.amp.autocast(dtype=torch.float16):
+trainable params: 3,538,944 || all params: 324,400,128 || trainable%: 1.0909194215854316
+[ft] ep1 b0 loss=0.683
+[ft] ep1 b10 loss=0.397
+[ft] ep1 b20 loss=0.712
+[ft] ep1 b30 loss=0.452
+[ft] ep1 b40 loss=0.237
+[ft] ep1 b50 loss=0.309
+[ft] ep1 b60 loss=0.580
+/home/clutch/Desktop/Vachak/ml/translation/scripts/finetune_simple.py:132: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+  with torch.cuda.amp.autocast(dtype=torch.float16):
+[ft] ep1 train_loss=0.433 dev_loss=0.263
+[ft] ep2 b0 loss=0.291
+[ft] ep2 b10 loss=0.168
+[ft] ep2 b20 loss=0.595
+[ft] ep2 b30 loss=0.135
+[ft] ep2 b40 loss=0.112
+[ft] ep2 b50 loss=0.689
+[ft] ep2 b60 loss=0.152
+[ft] ep2 train_loss=0.273 dev_loss=0.188
+[ft] ep3 b0 loss=0.327
+[ft] ep3 b10 loss=0.043
+[ft] ep3 b20 loss=0.266
+[ft] ep3 b30 loss=0.117
+[ft] ep3 b40 loss=0.199
+[ft] ep3 b50 loss=0.084
+[ft] ep3 b60 loss=0.171
+[ft] ep3 train_loss=0.202 dev_loss=0.194
+[ft] ep4 b0 loss=0.073
+[ft] ep4 b10 loss=0.112
+[ft] ep4 b20 loss=0.183
+[ft] ep4 b30 loss=0.384
+[ft] ep4 b40 loss=0.361
+[ft] ep4 b50 loss=0.229
+[ft] ep4 b60 loss=0.037
+[ft] ep4 train_loss=0.173 dev_loss=0.194
+[ft] ep5 b0 loss=0.172
+[ft] ep5 b10 loss=0.059
+[ft] ep5 b20 loss=0.083
+[ft] ep5 b30 loss=0.187
+[ft] ep5 b40 loss=0.253
+[ft] ep5 b50 loss=0.141
+[ft] ep5 b60 loss=0.062
+[ft] ep5 train_loss=0.139 dev_loss=0.169
+[ft] saved adapter -> /home/clutch/Desktop/Vachak/ml/finetune/it2_lora_hin_sat

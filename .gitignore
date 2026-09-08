@@ -1,0 +1,66 @@
+# Heavy models / datasets - exclude from GitHub ( >100MB )
+IndicTrans2/
+indictrans2-onnx-export/
+models/
+sherpa-onnx/build/
+sherpa-onnx/.build/
+*.bin
+*.onnx
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.wav
+*.mp3
+*.m4a
+
+# Android build artifacts
+android/.gradle/
+android/build/
+android/ml/build/
+android/app/build/
+android/.idea/
+android/local.properties
+.gradle/
+build/
+out/
+*.apks
+*.aab
+*.apk
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+export_venv/
+.Python
+
+# Temp / scratch
+.tmp/
+scratch_tmp/
+raw/
+REPS/
+.tmp
+*.tmp
+.DS_Store
+Thumbs.db
+
+# Large data dumps
+datasets/*.zip
+datasets/*.tar.gz
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Local-only heavy artifacts (kept on disk, never committed)
+merged_sat_bidi/
+*.hprof
+android/ml/.cxx/
+android/.cxx/
+app/build/
+*.vachakpack
+packages/packs/

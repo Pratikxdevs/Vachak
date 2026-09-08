@@ -1,0 +1,7 @@
+# DEV FIXTURE — synthetic Mundari utterance manifest for pipeline unit tests ONLY.
+# NOT real Mundari speech. NOT derived from any gated Mundari audio corpus.
+# Lines: <text>\t<audio_path_placeholder>. Exists so offline tests can run.
+# DATA ACCESS PENDING: replace with licensed Mundari speech resources.
+परीक्षण।	fixture/mundari_001.wav
+बच्चा स्कूल जा रहा है।	fixture/mundari_002.wav
+लाल रंग क्या है?	fixture/mundari_003.wav

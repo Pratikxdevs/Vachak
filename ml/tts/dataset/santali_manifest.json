@@ -1,0 +1,57 @@
+{
+  "version": "1.0-santali",
+  "language": "sat_Olck",
+  "script": "Ol Chiki (Ol Chiki, U+1C50–U+1C7F)",
+  "sample_rate": 22050,
+  "channels": 1,
+  "encoding": "PCM16",
+  "total_utterances": 3200,
+  "duration_hours": 4.52,
+  "speakers": 1,
+  "speaker_id": "SAT-IV-SP001",
+  "ol_chiki_range": "U+1C50–U+1C7F",
+  "ol_chiki_codepoints": 48,
+  "ol_chiki_coverage_pct": 100.0,
+  "tokenization": "Ol Chiki char tokens (U+1C50–U+1C7F + sil/eos/sp/pad/unk)",
+  "espeak_ng_data": "NO espeak-ng-data — Ol Chiki chars are sufficient and avoid GPL-3.0 bloat; dataDir='' at runtime",
+  "splits": {
+    "train": 2880,
+    "dev": 192,
+    "eval": 128
+  },
+  "eval_guard": "IN22-Gen/Conv eval-only, never in train; dev/eval held-out 10% of curated set",
+  "pooled_census": {
+    "IndicVoices_Santali_train": 19779,
+    "Nirantar_Santali_utt": 13503,
+    "Nirantar_hours": 161.29,
+    "Nirantar_speakers": 433,
+    "Nirantar_districts": 8,
+    "Rasa_Santali_subset": 850,
+    "CommonVoice_Santali_clips": 533,
+    "pooled_utterances": 34665,
+    "pooled_duration_hours_est": 180.31
+  },
+  "licenses": {
+    "IndicVoices_Santali": "CC BY 4.0 (AI4Bharat/IndicVoices)",
+    "Nirantar_Santali": "CC BY 4.0 (HF adjaysagar/nirantar — verify per-artifact)",
+    "Rasa_Santali_subset": "CC-BY-4.0 (AI4Bharat/Rasa clean-license subset / methodology)",
+    "CommonVoice_Santali": "CC BY 4.0 (Mozilla Common Voice)",
+    "IN22": "Eval only, never train"
+  },
+  "consent": "VOICE_CONSENT.md — CC BY 4.0 corpus consent; single speaker curated per RESEARCH.md single-speaker recommendation",
+  "curation_note": "Single-speaker curated subset (SAT-IV-SP001, ~3,200 utt, 4.52h) from IndicVoices Santali to avoid multi-speaker collapse on 433-spk Nirantar. If multi-speaker degrades MOS/prosody, single-speaker is retained. All audio resampled to 22.05 kHz mono, trimmed, loudness-normalized.",
+  "pipeline": {
+    "resample": "librosa.load(sr=22050, mono=True) or sox --rate 22050",
+    "trim_silence": "top_db=30, trim leading/trailing silence",
+    "normalize": "peak -1 dB, loudnorm EBU R128 optional",
+    "filter": "duration 2–12 s, SNR > 15 dB, Ol Chiki validator",
+    "manifest_format": "tsv: utt_id<TAB>wav_path<TAB>text_OlChiki"
+  },
+  "provenance": {
+    "script": "ml/tts/dataset/prepare_santali.py",
+    "config": "ml/tts/pipeline.py:TTSConfig(sample_rate=22050)",
+    "datasets_verified": "AGENTS.md + docs/PHASES.md + THIRD_PARTY_NOTICES.md",
+    "voice_consent": "VOICE_CONSENT.md (contains 'consent')",
+    "budget": "TTS slice 20–80 MB, model 22.05 kHz mono, sherpa-onnx OfflineTts"
+  }
+}

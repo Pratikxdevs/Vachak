@@ -1,0 +1,9 @@
+{
+  "stage": "train_vits",
+  "status": "TODO",
+  "arch": "vits",
+  "target": "mun",
+  "samples": 3,
+  "reason": "DATA ACCESS PENDING: gated Mundari speech not available",
+  "produces": "ml/tts/runs/mundari_vits (drop-in adapter, NOT shipped yet)"
+}

@@ -1,0 +1,52 @@
+/home/clutch/Desktop/Vachak/IndicTrans2/.venv/lib/python3.10/site-packages/transformers/utils/generic.py:441: FutureWarning: `torch.utils._pytree._register_pytree_node` is deprecated. Please use `torch.utils._pytree.register_pytree_node` instead.
+  _torch_pytree._register_pytree_node(
+/home/clutch/Desktop/Vachak/IndicTrans2/.venv/lib/python3.10/site-packages/transformers/utils/generic.py:309: FutureWarning: `torch.utils._pytree._register_pytree_node` is deprecated. Please use `torch.utils._pytree.register_pytree_node` instead.
+  _torch_pytree._register_pytree_node(
+/home/clutch/Desktop/Vachak/IndicTrans2/.venv/lib/python3.10/site-packages/huggingface_hub/file_download.py:949: FutureWarning: `resume_download` is deprecated and will be removed in version 1.0.0. Downloads always resume when possible. If you want to force a new download, use `force_download=True`.
+  warnings.warn(
+ | > Loading ai4bharat/indictrans2-indic-indic-dist-320M (fp16) ...
+Map (num_proc=4):   0%|          | 0/408 [00:00<?, ? examples/s]/home/clutch/Desktop/Vachak/IndicTrans2/.venv/lib/python3.10/site-packages/transformers/tokenization_utils_base.py:3860: UserWarning: `as_target_tokenizer` is deprecated and will be removed in v5 of Transformers. You can tokenize your labels by using the argument `text_target` of the regular `__call__` method (either in the same call as your input texts if you use the same keyword arguments, or in a separate call.
+  warnings.warn(
+Map (num_proc=4):  25%|██▌       | 102/408 [00:02<00:06, 44.43 examples/s]/home/clutch/Desktop/Vachak/IndicTrans2/.venv/lib/python3.10/site-packages/transformers/tokenization_utils_base.py:3860: UserWarning: `as_target_tokenizer` is deprecated and will be removed in v5 of Transformers. You can tokenize your labels by using the argument `text_target` of the regular `__call__` method (either in the same call as your input texts if you use the same keyword arguments, or in a separate call.
+  warnings.warn(
+Map (num_proc=4):  50%|█████     | 204/408 [00:04<00:04, 48.24 examples/s]/home/clutch/Desktop/Vachak/IndicTrans2/.venv/lib/python3.10/site-packages/transformers/tokenization_utils_base.py:3860: UserWarning: `as_target_tokenizer` is deprecated and will be removed in v5 of Transformers. You can tokenize your labels by using the argument `text_target` of the regular `__call__` method (either in the same call as your input texts if you use the same keyword arguments, or in a separate call.
+  warnings.warn(
+Map (num_proc=4):  75%|███████▌  | 306/408 [00:06<00:02, 50.05 examples/s]/home/clutch/Desktop/Vachak/IndicTrans2/.venv/lib/python3.10/site-packages/transformers/tokenization_utils_base.py:3860: UserWarning: `as_target_tokenizer` is deprecated and will be removed in v5 of Transformers. You can tokenize your labels by using the argument `text_target` of the regular `__call__` method (either in the same call as your input texts if you use the same keyword arguments, or in a separate call.
+  warnings.warn(
+Map (num_proc=4): 100%|██████████| 408/408 [00:08<00:00, 51.89 examples/s]Map (num_proc=4): 100%|██████████| 408/408 [00:08<00:00, 49.83 examples/s]
+ | > train size 408
+Map (num_proc=4):   0%|          | 0/45 [00:00<?, ? examples/s]/home/clutch/Desktop/Vachak/IndicTrans2/.venv/lib/python3.10/site-packages/transformers/tokenization_utils_base.py:3860: UserWarning: `as_target_tokenizer` is deprecated and will be removed in v5 of Transformers. You can tokenize your labels by using the argument `text_target` of the regular `__call__` method (either in the same call as your input texts if you use the same keyword arguments, or in a separate call.
+  warnings.warn(
+Map (num_proc=4):  27%|██▋       | 12/45 [00:02<00:05,  5.59 examples/s]/home/clutch/Desktop/Vachak/IndicTrans2/.venv/lib/python3.10/site-packages/transformers/tokenization_utils_base.py:3860: UserWarning: `as_target_tokenizer` is deprecated and will be removed in v5 of Transformers. You can tokenize your labels by using the argument `text_target` of the regular `__call__` method (either in the same call as your input texts if you use the same keyword arguments, or in a separate call.
+  warnings.warn(
+Map (num_proc=4):  51%|█████     | 23/45 [00:04<00:03,  5.72 examples/s]/home/clutch/Desktop/Vachak/IndicTrans2/.venv/lib/python3.10/site-packages/transformers/tokenization_utils_base.py:3860: UserWarning: `as_target_tokenizer` is deprecated and will be removed in v5 of Transformers. You can tokenize your labels by using the argument `text_target` of the regular `__call__` method (either in the same call as your input texts if you use the same keyword arguments, or in a separate call.
+  warnings.warn(
+Map (num_proc=4):  76%|███████▌  | 34/45 [00:06<00:01,  5.61 examples/s]/home/clutch/Desktop/Vachak/IndicTrans2/.venv/lib/python3.10/site-packages/transformers/tokenization_utils_base.py:3860: UserWarning: `as_target_tokenizer` is deprecated and will be removed in v5 of Transformers. You can tokenize your labels by using the argument `text_target` of the regular `__call__` method (either in the same call as your input texts if you use the same keyword arguments, or in a separate call.
+  warnings.warn(
+Map (num_proc=4): 100%|██████████| 45/45 [00:07<00:00,  5.68 examples/s]Map (num_proc=4): 100%|██████████| 45/45 [00:08<00:00,  5.59 examples/s]
+/home/clutch/Desktop/Vachak/IndicTrans2/.venv/lib/python3.10/site-packages/accelerate/accelerator.py:450: FutureWarning: `torch.cuda.amp.GradScaler(args...)` is deprecated. Please use `torch.amp.GradScaler('cuda', args...)` instead.
+  self.scaler = torch.cuda.amp.GradScaler(**kwargs)
+ | > dev size 45
+trainable params: 3,538,944 || all params: 324,400,128 || trainable%: 1.0909194215854316
+Traceback (most recent call last):
+  File "/home/clutch/Desktop/Vachak/ml/translation/scripts/train_lora_qlora.py", line 161, in <module>
+    main()
+  File "/home/clutch/Desktop/Vachak/ml/translation/scripts/train_lora_qlora.py", line 153, in main
+    trainer.train()
+  File "/home/clutch/Desktop/Vachak/IndicTrans2/.venv/lib/python3.10/site-packages/transformers/trainer.py", line 1537, in train
+    return inner_training_loop(
+  File "/home/clutch/Desktop/Vachak/IndicTrans2/.venv/lib/python3.10/site-packages/transformers/trainer.py", line 1578, in _inner_training_loop
+    self.num_tokens(train_dataloader, args.max_steps) * args.gradient_accumulation_steps
+  File "/home/clutch/Desktop/Vachak/IndicTrans2/.venv/lib/python3.10/site-packages/transformers/trainer.py", line 1142, in num_tokens
+    for step, batch in enumerate(train_dl):
+  File "/home/clutch/Desktop/Vachak/IndicTrans2/.venv/lib/python3.10/site-packages/accelerate/data_loader.py", line 452, in __iter__
+    current_batch = next(dataloader_iter)
+  File "/home/clutch/Desktop/Vachak/IndicTrans2/.venv/lib/python3.10/site-packages/torch/utils/data/dataloader.py", line 708, in __next__
+    data = self._next_data()
+  File "/home/clutch/Desktop/Vachak/IndicTrans2/.venv/lib/python3.10/site-packages/torch/utils/data/dataloader.py", line 764, in _next_data
+    data = self._dataset_fetcher.fetch(index)  # may raise StopIteration
+  File "/home/clutch/Desktop/Vachak/IndicTrans2/.venv/lib/python3.10/site-packages/torch/utils/data/_utils/fetch.py", line 55, in fetch
+    return self.collate_fn(data)
+  File "/home/clutch/Desktop/Vachak/IndicTrans2/.venv/lib/python3.10/site-packages/IndicTransToolkit/collator.py", line 44, in __call__
+    features = pad_without_fast_tokenizer_warning(
+NameError: name 'pad_without_fast_tokenizer_warning' is not defined

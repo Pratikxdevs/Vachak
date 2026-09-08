@@ -1,0 +1,91 @@
+{
+  "meta": {
+    "framework": "NIPUN Bharat — Foundational Literacy & Numeracy (FLN)",
+    "version": "1.0.0-phase4",
+    "target_language": "sat (Santali Ol Chiki)",
+    "license": "CC BY 4.0 (Vachak-authored mapping; NIPUN descriptors are public domain GoI framework)",
+    "note": "nipunCode is locally assigned per Vachak convention (G{grade}-{domain}-{seq}). Descriptors are author-drafted aligned to public NIPUN FLN competencies, not verbatim copy. SME verification required before shipping as approved pedagogy."
+  },
+  "outcomes": [
+    {
+      "outcomeId": "LO-SAT-G1-ORAL-01",
+      "nipunCode": "G1-O-COM-01",
+      "descriptor": "Child listens to greetings and introduces self orally in familiar language (Santali).",
+      "descriptorHi": "बच्चा अभिवादन सुनकर संताली में अपना नाम बता पाता है।",
+      "descriptorSatOlChiki": "ᱜᱤᱫᱽᱨᱟᱹ ᱡᱚᱦᱟᱨ ᱟᱸᱡᱚᱢ ᱠᱟᱛᱮ ᱟᱡᱟᱜ ᱧᱩᱛᱩᱢ ᱥᱟᱱᱛᱟᱲᱤ ᱛᱮ ᱞᱟᱹᱭ ᱫᱟᱲᱮᱭᱟᱜ-ᱟ ᱾",
+      "grade": 1,
+      "domain": "oral",
+      "nipunMapped": true
+    },
+    {
+      "outcomeId": "LO-SAT-G1-READ-01",
+      "nipunCode": "G1-R-ALP-02",
+      "descriptor": "Child recognizes Ol Chiki letters and matches word to picture.",
+      "descriptorHi": "बच्चा ओल चिकी अक्षरों को पहचान कर शब्द को चित्र से मिलाता है।",
+      "descriptorSatOlChiki": "ᱜᱤᱫᱽᱨᱟᱹ ᱚᱞ ᱪᱤᱠᱤ ᱪᱤᱱᱦᱟᱹᱣ ᱟᱨ ᱟᱹᱲᱟᱹ ᱪᱤᱛᱟᱹᱨ ᱥᱟᱶ ᱡᱚᱲᱟᱣ ᱫᱟᱲᱮᱭᱟᱜ-ᱟ ᱾",
+      "grade": 1,
+      "domain": "reading",
+      "nipunMapped": true
+    },
+    {
+      "outcomeId": "LO-SAT-G1-WRITE-01",
+      "nipunCode": "G1-W-TRC-03",
+      "descriptor": "Child traces dotted Ol Chiki letters cleanly with pencil control.",
+      "descriptorHi": "बच्चा बिंदीदार ओल चिकी अक्षरों पर पेंसिल से साफ़ अभ्यास करता है।",
+      "descriptorSatOlChiki": "ᱜᱤᱫᱽᱨᱟᱹ ᱴᱷᱤᱠᱟᱹ ᱚᱞ ᱪᱤᱠᱤ ᱪᱮᱛᱟᱱ ᱨᱮ ᱯᱮᱱᱥᱤᱞ ᱛᱮ ᱥᱟᱯᱷᱟ ᱛᱮ ᱚᱞ ᱫᱟᱲᱮᱭᱟᱜ-ᱟ ᱾",
+      "grade": 1,
+      "domain": "writing",
+      "nipunMapped": true
+    },
+    {
+      "outcomeId": "LO-SAT-G2-ORAL-01",
+      "nipunCode": "G2-O-NUM-01",
+      "descriptor": "Child counts objects 1–20 orally and aloud one-by-one (FLN numeracy: counting).",
+      "descriptorHi": "बच्चा १ से २० तक वस्तुओं को एक-एक करके आवाज़ में गिनता है।",
+      "descriptorSatOlChiki": "ᱜᱤᱫᱽᱨᱟᱹ ᱑ ᱠᱷᱚᱱ ᱒᱐ ᱫᱷᱟᱹᱵᱤᱡ ᱡᱤᱱᱤᱥ ᱢᱤᱫ ᱢᱤᱫ ᱛᱮ ᱟᱲᱟᱝ ᱛᱮ ᱞᱮᱠᱷᱟ ᱫᱟᱲᱮᱭᱟᱜ-ᱟ ᱾",
+      "grade": 2,
+      "domain": "oral",
+      "nipunMapped": true
+    },
+    {
+      "outcomeId": "LO-SAT-G2-READ-01",
+      "nipunCode": "G2-R-STO-02",
+      "descriptor": "Child reads a short Santali story slowly and uses picture cues for meaning.",
+      "descriptorHi": "बच्चा संताली की छोटी कहानी धीरे-धीरे पढ़कर चित्रों से अर्थ समझता है।",
+      "descriptorSatOlChiki": "ᱜᱤᱫᱽᱨᱟᱹ ᱥᱟᱱᱛᱟᱲᱤ ᱦᱩᱰᱤᱧ ᱠᱟᱹᱦᱱᱤ ᱱᱤᱨᱮ ᱱᱤᱨᱮ ᱛᱮ ᱯᱟᱲᱦᱟᱣ ᱟᱨ ᱪᱤᱛᱟᱹᱨ ᱠᱷᱚᱱ ᱢᱮᱱᱮᱛ ᱵᱩᱡᱷᱟᱹᱣ ᱫᱟᱲᱮᱭᱟᱜ-ᱟ ᱾",
+      "grade": 2,
+      "domain": "reading",
+      "nipunMapped": true
+    },
+    {
+      "outcomeId": "LO-SAT-G2-WRITE-01",
+      "nipunCode": "G2-W-NUM-03",
+      "descriptor": "Child writes numbers 1–100, skip-counts by 2/5/10 and fills missing numbers.",
+      "descriptorHi": "बच्चा १ से १०० तक की संख्याएँ लिखता है, २/५/१० से छलांग गिनती करता है।",
+      "descriptorSatOlChiki": "ᱜᱤᱫᱽᱨᱟᱹ ᱑ ᱠᱷᱚᱱ ᱑᱐᱐ ᱫᱷᱟᱹᱵᱤᱡ ᱞᱮᱠᱷᱟ ᱚᱞ ᱟᱨ ᱒/᱕/᱑᱐ ᱛᱮ ᱡᱟᱸᱯ ᱞᱮᱠᱷᱟ ᱫᱟᱲᱮᱭᱟᱜ-ᱟ ᱾",
+      "grade": 2,
+      "domain": "writing",
+      "nipunMapped": true
+    },
+    {
+      "outcomeId": "LO-SAT-G3-ORAL-01",
+      "nipunCode": "G3-O-DIA-01",
+      "descriptor": "Child holds a simple market dialogue in Santali (ask price, quantity).",
+      "descriptorHi": "बच्चा बाजार में संताली में सरल संवाद करता है — मात्रा और दाम पूछना।",
+      "descriptorSatOlChiki": "ᱜᱤᱫᱽᱨᱟᱹ ᱦᱟᱴ ᱨᱮ ᱥᱟᱱᱛᱟᱲᱤ ᱛᱮ ᱨᱚᱲ ᱫᱟᱲᱮᱭᱟᱜ-ᱟ — ᱛᱤᱱᱟᱹᱜ ᱟᱨ ᱴᱟᱠᱟ ᱠᱩᱞᱤ ᱾",
+      "grade": 3,
+      "domain": "oral",
+      "nipunMapped": true
+    },
+    {
+      "outcomeId": "LO-SAT-G3-READ-01",
+      "nipunCode": "G3-R-COM-02",
+      "descriptor": "Child reads a paragraph about village and answers literal questions in writing.",
+      "descriptorHi": "बच्चा गाँव पर अनुच्छेद पढ़कर प्रश्नों के उत्तर लिखता है।",
+      "descriptorSatOlChiki": "ᱜᱤᱫᱽᱨᱟᱹ ᱟᱹᱛᱩ ᱯᱟᱨᱟ ᱯᱟᱲᱦᱟᱣ ᱠᱟᱛᱮ ᱠᱩᱞᱤ ᱨᱩᱣᱟᱹᱲ ᱚᱞ ᱫᱟᱲᱮᱭᱟᱜ-ᱟ ᱾",
+      "grade": 3,
+      "domain": "reading",
+      "nipunMapped": true
+    }
+  ]
+}

@@ -1,0 +1,119 @@
+{
+  "worksheet_id": "WS-LO-COUNT-1-bilingual-easy",
+  "meta": {
+    "grade": "G2",
+    "subject": "SUBJ-MATH-G2",
+    "learning_outcome": "G2-M-CNT-01",
+    "difficulty": "easy",
+    "language": "bilingual",
+    "language_label": "Hindi + Target",
+    "num_items": 6,
+    "generator": "worksheet/engine.py v1.0 (deterministic, offline)",
+    "fixture_note": "DEV FIXTURE — generated content, not SME-verified."
+  },
+  "questions": [
+    {
+      "id": "Q-CNT-1",
+      "type": "counting",
+      "prompt": "इन वस्तुओं को गिनें (गेंद):  —  ᱱᱚᱶᱟ ᱡᱤᱱᱤᱥ ᱠᱚ ᱞᱮᱠᱷᱟ ᱢᱟ (ᱜᱮᱱᱫᱚ):",
+      "render": "⚽ ⚽ ⚽ ⚽ ⚽ ⚽ ",
+      "answer": 6
+    },
+    {
+      "id": "Q-CNT-2",
+      "type": "counting",
+      "prompt": "इन वस्तुओं को गिनें (सेब):  —  ᱱᱚᱶᱟ ᱡᱤᱱᱤᱥ ᱠᱚ ᱞᱮᱠᱷᱟ ᱢᱟ (ᱥᱟᱯ):",
+      "render": "🍎 🍎 🍎 🍎 🍎 ",
+      "answer": 5
+    },
+    {
+      "id": "Q-MC-1",
+      "type": "multiple_choice",
+      "prompt": "गिनती का अर्थ क्या है?  —  ᱞᱮᱠᱷᱟ ᱨᱮᱭᱟᱜ ᱢᱮᱱᱮᱛ ᱪᱮ?",
+      "options": [
+        "ᱠᱚᱢ",
+        "ᱥᱟᱭ",
+        "ᱞᱮᱠᱷᱟ",
+        "ᱵᱟᱹᱲᱛᱤ"
+      ],
+      "answer": "ᱞᱮᱠᱷᱟ"
+    },
+    {
+      "id": "Q-MC-2",
+      "type": "multiple_choice",
+      "prompt": "संख्या का अर्थ क्या है?  —  ᱞᱮᱠᱷᱟ ᱨᱮᱭᱟᱜ ᱢᱮᱱᱮᱛ ᱪᱮ?",
+      "options": [
+        "ᱠᱚᱢ",
+        "ᱥᱟᱭ",
+        "ᱞᱮᱠᱷᱟ",
+        "ᱜᱮᱞ"
+      ],
+      "answer": "ᱞᱮᱠᱷᱟ"
+    },
+    {
+      "id": "Q-IMG-1",
+      "type": "image_based",
+      "prompt": "इस चित्र का नाम बताएं:  —  ᱱᱚᱶᱟ ᱪᱤᱛᱟᱹ ᱨᱮᱭᱟᱜ ᱧᱩᱛᱩᱢ ᱞᱟᱹᱭ ᱢᱟ:",
+      "image_ref": "assets/flashcards/number_1.png",
+      "answer": "१  —  ᱑"
+    },
+    {
+      "id": "Q-MATCH-1",
+      "type": "matching",
+      "prompt": "मिलान करें (Hindi ↔ Target)  —  ᱢᱤᱞᱟᱹᱣ ᱢᱟ (Hindi ↔ Target)",
+      "pairs": [
+        {
+          "hi": "गिनती",
+          "target": "ᱞᱮᱠᱷᱟ"
+        },
+        {
+          "hi": "संख्या",
+          "target": "ᱞᱮᱠᱷᱟ"
+        },
+        {
+          "hi": "अधिक",
+          "target": "ᱵᱟᱹᱲᱛᱤ"
+        },
+        {
+          "hi": "कम",
+          "target": "ᱠᱚᱢ"
+        },
+        {
+          "hi": "दहाई",
+          "target": "ᱜᱮᱞ"
+        },
+        {
+          "hi": "सौ",
+          "target": "ᱥᱟᱭ"
+        }
+      ],
+      "answer": "See answer key: column A↔B pairs"
+    }
+  ],
+  "answer_key": [
+    {
+      "id": "Q-CNT-1",
+      "answer": "6"
+    },
+    {
+      "id": "Q-CNT-2",
+      "answer": "5"
+    },
+    {
+      "id": "Q-MC-1",
+      "answer": "ᱞᱮᱠᱷᱟ"
+    },
+    {
+      "id": "Q-MC-2",
+      "answer": "ᱞᱮᱠᱷᱟ"
+    },
+    {
+      "id": "Q-IMG-1",
+      "answer": "᱑"
+    },
+    {
+      "id": "Q-MATCH-1",
+      "answer": "गिनती=ᱞᱮᱠᱷᱟ | संख्या=ᱞᱮᱠᱷᱟ | अधिक=ᱵᱟᱹᱲᱛᱤ | कम=ᱠᱚᱢ | दहाई=ᱜᱮᱞ | सौ=ᱥᱟᱭ"
+    }
+  ]
+}
