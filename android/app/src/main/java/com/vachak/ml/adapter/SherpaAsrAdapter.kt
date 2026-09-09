@@ -24,11 +24,17 @@ class SherpaAsrAdapter(
     override fun supports(language: String) = language == "hi"
 
     override fun loadModel(packId: String): EngineResult<Unit> {
-        return runCatching { real = IndicConformerAsrAdapter(context) }
-            .fold(
-                onSuccess = { EngineResult.Ok(Unit) },
-                onFailure = { e -> EngineResult.Err(EngineError.MODEL_LOAD_FAILED, e.message ?: "asr load failed") }
-            )
+        return runCatching {
+            val adapter = IndicConformerAsrAdapter(context)
+            real = adapter
+            // Actually warm the 140MB recognizer now (IO thread) so the first
+            // mic press transcribes immediately — "model always live".
+            // Status (READY/ERROR) is recorded by the adapter itself.
+            adapter.warmUpIfNeeded()
+        }.fold(
+            onSuccess = { EngineResult.Ok(Unit) },
+            onFailure = { e -> EngineResult.Err(EngineError.MODEL_LOAD_FAILED, e.message ?: "asr load failed") }
+        )
     }
 
     override fun transcribe(pcm16: ShortArray, sampleRateHz: Int): EngineResult<String> {

@@ -18,7 +18,6 @@ import com.vachak.engine.EngineProvider
 import com.vachak.engine.EngineResult
 import com.vachak.ml.adapter.AdapterTranslationEngine
 import com.vachak.sync.PackManager
-import com.vachak.ui.components.BudgetIndicator
 import com.vachak.ui.components.VachakSection
 import com.vachak.ui.theme.VachakColors
 import kotlinx.coroutines.Dispatchers
@@ -44,10 +43,17 @@ fun DiagnosticsScreen(
     val context = LocalContext.current
     val activeLang by engine.activeLanguage.collectAsState()
     LaunchedEffect(activeLang) {
-        val r = engine.benchmark.run(com.vachak.engine.LanguagePair("hi", activeLang), "नमस्ते")
-        bench = when (r) {
-            is EngineResult.Ok -> "ASR ${r.value.asrMs}ms • MT ${r.value.mtMs}ms • TTS ${r.value.ttsMs}ms • Total ${r.value.totalMs}ms ${if (r.value.withinBudget) "✓ <3s" else "✗ ≥3s"}"
-            is EngineResult.Err -> "Benchmark unavailable: ${r.message}"
+        // MEASURED pipeline timings only (LastPipelineRun). Never canned: null
+        // until the first Live run completes renders as "not measured yet".
+        val run = com.vachak.ml.LastPipelineRun.sample
+        bench = if (run == null) {
+            "Not measured yet — run Live once (voice or typed); timings here are measured on-device, never mocked."
+        } else {
+            val stages = run.stageMs()
+            val total = run.endToEndMs()
+            val verdict = if ((total ?: Float.MAX_VALUE) < 3000) "✓ <3s" else "⚠ ≥3s"
+            "ASR ${stages["asr"]?.toLong() ?: "-"}ms • MT ${stages["translate"]?.toLong() ?: "-"}ms • " +
+                "TTS ${stages["tts"]?.toLong() ?: "-"}ms • Total ${total?.toLong() ?: "-"}ms $verdict (run ${run.runId.takeLast(6)})"
         }
         // active adapter badge via AdapterTranslationEngine
         try {
@@ -63,22 +69,40 @@ fun DiagnosticsScreen(
                 val dbBytes = try {
                     val dbFile = context.getDatabasePath("vachak_content.db")
                     if (dbFile.exists()) dbFile.length() else 0L
-                } catch (_: Exception) { 0L }
+                } catch (e: Exception) {
+                    android.util.Log.w("Vachak-Diag", "db size unreadable: ${e.message}")
+                    0L
+                }
+                // MEASURED bytes: installed APK file + extracted filesDir models + packs + db.
+                // (APK asset table doesn't expose sizes; packageCodePath + filesDir walk does.)
                 val freeBytes = PackManager.freeSpaceBytes(context)
-                val assetEstimateMb = 535 // ASR 99 + MT 357 + TTS 41 + VAD 0.6 + content/flashcards ~37
-                val totalMb = (packBytes + dbBytes) / (1024 * 1024) + assetEstimateMb
+                val apkBytes = try { java.io.File(context.packageCodePath).length() } catch (e: Exception) {
+                    android.util.Log.w("Vachak-Diag", "apk size unreadable: ${e.message}")
+                    0L
+                }
+                val modelsBytes = try {
+                    java.io.File(context.filesDir, "vachak_models").walkTopDown().filter { it.isFile }.sumOf { it.length() }
+                } catch (e: Exception) {
+                    android.util.Log.w("Vachak-Diag", "filesDir models scan failed: ${e.message}")
+                    0L
+                }
+                val totalMb = (packBytes + dbBytes + apkBytes + modelsBytes) / (1024 * 1024)
                 val progress = (totalMb / 500f).coerceIn(0f, 1f)
                 val sha = try {
                     val packs = PackManager.packEntities(context)
                     packs.firstOrNull { it.isActive }?.manifestSha256 ?: packs.firstOrNull()?.manifestSha256
-                } catch (_: Exception) { null }
+                } catch (e: Exception) {
+                    android.util.Log.w("Vachak-Diag", "pack sha unreadable: ${e.message}")
+                    null
+                }
                 withContext(Dispatchers.Main) {
-                    liveStorage = "Live: ~${totalMb} MB / 500 MB (packs ${packBytes/1024}KB + db ${dbBytes/1024}KB + assets ${assetEstimateMb}MB)"
-                    liveDb = "Storage progress ${ (progress*100).toInt()}% • DB ${dbBytes/1024}KB"
-                    liveFree = if (freeBytes >= 0) "Free: ${freeBytes / (1024*1024)} MB • used ${packBytes / (1024*1024)} MB" else null
+                    liveStorage = "Live: ~${totalMb} MB / 500 MB (apk ${apkBytes / 1024 / 1024}MB + models ${modelsBytes / 1024 / 1024}MB + packs ${packBytes / 1024}KB + db ${dbBytes / 1024}KB)"
+                    liveDb = "Storage progress ${(progress * 100).toInt()}% • DB ${dbBytes / 1024}KB"
+                    liveFree = if (freeBytes >= 0) "Free: ${freeBytes / (1024 * 1024)} MB • used ${packBytes / (1024 * 1024)} MB" else null
                     packShaLine = sha?.let { "packSha256: ${it.take(16)}… • ${ActiveLanguage.label(activeLang)} • withinBudget=${totalMb <= 500}" }
                 }
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                android.util.Log.w("Vachak-Diag", "live storage scan failed", e)
                 withContext(Dispatchers.Main) { liveStorage = "Live storage unavailable — using estimate" }
             }
         }
@@ -131,16 +155,9 @@ fun DiagnosticsScreen(
             liveStorage?.let { Text(it, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace) }
             liveDb?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
             liveFree?.let { Text(it, style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-            BudgetIndicator(progress = 0.62f, label = "Storage ~312 MB / 500 MB (APK+pack) — live above")
+            Text("RAM: sequential single-model residency, numThreads=1 (no live gauge — see logcat Vachak-Latency)", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(4.dp))
-            BudgetIndicator(progress = 0.48f, label = "RAM sequential peak ≤2GB")
-            Spacer(Modifier.height(4.dp))
-            BudgetIndicator(progress = 0.52f, label = "MT slice 357 MB / 180 MB — variance doc see P1")
             HorizontalDivider()
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("Models: ASR 99MB • MT 357MB • TTS 41MB • VAD 0.6MB", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace)
-            }
-            Text("Safety margin: pack compressed 347M vs 497M source (~30% zip)", style = MaterialTheme.typography.labelSmall, color = VachakColors.OfflineGreen)
         }
 
         VachakSection(title = "Sequential Enforcement", icon = Icons.Outlined.Lock) {

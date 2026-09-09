@@ -57,7 +57,9 @@ data class EngineProvider(
                 active?.language?.let { lang ->
                     if (lang.isNotBlank()) ActiveLanguage.set(lang)
                 }
-            } catch (_: Exception) {}
+            } catch (e: Exception) {
+                android.util.Log.w("Vachak-Pack", "active-pack language sync failed, keeping default ${ActiveLanguage.current}: ${e.message}")
+            }
             val adapterEngine = AdapterTranslationEngine(context, ActiveLanguage.current)
             return EngineProvider(
                 translation = adapterEngine,

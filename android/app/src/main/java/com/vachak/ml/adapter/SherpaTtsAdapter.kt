@@ -48,8 +48,11 @@ class SherpaTtsAdapter(
         if (context == null || !useReal) return EngineResult.Ok(Unit)
         synchronized(adapterLock) {
             if (cachedAdapter == null) {
-                return runCatching { 
-                    cachedAdapter = SherpaOnnxTtsAdapter(context!!, packDir = packDir)
+                return runCatching {
+                    val created = SherpaOnnxTtsAdapter(context!!, packDir = packDir)
+                    cachedAdapter = created
+                    // Warm now (IO thread) so first Play has no cold-load pause.
+                    created.warmUpIfNeeded()
                     Log.d(tag, "loadModel packDir=$packDir -> OK"); EngineResult.Ok(Unit)
                 }.fold(
                     onSuccess = { it },
@@ -67,7 +70,7 @@ class SherpaTtsAdapter(
         if (!supports(language)) return EngineResult.Err(EngineError.UNSUPPORTED_LANGUAGE, language)
         if (context == null || !useReal) {
             // Mock path: fabricate audible-length PCM (>200ms) for offline tests
-            val sr = 22050
+            val sr = com.vachak.ml.VachakAudio.TTS_OUTPUT_HZ
             val minSamples = (0.22 * sr).toInt() // 4851 > 4800 at 24k but for 22.05k
             val n = maxOf(minSamples, (text.length * 220).coerceAtLeast(minSamples))
             Log.d(tag, "synthesize mock \"$text\" ($language -> $normalizedLang) -> $n samples @ $sr Hz (useReal=false)")

@@ -104,7 +104,9 @@ class SherpaOnnxTtsAdapter(
                     return direct.absolutePath
                 }
             }
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            Log.w(tag, "pack TTS resolution failed, falling back to bundled assets: ${e.message}")
+        }
         // Fallback to bundled assets (P2 default): recursive copy via SherpaAssets
         val assetDir = SherpaAssets.prepare(context, modelDir)
         Log.d(tag, "using asset TTS dir: $assetDir (fallback from pack)")
@@ -123,8 +125,27 @@ class SherpaOnnxTtsAdapter(
             detectShim(baseDir)
         } catch (_: Exception) { false }
     }
-    /** Close old TTS for pack reload (P5). */
-    fun reloadFromPack() {
+    /** Non-blocking warm-up off the UI thread (IO): resolves + creates the
+     * OfflineTts so first Play has no cold-load pause. Status recorded.
+     * Placeholder shim models are NEVER handed to the native layer here
+     * (native hard-abort risk); they report text-only READY instead. */
+    fun warmUpIfNeeded() {
+        try {
+            if (isShim()) {
+                ModelStatus.setTts(
+                    ModelInfo(ModelState.READY, "placeholder voice (55-token shim) — text-only mode", degraded = true)
+                )
+                Log.w(tag, "warmUp: placeholder voice — native load skipped (synthesis disabled until trained VITS ships)")
+                return
+            }
+            ensureLoaded()
+        } catch (e: Exception) {
+            // Status already ERROR via ensureLoaded; log once here.
+            Log.w(tag, "warmUp failed: ${e.message}")
+        }
+    }
+
+    /** Close old TTS for pack reload (P5). */    fun reloadFromPack() {
         tts?.let { try { /* OfflineTts has no explicit close; drop reference */ } catch (_: Exception) {} }
         tts = null
         resolvedBaseDir = null
@@ -141,6 +162,12 @@ class SherpaOnnxTtsAdapter(
         if (!java.io.File(modelPath).exists()) {
             Log.e(tag, "model.onnx not found at $modelPath (baseDir=$baseDir)")
         }
+        // Status: a 55-token placeholder is "ready" only as text-only mode —
+        // synthesis stays disabled until a trained VITS ships (see app gate).
+        val shim = detectShim(baseDir)
+        val voiceDetail = if (shim) "placeholder voice (55-token shim) — text-only mode" else "VITS voice ($baseDir)"
+        val degradedVoice = shim
+        ModelStatus.loadingTts(voiceDetail)
         // Ol Chiki char tokens do NOT require espeak-ng-data (avoids 10-15 MB + GPL-3.0).
         // If a model was trained with espeak G2P, it would ship a slim espeak-ng-data;
         // otherwise dataDir must be "" so sherpa-onnx does not require the directory.
@@ -161,8 +188,17 @@ class SherpaOnnxTtsAdapter(
             Log.d(tag, "creating OfflineTts (dir=$baseDir, model=$modelPath, dataDir=\"$dataDir\", packDir=${packDir ?: "null"})")
             // Models are extracted to the filesystem (filesDir) or are already in pack dir,
             // so pass null AssetManager (fs path) as fixed in P0.
-            tts = OfflineTts(null, config)
-            Log.d(tag, "OfflineTts ready (baseDir=$baseDir, pack=${packDir != null})")
+            val t0 = android.os.SystemClock.elapsedRealtimeNanos()
+            try {
+                tts = OfflineTts(null, config)
+            } catch (e: Exception) {
+                ModelStatus.setTts(ModelInfo(ModelState.ERROR, "TTS load failed: ${e.message?.take(140)}"))
+                Log.e(tag, "OfflineTts creation failed (dir=$baseDir)", e)
+                throw e
+            }
+            val ms = (android.os.SystemClock.elapsedRealtimeNanos() - t0) / 1_000_000
+            ModelStatus.setTts(ModelInfo(ModelState.READY, voiceDetail, ms, degradedVoice))
+            Log.d(tag, "OfflineTts ready in ${ms}ms (baseDir=$baseDir, pack=${packDir != null})")
         return tts!!
     }
 

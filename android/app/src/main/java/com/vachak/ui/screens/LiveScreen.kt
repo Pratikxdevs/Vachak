@@ -44,6 +44,8 @@ import com.vachak.engine.EngineResult
 import com.vachak.engine.LanguagePair
 import com.vachak.ml.LatencySample
 import com.vachak.ml.LatencyTracker
+import com.vachak.ml.LastPipelineRun
+import com.vachak.ml.VachakAudio
 import com.vachak.ml.StreamingAsrSession
 import com.vachak.ui.components.BreathVisualizer
 import com.vachak.ui.components.ConversationMessagePair
@@ -167,7 +169,7 @@ fun LiveScreen(
     fun playPcm(text: String, lang: String = activeLang) {
         scope.launch(Dispatchers.IO) {
             val pcmRes = engine.tts.synthesize(text, lang)
-            if (pcmRes is EngineResult.Ok) tryPlayPcm(pcmRes.value, 22050)
+            if (pcmRes is EngineResult.Ok) tryPlayPcm(pcmRes.value, VachakAudio.TTS_OUTPUT_HZ)
         }
     }
 
@@ -177,6 +179,8 @@ fun LiveScreen(
         val item = ConversationItem(id = id, hindiText = hindi, santaliText = null, timestampMillis = System.currentTimeMillis(), isTranslating = true)
         LiveConversationStore.items.add(item)
         isTranslating = true
+        // Typed path has no voice tracker: measure from here so timings show for every item.
+        val tr = tracker ?: LatencyTracker(LatencySample(runId = "typed-${SystemClock.elapsedRealtimeNanos()}")).also { it.markSpeechBegin() }
         scope.launch(Dispatchers.IO) {
             val mtStart = SystemClock.elapsedRealtimeNanos()
             val mt = engine.translation.translate(hindi, LanguagePair("hi", activeLang))
@@ -192,7 +196,7 @@ fun LiveScreen(
             }
             val mtMs = (SystemClock.elapsedRealtimeNanos() - mtStart) / 1_000_000
             Log.d(TAG_MT, "MT ${mtMs}ms [MT:INFERENCE] \"$hindi\" -> \"$translated\"")
-            tracker?.markTranslate(translated ?: "")
+            tr.markTranslate(translated ?: "")
             withContext(Dispatchers.Main) {
                 val idx = LiveConversationStore.items.indexOfFirst { it.id == id }
                 if (idx != -1) {
@@ -206,7 +210,7 @@ fun LiveScreen(
                 // fire TTS in background but don't block
                 if (translated != null) {
                     scope.launch(Dispatchers.IO) {
-                        tracker?.markTtsBegin()
+                        tr.markTtsBegin()
                         val ttsStart = SystemClock.elapsedRealtimeNanos()
                         val pcmRes = engine.tts.synthesize(translated, activeLang)
                         val ttsMs = (SystemClock.elapsedRealtimeNanos() - ttsStart) / 1_000_000
@@ -214,12 +218,25 @@ fun LiveScreen(
                             is EngineResult.Ok -> Log.d(TAG_LAT, "TTS ${ttsMs}ms [TTS:SYNTHESIS] ${pcmRes.value.size} samples")
                             is EngineResult.Err -> Log.d(TAG_LAT, "TTS ${ttsMs}ms [TTS:SYNTHESIS] failed ${pcmRes.code}: ${pcmRes.message}")
                         }
-                        tracker?.markAudioBegin()
+                        tr.markAudioBegin()
+                        // Measured stages -> item footer + last-run holder (never canned).
+                        val stages = tr.result().stageMs()
+                        val total = tr.result().endToEndMs()?.toLong()
+                        LastPipelineRun.publish(tr)
                         withContext(Dispatchers.Main) {
+                            val i = LiveConversationStore.items.indexOfFirst { it.id == id }
+                            if (i != -1) {
+                                LiveConversationStore.items[i] = LiveConversationStore.items[i].copy(
+                                    asrMs = stages["asr"]?.toLong(),
+                                    mtMs = stages["translate"]?.toLong(),
+                                    ttsMs = stages["tts"]?.toLong(),
+                                    totalMs = total
+                                )
+                            }
                             when (pcmRes) {
                                 is EngineResult.Ok -> {
-                                    tryPlayPcm(pcmRes.value, 22050)
-                                    ttsMessage = "Playing ${ActiveLanguage.label(activeLang)} audio • ${pcmRes.value.size} samples @22050Hz"
+                                    tryPlayPcm(pcmRes.value, VachakAudio.TTS_OUTPUT_HZ)
+                                    ttsMessage = "Playing ${ActiveLanguage.label(activeLang)} audio • ${pcmRes.value.size} samples @${VachakAudio.TTS_OUTPUT_HZ}Hz"
                                 }
                                 is EngineResult.Err -> {
                                     ttsMessage = "TTS: ${pcmRes.message}"
@@ -296,7 +313,7 @@ fun LiveScreen(
             Log.d(TAG_ASR, "LaunchedEffect stopped, clearing partial")
             return@LaunchedEffect
         }
-        val DECODE_INTERVAL_MS = 700L
+        val DECODE_INTERVAL_MS = VachakAudio.PARTIAL_DECODE_MS
         var lastPartial = ""
         var errShown = false
         Log.d(TAG_ASR, "LaunchedEffect started isListening=true")
@@ -570,6 +587,7 @@ fun LiveScreen(
                 }
             }
 
+            ModelStatusRow()
             VoiceArea(
                 hasConversation = hasConversation,
                 isListening = isListening,
@@ -687,7 +705,7 @@ fun LiveScreen(
                         }
                         livePreview?.let { sat ->
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                TextButton(onClick = { scope.launch(Dispatchers.IO) { engine.tts.synthesize(sat, activeLang).let { if (it is EngineResult.Ok) tryPlayPcm(it.value, 22050) } } }, contentPadding = PaddingValues(0.dp)) {
+                                TextButton(onClick = { scope.launch(Dispatchers.IO) { engine.tts.synthesize(sat, activeLang).let { if (it is EngineResult.Ok) tryPlayPcm(it.value, VachakAudio.TTS_OUTPUT_HZ) } } }, contentPadding = PaddingValues(0.dp)) {
                                     Icon(Icons.AutoMirrored.Outlined.VolumeUp, null, tint = VachakColors.DeepLavender, modifier = Modifier.size(16.dp))
                                     Spacer(Modifier.width(4.dp)); Text("Play", style = MaterialTheme.typography.labelMedium, color = VachakColors.DeepLavender)
                                 }
@@ -749,6 +767,67 @@ fun LiveScreen(
             confirmButton = { TextButton(onClick = { showDebugDialog = false }) { Text("Close") } },
             dismissButton = { TextButton(onClick = { asrError = null; livePreviewError = null; showDebugDialog = false }) { Text("Clear errors") } }
         )
+    }
+}
+
+/**
+ * Always-visible model health strip: ASR / MT / TTS dots driven by ModelStatus.
+ * Green = live, amber = ready-but-limited (placeholder voice) or warming,
+ * red = failed (detail carries the cause). The models behind a red dot are
+ * exactly what the next pipeline failure will blame — no more guessing.
+ */
+@Composable
+private fun ModelStatusRow() {
+    val asr by com.vachak.ml.ModelStatus.asr.collectAsState()
+    val mt by com.vachak.ml.ModelStatus.mt.collectAsState()
+    val tts by com.vachak.ml.ModelStatus.tts.collectAsState()
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        ModelDot(asr, "ASR")
+        ModelDot(mt, "MT")
+        ModelDot(tts, "TTS")
+        val worst = listOf(asr, mt, tts).firstOrNull { it.state == com.vachak.ml.ModelState.ERROR }
+        if (worst != null) {
+            Text(
+                worst.detail?.take(60) ?: "model error",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.error,
+                maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
+        } else {
+            val loading = listOf(asr, mt, tts).any { it.state == com.vachak.ml.ModelState.LOADING || it.state == com.vachak.ml.ModelState.IDLE }
+            if (loading) {
+                Text(
+                    "Loading models…",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = VachakColors.TextSecondary,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ModelDot(info: com.vachak.ml.ModelInfo, label: String) {
+    val color = when (info.state) {
+        com.vachak.ml.ModelState.READY ->
+            if (info.degraded) VachakColors.Amber else VachakColors.Success
+        com.vachak.ml.ModelState.ERROR -> MaterialTheme.colorScheme.error
+        com.vachak.ml.ModelState.LOADING -> VachakColors.Lavender600
+        com.vachak.ml.ModelState.IDLE -> VachakColors.Border
+    }
+    Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+        Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(color))
+        Text(label, style = MaterialTheme.typography.labelSmall, color = VachakColors.TextSecondary)
+        info.loadMs?.let {
+            Text("${it}ms", style = MaterialTheme.typography.labelSmall, color = VachakColors.TextSecondary)
+        }
     }
 }
 
@@ -873,7 +952,7 @@ private fun VoiceArea(
     }
 }
 
-private fun tryPlayPcm(pcm: ShortArray, sampleRate: Int = 22050) {
+private fun tryPlayPcm(pcm: ShortArray, sampleRate: Int = VachakAudio.TTS_OUTPUT_HZ) {
     if (pcm.isEmpty()) return
     try {
         val minBuf = AudioTrack.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT)
@@ -898,8 +977,11 @@ private fun tryPlayPcm(pcm: ShortArray, sampleRate: Int = 22050) {
         // This decouples the sleep from the pipeline latency measurement
         Thread {
             Thread.sleep((pcm.size * 1000L / sampleRate).coerceAtMost(4000))
-            track.stop()
-            track.release()
+            try { track.stop() } catch (e: Exception) { Log.w(TAG_TTS, "track.stop failed: ${e.message}") }
+            try { track.release() } catch (e: Exception) { Log.w(TAG_TTS, "track.release failed: ${e.message}") }
         }.start()
-    } catch (_: Exception) { }
+    } catch (e: Exception) {
+        // Playback failure must be visible: the taps-Play-hears-nothing mystery.
+        Log.e(TAG_TTS, "tryPlayPcm failed (${pcm.size} samples @${sampleRate}Hz)", e)
+    }
 }

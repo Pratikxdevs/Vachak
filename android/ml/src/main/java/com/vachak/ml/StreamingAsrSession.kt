@@ -88,10 +88,10 @@ class StreamingAsrSession(
     private var speechStartSample: Int? = null
     private var lastChunk: ShortArray? = null
 
-    private val vadRmsThreshold = 0.012f
-    private val silenceHangoverMs = 600
-    private val minUtteranceMs = 300
-    private val maxUtteranceMs = 14000
+    private val vadRmsThreshold = VachakAudio.VAD_RMS_THRESHOLD
+    private val silenceHangoverMs = VachakAudio.SILENCE_HANGOVER_MS
+    private val minUtteranceMs = VachakAudio.MIN_UTTERANCE_MS
+    private val maxUtteranceMs = VachakAudio.MAX_UTTERANCE_MS
 
     private var t0Ns: Long? = null
     private var firstPartialNs: Long? = null
@@ -100,7 +100,7 @@ class StreamingAsrSession(
     // True incremental streaming would require OnlineRecognizer with streaming model, which
     // OfflineWhisper/OfflineNemoEncDecCtc does NOT support.
     private val streamingModeLabel = "WINDOWED_STREAMING"
-    private val windowSamples = sampleRate * 3 // 48000 samples = 3s bounded window (fixed-size, NOT entire history)
+    private val windowSamples = sampleRate * VachakAudio.STREAM_WINDOW_SEC // 3s bounded window (fixed-size, NOT entire history)
     private var accumulatedPreview: String = "" // deduped accumulation for tail-window stitching
     private var lastRawWindowText: String = ""
 
@@ -126,7 +126,7 @@ class StreamingAsrSession(
         } else {
             Log.d(tagAsr, "StreamingAsrSession start t0=${t0Ns} lightweight mode=$streamingModeLabel windowSamples=$windowSamples (warm-up offloaded to IO)")
         }
-        try { vad.flush() } catch (_: Exception) {}
+        try { vad.flush() } catch (e: Exception) { Log.w(tagVad, "vad.flush failed (VAD state may leak into next segment)", e) }
         Log.d(tagVad, "Streaming session start t0=${t0Ns} segmentId reset")
         Log.d(tagVad, "SEGMENT_START id=0 startSample=${currentSegmentStartSample} (session start, awaiting speech)")
         Log.d(tagAsr, "Streaming mode determination: OfflineRecognizer (OfflineWhisper/OfflineNemoEncDecCtc offline, OfflineModelConfig) incompatible with OnlineRecognizer true streaming (requires OnlineTransducer/OnlineNeMoCtc streaming model with incremental state) — using $streamingModeLabel fallback: fixed ${windowSamples} samples (${windowSamples * 1000 / sampleRate}ms) overlapping windows, bounded O(window) decode, deduplicated, pack-aware offline")
@@ -147,7 +147,10 @@ class StreamingAsrSession(
             if (vad is SherpaOnnxVadAnalyzer) {
                 // No extra action; flush already ensured Vad creation via ensure().
             }
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            // VAD warm-up is best-effort; real creation errors surface at first accept().
+            Log.w(tagVad, "warmUp VAD touch failed: ${e.message}")
+        }
     }
 
     fun pushAudio(chunk: ShortArray): List<VadSegmentLog> {
@@ -236,19 +239,20 @@ class StreamingAsrSession(
         Log.d(tagAsr, "ASR_WINDOW id=$segmentIdCounter startSample=$windowStartGlobal endSample=$windowEndGlobal newSamples=$windowSize mode=$streamingModeLabel")
 
         val startNs = SystemClock.elapsedRealtimeNanos()
-        val txtRaw = if (testTranscriber != null) testTranscriber.invoke(windowShort).trim() else {
-            try {
+        // Any throwing decoder (real OR injected) is a MODEL failure, never
+        // VAD silence: record the cause and keep the previous partial.
+        val txtRaw = try {
+            if (testTranscriber != null) testTranscriber.invoke(windowShort).trim()
+            else {
                 val floatPcm = FloatArray(windowShort.size) { windowShort[it] / 32768.0f }
                 directAsr.transcribe(floatPcm, sampleRate).text.trim()
-            } catch (e: Exception) {
-                // Model breakage, not silence: record it so finish()/callers
-                // report MODEL failure instead of "no speech detected".
-                if (lastDecodeError == null) {
-                    lastDecodeError = e.message?.take(160)
-                    Log.e(tagAsr, "ASR_PARTIAL id=$segmentIdCounter decode threw", e)
-                }
-                return currentPartial
             }
+        } catch (e: Exception) {
+            if (lastDecodeError == null) {
+                lastDecodeError = e.message?.take(160)
+                Log.e(tagAsr, "ASR_PARTIAL id=$segmentIdCounter decode threw", e)
+            }
+            return currentPartial
         }
         val latencyMs = (SystemClock.elapsedRealtimeNanos() - startNs) / 1_000_000
         Log.d(tagAsr, "ASR_PARTIAL id=$segmentIdCounter latencyMs=$latencyMs text=\"$txtRaw\"")
@@ -309,19 +313,20 @@ class StreamingAsrSession(
         val pcm = currentSegmentSamples.toShortArray()
         // Exactly ONE final decode for this segment (full segment, not window), commit exactly once
         val startNs = SystemClock.elapsedRealtimeNanos()
-        val txt = if (testTranscriber != null) testTranscriber.invoke(pcm).trim() else {
-            try {
+        val txt = try {
+            if (testTranscriber != null) testTranscriber.invoke(pcm).trim()
+            else {
                 val floatPcm = FloatArray(pcm.size) { pcm[it] / 32768.0f }
                 directAsr.transcribe(floatPcm, sampleRate).text.trim()
-            } catch (e: Exception) {
-                // Same contract as getPartial: a throwing model is a MODEL
-                // failure, never VAD silence. Commit nothing, record why.
-                if (lastDecodeError == null) {
-                    lastDecodeError = e.message?.take(160)
-                    Log.e(tagAsr, "ASR_FINAL id=$segmentIdCounter decode threw", e)
-                }
-                ""
             }
+        } catch (e: Exception) {
+            // Same contract as getPartial: a throwing decoder is a MODEL
+            // failure, never VAD silence. Commit nothing, record why.
+            if (lastDecodeError == null) {
+                lastDecodeError = e.message?.take(160)
+                Log.e(tagAsr, "ASR_FINAL id=$segmentIdCounter decode threw", e)
+            }
+            ""
         }
         val latencyMs = (SystemClock.elapsedRealtimeNanos() - startNs) / 1_000_000
         Log.d(tagVad, "SEGMENT_FINAL id=$segmentIdCounter startSample=$startSample endSample=$endSample durationMs=$durationMs finalized=true text=\"$txt\"")
@@ -346,7 +351,7 @@ class StreamingAsrSession(
         hasSpeech = false
         silenceMs = 0
         speechStartSample = null
-        try { vad.flush() } catch (_: Exception) {}
+        try { vad.flush() } catch (e: Exception) { Log.w(tagVad, "vad.flush failed (VAD state may leak into next segment)", e) }
         return log
     }
 
@@ -354,7 +359,7 @@ class StreamingAsrSession(
         if (currentSegmentSamples.isNotEmpty()) {
             finalizeCurrentSegment(isEndpoint = true)
         }
-        try { vad.flush() } catch (_: Exception) {}
+        try { vad.flush() } catch (e: Exception) { Log.w(tagVad, "vad.flush failed (VAD state may leak into next segment)", e) }
         var seg: VadSegment? = null
         while (vad.popSegment()?.also { seg = it } != null) {
             Log.d(tagVad, "finish drain VAD internal pop ${seg!!.samples.size} samples")

@@ -60,7 +60,9 @@ class IndicConformerAsrAdapter(
                     return cand.absolutePath
                 }
             }
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            Log.w(tag, "pack ASR resolution failed, falling back to bundled assets: ${e.message}")
+        }
         return SherpaAssets.prepare(context, modelDir)
     }
 
@@ -79,23 +81,39 @@ class IndicConformerAsrAdapter(
             if (sharedRecognizer != null && sharedBaseDir == baseDir) {
                 recognizer = sharedRecognizer
                 Log.d(tag, "reusing shared OfflineRecognizer dir=$baseDir")
+                ModelStatus.setAsr(ModelInfo(ModelState.READY, "shared recognizer ($baseDir)"))
                 return
             }
         }
+        ModelStatus.loadingAsr("NEMO Hindi ($baseDir)")
+        val t0 = android.os.SystemClock.elapsedRealtimeNanos()
         Log.d(tag, "creating OfflineRecognizer (NEMO, dir=$baseDir)")
         // Models are extracted to the filesystem (filesDir) or pack dir, so pass null AssetManager.
-        val created = OfflineRecognizer(null, buildConfig(baseDir))
-        recognizer = created
-        synchronized(sharedLock) {
-            sharedRecognizer = created
-            sharedBaseDir = baseDir
+        try {
+            val created = OfflineRecognizer(null, buildConfig(baseDir))
+            recognizer = created
+            synchronized(sharedLock) {
+                sharedRecognizer = created
+                sharedBaseDir = baseDir
+            }
+            val ms = (android.os.SystemClock.elapsedRealtimeNanos() - t0) / 1_000_000
+            ModelStatus.setAsr(ModelInfo(ModelState.READY, "NEMO Hindi 134M ($baseDir)", ms))
+            Log.d(tag, "OfflineRecognizer ready in ${ms}ms (cached for reuse)")
+        } catch (e: Exception) {
+            ModelStatus.setAsr(ModelInfo(ModelState.ERROR, "ASR load failed: ${e.message?.take(140)}"))
+            Log.e(tag, "OfflineRecognizer creation failed (dir=$baseDir)", e)
+            throw e
         }
-        Log.d(tag, "OfflineRecognizer ready (cached for reuse)")
     }
 
     /** Non-blocking warm-up to be called off the UI thread (IO). */
     fun warmUpIfNeeded() {
-        try { ensureLoaded() } catch (e: Exception) { Log.w(tag, "warmUp failed: ${e.message}") }
+        try {
+            ensureLoaded()
+        } catch (e: Exception) {
+            // Status already recorded as ERROR by ensureLoaded; log once here.
+            Log.w(tag, "warmUp failed: ${e.message}")
+        }
     }
 
     override fun transcribe(samples: FloatArray, sampleRate: Int): AsrResult {

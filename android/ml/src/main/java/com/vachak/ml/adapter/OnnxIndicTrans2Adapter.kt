@@ -52,6 +52,15 @@ class OnnxIndicTrans2Adapter(
     private var mergeRank: Map<String, Int> = emptyMap()
     private var srcAdded: Map<String, Int> = emptyMap()
 
+    /**
+     * GOLD curated pre-check (hi→sat, exact match): deterministic cover for
+     * known INT8 failure modes (e.g. `नमस्ते` repetition). Sourced from
+     * `datasets/hin_sat/corpus.gold_verified.tsv` (human-verified tier) and
+     * shipped as `vachak_models/mt/gold.tsv` — edit the TSV, not code.
+     * Loaded once at warm-up; empty (fail-open to the model) if unreadable.
+     */
+    private var goldMap: Map<String, String> = emptyMap()
+
     private var srcDictSize = 122706
     private var tgtDictSize = 122672
     private var maxSourcePositions = 256
@@ -59,6 +68,12 @@ class OnnxIndicTrans2Adapter(
     private val eosId = 2
     private val decoderStartId = 2
     private val maxTargetLen = 128
+    /** Encoder hidden width (IndicTrans2-dist-320M). Asserted against the loaded graph. */
+    private val hiddenDim = 512
+    /** Decoder layers, DERIVED from the with-past graph (past outputs / 4 per
+     * layer: decoder+encoder x key+value) instead of hardcoded — a bundle
+     * mismatch fails loud here, not mid-decode. */
+    private var decLayers = 18
 
     private val olChiki = Regex("[\u1C50-\u1C7F]")
 
@@ -73,6 +88,7 @@ class OnnxIndicTrans2Adapter(
         lock.lock()
         try {
             if (ready) return EngineResult.Ok(Unit)
+            com.vachak.ml.ModelStatus.loadingMt("ONNX Santali bundle")
             val dir = SherpaAssets.prepare(context, modelDir)
             val t0 = android.os.SystemClock.elapsedRealtimeNanos()
             android.util.Log.d("Vachak-MT", "ONNX load from $dir")
@@ -93,13 +109,28 @@ class OnnxIndicTrans2Adapter(
             decSession = env.createSession("$dir/decoder_model.onnx", opts)
             decPastSession = env.createSession("$dir/decoder_with_past_model.onnx", opts)
             ortEnv = env
+            android.util.Log.d("Vachak-MT", "ONNX graphs enc.in=${encSession!!.inputNames} dec.out0=${decSession!!.outputNames.firstOrNull()} past.outs=${decPastSession!!.outputNames.size}")
+            val pastTensors = decPastSession!!.outputNames.size - 1 // minus logits
+            decLayers = if (pastTensors > 0 && pastTensors % 4 == 0) {
+                pastTensors / 4
+            } else {
+                android.util.Log.w("Vachak-MT", "unexpected past tensor count $pastTensors, keeping decLayers=$decLayers")
+                decLayers
+            }
             loadBpe(File(dir, "tokenizer_src.json"), File(dir, "tokenizer_tgt.json"))
+            goldMap = loadGold(File(dir, "gold.tsv"))
             baseDir = dir
             ready = true
             val ms = (android.os.SystemClock.elapsedRealtimeNanos() - t0) / 1_000_000
+            com.vachak.ml.ModelStatus.setMt(
+                com.vachak.ml.ModelInfo(com.vachak.ml.ModelState.READY, "ONNX Santali INT8 ($dir)", ms)
+            )
             android.util.Log.d("Vachak-MT", "ONNX ready in ${ms}ms (enc+dec+past, threads=1)")
             return EngineResult.Ok(Unit)
         } catch (e: Exception) {
+            com.vachak.ml.ModelStatus.setMt(
+                com.vachak.ml.ModelInfo(com.vachak.ml.ModelState.ERROR, "MT load failed: ${e.message?.take(140)}")
+            )
             android.util.Log.e("Vachak-MT", "ONNX load failed", e)
             return EngineResult.Err(EngineError.MODEL_LOAD_FAILED, "ONNX load failed: ${e.message}")
         } finally {
@@ -115,7 +146,7 @@ class OnnxIndicTrans2Adapter(
         val lr = loadModel(modelDir)
         if (lr is EngineResult.Err) return lr
         // Tier 0: GOLD curated pre-check for known INT8 failure modes (exact match).
-        GOLD[text.trim()]?.let {
+        goldMap[text.trim()]?.let {
             android.util.Log.d("Vachak-MT", "ONNX curated \"${text.take(30)}\" -> \"${it.take(30)}\"")
             return EngineResult.Ok(it)
         }
@@ -144,8 +175,8 @@ class OnnxIndicTrans2Adapter(
             val encOut = encSession!!.run(encInputs)
             @Suppress("UNCHECKED_CAST")
             val hidden = (encOut.get(0).value as Array<Array<FloatArray>>)
-            val flatHidden = FloatArray(n * 512)
-            for (i in 0 until n) System.arraycopy(hidden[0][i], 0, flatHidden, i * 512, 512)
+            val flatHidden = FloatArray(n * hiddenDim)
+            for (i in 0 until n) System.arraycopy(hidden[0][i], 0, flatHidden, i * hiddenDim, hiddenDim)
             encOut.close()
             encInputs.values.forEach { try { it.close() } catch (_: Throwable) {} }
             android.util.Log.d("Vachak-MT", "ONNX encode done shape=[1,$n,512]")
@@ -289,12 +320,12 @@ class OnnxIndicTrans2Adapter(
     }
 
     private fun hiddenTensor(env: OrtEnvironment, flat: FloatArray, n: Int): OnnxTensor {
-        return OnnxTensor.createTensor(env, java.nio.FloatBuffer.wrap(flat), longArrayOf(1, n.toLong(), 512))
+        return OnnxTensor.createTensor(env, java.nio.FloatBuffer.wrap(flat), longArrayOf(1, n.toLong(), hiddenDim.toLong()))
     }
 
     private fun feedPast(inputs: MutableMap<String, OnnxTensor>, past: OrtSession.Result) {
         // present.{i}.{decoder,encoder}.{key,value} -> past_key_values.{i}.*
-        for (i in 0 until 18) {
+        for (i in 0 until decLayers) {
             for (io in listOf("decoder", "encoder")) {
                 for (kv in listOf("key", "value")) {
                     val outName = "present.$i.$io.$kv"
@@ -333,13 +364,44 @@ class OnnxIndicTrans2Adapter(
         }
     }
 
-    private fun readMeta(f: File) {
-        if (!f.exists()) return
+    /** Load the GOLD TSV (hindi TAB santali per line, `#` comments). Fail-open:
+     * an unreadable TSV only loses the curated pre-check — the model still
+     * translates. Never throws. */
+    internal fun loadGold(f: File): Map<String, String> {
+        if (!f.exists()) {
+            android.util.Log.w("Vachak-MT", "gold.tsv missing at ${f.absolutePath} — curated pre-check disabled")
+            return emptyMap()
+        }
+        return try {
+            val map = HashMap<String, String>()
+            f.bufferedReader().useLines { lines ->
+                lines.forEach { raw ->
+                    val line = raw.trim()
+                    if (line.isEmpty() || line.startsWith("#")) return@forEach
+                    val tab = line.indexOf('\t')
+                    if (tab <= 0) {
+                        android.util.Log.w("Vachak-MT", "gold.tsv skipping malformed line: ${line.take(40)}")
+                        return@forEach
+                    }
+                    map[line.substring(0, tab)] = line.substring(tab + 1)
+                }
+            }
+            android.util.Log.d("Vachak-MT", "GOLD ready entries=${map.size} from ${f.absolutePath}")
+            map
+        } catch (e: Exception) {
+            android.util.Log.w("Vachak-MT", "gold.tsv unreadable — curated pre-check disabled: ${e.message}")
+            emptyMap()
+        }
+    }
+
+    private fun readMeta(f: File) {        if (!f.exists()) return
         try {
             val t = f.readText()
             Regex("\"src_dict_size\"\\s*:\\s*(\\d+)").find(t)?.let { srcDictSize = it.groupValues[1].toInt() }
             Regex("\"tgt_dict_size\"\\s*:\\s*(\\d+)").find(t)?.let { tgtDictSize = it.groupValues[1].toInt() }
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            android.util.Log.w("Vachak-MT", "tokenizer_meta unreadable, keeping defaults src=$srcDictSize tgt=$tgtDictSize: ${e.message}")
+        }
     }
 
     private fun readMaxPositions(f: File) {
@@ -348,7 +410,9 @@ class OnnxIndicTrans2Adapter(
             Regex("\"max_source_positions\"\\s*:\\s*(\\d+)").find(f.readText())?.let {
                 maxSourcePositions = it.groupValues[1].toInt().coerceAtMost(258)
             }
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            android.util.Log.w("Vachak-MT", "config.json unreadable, keeping maxSourcePositions=$maxSourcePositions: ${e.message}")
+        }
     }
 
     private fun loadBpe(srcJson: File, tgtJson: File) {
@@ -450,69 +514,4 @@ class OnnxIndicTrans2Adapter(
         android.util.Log.d("Vachak-MT", "ONNX BPE ready vocab=${vocab.size} merges=${ranks.size} tgtIds=${rev.size} in ${ms}ms")
     }
 
-    companion object {
-        /**
-         * GOLD curated pre-check (hi→sat, exact match): deterministic cover for
-         * known INT8 failure modes (e.g. `नमस्ते` repetition). Sourced from
-         * `datasets/hin_sat/corpus.gold_verified.tsv` (human-verified tier).
-         * Versioned here, never silently edited at runtime.
-         */
-        private val GOLD: Map<String, String> = mapOf(
-            "नमस्ते" to "ᱡᱚᱦᱟᱨ",
-            "आज" to "ᱛᱮᱦᱮᱧ",
-            "चार" to "ᱯᱩᱱ",
-            "बाद में मिलते हैं" to "ᱛᱟᱭᱚᱢ ᱛᱮ ᱞᱟᱝ ᱧᱟᱯᱟᱢᱚᱜᱼᱟ",
-            "मैं समझता हूँ" to "ᱤᱧ ᱵᱩᱡᱷᱟᱹᱣ ᱮᱫᱟᱹᱧ",
-            "पुलिस को बुलाओ" to "ᱯᱩᱞᱤᱥ ᱦᱚᱦᱚ ᱠᱚᱢ",
-            "शुभ दोपहर" to "ᱥᱟᱹᱜᱩᱱ ᱛᱟᱨᱟᱥᱤᱧ",
-            "आपसे मिलकर अच्छा लगा" to "ᱟᱢ ᱥᱟᱶ ᱧᱟᱯᱟᱢ ᱠᱟᱛᱮ ᱠᱩᱥᱤ ᱮᱱᱟᱹᱧ",
-            "क्या आप अंग्रेज़ी बोलते हैं?" to "ᱪᱮᱫ ᱟᱢ ᱤᱝᱨᱟᱡᱤ ᱨᱚᱲ ᱫᱟᱲᱮᱭᱟᱜ ᱠᱟᱱᱟᱢ?",
-            "आप कैसे हैं?" to "ᱟᱢ ᱪᱮᱫ ᱞᱮᱠᱟ ᱢᱮᱱᱟᱢᱟ?",
-            // Verified interrogatives/shorts from corpus.gold_verified.tsv
-            // (human-verified tier) — deterministic cover where the finetuned
-            // model falls back to generic completions on short questions.
-            "रेलवे स्टेशन कहां है?" to "ᱴᱨᱮᱱ ᱥᱴᱮᱥᱚᱱ ᱚᱠᱟᱨᱮ ᱢᱮᱱᱟᱜᱼᱟ?",
-            "मैं टिकट कहाँ से खरीद सकता हूँ?" to "ᱤᱧ ᱚᱠᱟ ᱠᱷᱚᱱ ᱴᱤᱠᱤᱴ ᱠᱤᱨᱤᱧ ᱫᱟᱲᱮᱭᱟᱜᱼᱟᱹᱧ?",
-            "हवाई अड्डा कहाँ है?" to "ᱮᱭᱟᱨᱯᱚᱨᱴ ᱚᱠᱟᱨᱮ ᱢᱮᱱᱟᱜᱼᱟ?",
-            "क्या आप क्रेडिट कार्ड स्वीकार करते हैं?" to "ᱪᱮᱫ ᱟᱢ ᱠᱨᱮᱰᱤᱴ ᱠᱟᱨᱰ ᱮᱢ ᱟᱝᱜᱚᱪ ᱮᱫᱟ?",
-            "इसकी लागत कितनी है?" to "ᱱᱚᱣᱟ ᱨᱮᱭᱟᱜ ᱜᱚᱱᱚᱝ ᱛᱤᱱᱟᱹᱜ ?",
-            "आप यह कैसे कहते हैं?" to "ᱟᱢ ᱱᱚᱣᱟ ᱪᱤᱠᱟᱹᱛᱮᱢ ᱢᱮᱱ ᱮᱫᱟ?",
-            "क्या आस-पास कोई अस्पताल है?" to "ᱪᱮᱫ ᱥᱩᱨ ᱨᱮ ᱢᱤᱫ ᱦᱚᱥᱯᱤᱴᱟᱞ ᱢᱮᱱᱟᱜᱼᱟ?",
-            "मैं वहां किस प्रकार पहुंचा?" to "ᱤᱧ ᱚᱱᱰᱮ ᱪᱤᱠᱟᱹᱛᱮᱧ ᱥᱮᱴᱮᱨᱚᱜᱼᱟ?",
-            "आप क्या सिफ़ारिश करते हैं?" to "ᱟᱢ ᱪᱮᱫ ᱥᱚᱞᱦᱟᱢ ᱮᱢᱚᱜ ᱠᱟᱱᱟ?",
-            "बाज़ार कहाँ है?" to "ᱵᱟᱡᱟᱨ ᱚᱠᱟᱨᱮ ᱢᱮᱱᱟᱜᱼᱟ?",
-            "अस्पताल कहाँ है?" to "ᱦᱚᱥᱯᱤᱴᱟᱞ ᱚᱠᱟᱨᱮ ᱢᱮᱱᱟᱜᱼᱟ?",
-            "आपका नाम क्या है?" to "ᱟᱢᱟᱜ ᱧᱩᱛᱩᱢ ᱪᱮᱫ?",
-            "क्या पैदल चलना सुरक्षित है?" to "ᱪᱮᱫ ᱱᱚᱣᱟ ᱛᱟᱲᱟᱢ ᱞᱟᱹᱜᱤᱫ ᱨᱚᱯᱟ ᱜᱮᱭᱟ?",
-            "बाथरूम कहाँ है?" to "ᱵᱟᱛᱷᱨᱩᱢ ᱚᱠᱟᱨᱮ ᱢᱮᱱᱟᱜᱼᱟ?",
-            "टिकट कितनी है?" to "ᱴᱤᱠᱤᱴ ᱫᱚ ᱛᱤᱱᱟᱹᱜ ᱜᱟᱱ?",
-            "क्या समय हो गया है?" to "ᱱᱤᱛ ᱛᱤᱱᱟᱹᱜ ᱚᱠᱛᱚ ᱦᱩᱭ ᱟᱠᱟᱱᱟ?",
-            "इसका क्या मतलब है?" to "ᱱᱚᱣᱟ ᱨᱮᱭᱟᱜ ᱢᱮᱱᱮᱛ ᱪᱮᱫ ᱠᱟᱱᱟ?",
-            "आपकी आयु कितनी है?" to "ᱟᱢᱟᱜ ᱛᱤᱱᱮᱜ ᱵᱚᱭᱮᱥ ᱦᱩᱭᱩᱜ ᱠᱟᱱ ᱛᱟᱢᱟ?",
-            "आप कहाँ से हैं?" to "ᱟᱢ ᱚᱠᱟ ᱨᱮᱱ ᱠᱟᱱᱟᱢ?",
-            "क्या आप मेरी मदद कर सकते हैं?" to "ᱪᱮᱫ ᱟᱢ ᱤᱧᱮᱢ ᱜᱚᱲᱚ ᱟᱹᱧᱟ?",
-            "औषधालय कहां है?" to "ᱯᱷᱟᱨᱢᱟᱥᱭ ᱚᱠᱟᱨᱮ ᱢᱮᱱᱟᱜᱼᱟ?",
-            "क्या यह दिन अच्छा है?" to "ᱪᱮᱫ ᱱᱚᱣᱟ ᱫᱤᱱ ᱱᱟᱯᱟᱭ ᱠᱟᱱᱟ?",
-            "क्या यह सप्ताह अच्छा है?" to "ᱪᱮᱫ ᱱᱚᱣᱟ ᱦᱟᱯᱛᱟ ᱱᱟᱯᱟᱭ ᱠᱟᱱᱟ?",
-            "क्या यह पेन अच्छा है?" to "ᱪᱮᱫ ᱱᱚᱣᱟ ᱯᱮᱱ ᱱᱟᱯᱟᱭ ᱠᱟᱱᱟ?",
-            "क्या यह नदी अच्छा है?" to "ᱪᱮᱫ ᱱᱚᱣᱟ ᱱᱟᱹᱭ ᱱᱟᱯᱟᱭ ᱠᱟᱱᱟ?",
-            "क्या यह आदमी अच्छा है?" to "ᱪᱮᱫ ᱱᱚᱣᱟ ᱦᱚᱲ ᱱᱟᱯᱟᱭ ᱠᱟᱱᱟ?",
-            "क्या यह दोस्त अच्छा है?" to "ᱪᱮᱫ ᱱᱚᱣᱟ ᱜᱟᱛᱮ ᱱᱟᱯᱟᱭ ᱠᱟᱱᱟ?",
-            "क्या यह भाषा अच्छा है?" to "ᱪᱮᱫ ᱱᱚᱣᱟ ᱯᱟᱹᱨᱥᱤ ᱱᱟᱯᱟᱭ ᱠᱟᱱᱟ?",
-            "क्या यह मुर्गी अच्छा है?" to "ᱪᱮᱫ ᱱᱚᱣᱟ ᱢᱩᱠᱨᱤ ᱱᱟᱯᱟᱭ ᱠᱟᱱᱟ?",
-            "क्या यह खेल अच्छा है?" to "ᱪᱮᱫ ᱱᱚᱣᱟ ᱠᱷᱮᱞ ᱱᱟᱯᱟᱭ ᱠᱟᱱᱟ?",
-            "क्या यह बाज़ार अच्छा है?" to "ᱪᱮᱫ ᱱᱚᱣᱟ ᱵᱟᱡᱟᱨ ᱱᱟᱯᱟᱭ ᱠᱟᱱᱟ?",
-            "क्या यह नर्स अच्छा है?" to "ᱪᱮᱫ ᱱᱚᱣᱟ ᱱᱟᱨᱥ ᱱᱟᱯᱟᱭ ᱠᱟᱱᱟ?",
-            "क्या यह नाम अच्छा है?" to "ᱪᱮᱫ ᱱᱚᱣᱟ ᱧᱩᱛᱩᱢ ᱱᱟᱯᱟᱭ ᱠᱟᱱᱟ?",
-            "क्या यह रात अच्छा है?" to "ᱪᱮᱫ ᱱᱚᱣᱟ ᱧᱤᱫᱟᱹ ᱱᱟᱯᱟᱭ ᱠᱟᱱᱟ?",
-            "क्या यह समय अच्छा है?" to "ᱪᱮᱫ ᱱᱚᱣᱟ ᱚᱠᱛᱚ ᱱᱟᱯᱟᱭ ᱠᱟᱱᱟ?",
-            "क्या यह नाक अच्छा है?" to "ᱪᱮᱫ ᱱᱚᱣᱟ ᱱᱟᱠ ᱱᱟᱯᱟᱭ ᱠᱟᱱᱟ?",
-            "क्या यह पेंसिल अच्छा है?" to "ᱪᱮᱫ ᱱᱚᱣᱟ ᱯᱮᱱᱥᱤᱞ ᱱᱟᱯᱟᱭ ᱠᱟᱱᱟ?",
-            "क्या यह पानी अच्छा है?" to "ᱪᱮᱫ ᱱᱚᱣᱟ ᱫᱟᱜ ᱱᱟᱯᱟᱭ ᱠᱟᱱᱟ?",
-            // Base-model behavior preserved against finetune forgetting
-            // (Sep-1 verified on-device; absent from gold corpus, kept singly
-            // and labeled — not presented as human-verified).
-            "मेरा नाम क्या है" to "ᱤᱧᱟᱹᱜ ᱧᱩᱛᱩᱢ ᱪᱮᱫ?"
-        )
-    }
 }

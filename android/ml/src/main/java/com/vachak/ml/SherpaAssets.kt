@@ -23,6 +23,7 @@ import java.io.File
 object SherpaAssets {
     private const val TAG = "Vachak-Assets"
     const val ASSET_ROOT = "vachak_models"
+    private const val MANIFEST = ".vachak_manifest"
     @Volatile private var prepared = mutableSetOf<String>()
     private val lock = Any()
 
@@ -46,11 +47,18 @@ object SherpaAssets {
             else -> File(outDir, "tokens.txt").exists()
         }
         if (markerExists) {
-            synchronized(lock) { prepared.add(key) }
-            Log.d(TAG, "prepare cached (marker exists): $key -> ${outDir.absolutePath}")
-            return outDir.absolutePath
+            // Integrity gate: a kill -9 mid-copy leaves markers behind with
+            // truncated bytes. The manifest (written after a verified copy)
+            // is the source of truth — mismatch means re-copy once, loudly.
+            if (verifyManifest(context, subdir, outDir)) {
+                synchronized(lock) { prepared.add(key) }
+                Log.d(TAG, "prepare cached (marker+manifest OK): $key -> ${outDir.absolutePath}")
+                return outDir.absolutePath
+            }
+            Log.w(TAG, "prepare manifest MISMATCH for $key — previous copy incomplete, re-copying")
         }
         copyTree(context, "$ASSET_ROOT/$subdir", outDir)
+        writeManifest(context, subdir, outDir)
         synchronized(lock) { prepared.add(key) }
         return outDir.absolutePath
     }
@@ -66,8 +74,58 @@ object SherpaAssets {
         return if (f.isDirectory && File(f, "model.onnx").exists() && File(f, "tokens.txt").exists()) f.absolutePath else null
     }
 
-    private fun copyTree(context: Context, assetPath: String, outDir: File) {
-        val entries = runCatching { context.assets.list(assetPath) }.getOrNull()
+    /**
+     * Manifest of name->bytes for every file under an extracted subdir,
+     * written only after a complete copy. Comparing it on the marker-hit
+     * path turns silent truncation rot into a one-time loud re-copy.
+     */
+    private fun manifestEntries(outDir: File): Map<String, Long> =
+        outDir.walkTopDown()
+            .filter { it.isFile && it.name != MANIFEST }
+            .associate { it.relativeTo(outDir).path to it.length() }
+
+    private fun writeManifest(context: Context, subdir: String, outDir: File) {
+        try {
+            val lines = manifestEntries(outDir).entries
+                .sortedBy { it.key }
+                .joinToString("\n") { "${it.key}\t${it.value}" }
+            File(outDir, MANIFEST).writeText("# vachak $subdir manifest (name<TAB>bytes)\n$lines\n")
+            Log.d(TAG, "manifest written for $subdir (${lines.lines().size} files)")
+        } catch (e: Exception) {
+            Log.w(TAG, "manifest write failed for $subdir: ${e.message}")
+        }
+    }
+
+    private fun verifyManifest(context: Context, subdir: String, outDir: File): Boolean {
+        return try {
+            val mf = File(outDir, MANIFEST)
+            if (!mf.exists()) {
+                // Pre-manifest install (upgrade path): trust markers this once,
+                // then write the manifest so all future launches verify.
+                Log.d(TAG, "no manifest for $subdir (pre-manifest install) — trusting markers once")
+                writeManifest(context, subdir, outDir)
+                return true
+            }
+            val expected = mf.readLines()
+                .filter { it.isNotBlank() && !it.startsWith("#") }
+                .associate {
+                    val (name, size) = it.split("\t")
+                    name to size.toLong()
+                }
+            val actual = manifestEntries(outDir)
+            if (expected == actual) return true
+            val missing = (expected.keys - actual.keys).take(5)
+            val wrongSize = expected.keys.intersect(actual.keys)
+                .filter { expected[it] != actual[it] }.take(5)
+            Log.w(TAG, "manifest mismatch $subdir missing=$missing wrongSize=$wrongSize")
+            false
+        } catch (e: Exception) {
+            Log.w(TAG, "manifest verify failed for $subdir (re-copying to be safe): ${e.message}")
+            false
+        }
+    }
+
+    private fun copyTree(context: Context, assetPath: String, outDir: File) {        val entries = runCatching { context.assets.list(assetPath) }.getOrNull()
         if (entries.isNullOrEmpty()) {
             // Leaf file: copy it.
             runCatching {

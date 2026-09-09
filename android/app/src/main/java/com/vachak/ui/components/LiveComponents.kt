@@ -27,6 +27,20 @@ import java.util.Locale
 
 private fun fmt(ts: Long): String = SimpleDateFormat("hh:mm a", Locale.getDefault()).format(Date(ts))
 
+/** Measured-stage footer: "ASR 412ms • MT 380ms • TTS 610ms • Total 1.9s ✓<3s". Missing stages are skipped, never zero-filled. */
+private fun timingLine(asrMs: Long?, mtMs: Long?, ttsMs: Long?, totalMs: Long?): String {
+    val parts = mutableListOf<String>()
+    asrMs?.let { parts += "ASR ${it}ms" }
+    mtMs?.let { parts += "MT ${it}ms" }
+    ttsMs?.let { parts += "TTS ${it}ms" }
+    totalMs?.let {
+        val secs = it / 1000f
+        val verdict = if (it < 3000) "✓<3s" else "⚠≥3s"
+        parts += "Total ${"%.1f".format(secs)}s $verdict"
+    }
+    return parts.joinToString(" • ")
+}
+
 @Composable
 fun LiveTranscriptionStrip(
     text: String,
@@ -117,6 +131,15 @@ fun ConversationMessagePair(
                     }
                     item.santaliText != null -> {
                         Text(item.santaliText, style = MaterialTheme.typography.bodyMedium, color = VachakColors.TextPrimary, fontSize = 16.sp, lineHeight = 22.sp)
+                        // Measured pipeline timings for this item (null until the run completes).
+                        if (item.asrMs != null || item.mtMs != null || item.ttsMs != null || item.totalMs != null) {
+                            Text(
+                                timingLine(item.asrMs, item.mtMs, item.ttsMs, item.totalMs),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = VachakColors.TextSecondary,
+                                fontSize = 12.sp
+                            )
+                        }
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                             TextButton(onClick = onPlaySantali, contentPadding = PaddingValues(0.dp)) {
                                 Icon(Icons.AutoMirrored.Outlined.VolumeUp, null, tint = VachakColors.DeepLavender, modifier = Modifier.size(18.dp))

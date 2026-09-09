@@ -51,3 +51,24 @@ class LatencyTracker(private val sample: LatencySample) {
     fun result(): LatencySample = sample
     private fun now(): Long = SystemClock.elapsedRealtimeNanos()
 }
+
+/**
+ * Last completed voice/typed pipeline run, published for DiagnosticsScreen
+ * and the debug dialog. Replaces the old mock benchmark card: timings shown
+ * anywhere in the UI are MEASURED here, never canned. Null until the first
+ * run completes (UI must render "not measured yet", not zeros).
+ */
+object LastPipelineRun {
+    @Volatile var sample: LatencySample? = null
+        private set
+
+    fun publish(tracker: LatencyTracker) {
+        sample = tracker.result()
+        val s = sample!!
+        android.util.Log.d(
+            "Vachak-Latency",
+            "RUN ${s.runId} stages=${s.stageMs()} totalMs=${s.endToEndMs()} " +
+                "withinBudget=${(s.endToEndMs() ?: Float.MAX_VALUE) < 3000}"
+        )
+    }
+}

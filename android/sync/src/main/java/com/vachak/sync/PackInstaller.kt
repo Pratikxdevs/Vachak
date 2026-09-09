@@ -189,7 +189,10 @@ class PackInstaller(private val context: Context) {
                 }
             }
             zip.close(); true
-        } catch (_: Exception) { false }
+        } catch (e: Exception) {
+            Log.w(tag, "validatePackFile(${file.name}) failed: ${e.message}")
+            false
+        }
     }
 
     private fun sha256(data: ByteArray): String {

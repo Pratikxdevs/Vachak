@@ -14,7 +14,12 @@ data class ConversationItem(
     val santaliText: String?, // null while translating
     val timestampMillis: Long,
     val isTranslating: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
+    /** Measured pipeline stages for this item (null until the run completes). */
+    val asrMs: Long? = null,
+    val mtMs: Long? = null,
+    val ttsMs: Long? = null,
+    val totalMs: Long? = null
 )
 
 object LiveConversationStore {

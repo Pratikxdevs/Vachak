@@ -88,17 +88,35 @@ class MainActivity : ComponentActivity() {
         android.util.Log.d("Vachak-Native", "Display refreshRate: ${displayRefresh}Hz, preferredModeId=${window.attributes.preferredDisplayModeId}")
 
         val engine = EngineProvider.real(this)
-        // Background model preparation — preload heavy ONNX/sherpa assets off Main, not blocking first frame
+        // Background model preparation — preload heavy ONNX/sherpa assets off Main, not blocking first frame.
+        // Results are LOGGED WITH CAUSES (never swallowed): a red model here
+        // explains every downstream failure. Live state in ModelStatus.
         lifecycleScope.launch(Dispatchers.IO) {
-            try { engine.translation.loadModel("") } catch (_: Throwable) {}
-            try { engine.asr.loadModel("") } catch (_: Throwable) {}
-            try { engine.tts.loadModel("") } catch (_: Throwable) {}
+            val tag = "Vachak-Models"
+            try {
+                when (val r = engine.translation.loadModel("")) {
+                    is com.vachak.engine.EngineResult.Ok -> android.util.Log.d(tag, "preload MT: OK")
+                    is com.vachak.engine.EngineResult.Err -> android.util.Log.e(tag, "preload MT failed [${r.code}]: ${r.message}")
+                }
+            } catch (e: Throwable) { android.util.Log.e(tag, "preload MT threw", e) }
+            try {
+                when (val r = engine.asr.loadModel("")) {
+                    is com.vachak.engine.EngineResult.Ok -> android.util.Log.d(tag, "preload ASR: OK")
+                    is com.vachak.engine.EngineResult.Err -> android.util.Log.e(tag, "preload ASR failed [${r.code}]: ${r.message}")
+                }
+            } catch (e: Throwable) { android.util.Log.e(tag, "preload ASR threw", e) }
+            try {
+                when (val r = engine.tts.loadModel("")) {
+                    is com.vachak.engine.EngineResult.Ok -> android.util.Log.d(tag, "preload TTS: OK")
+                    is com.vachak.engine.EngineResult.Err -> android.util.Log.e(tag, "preload TTS failed [${r.code}]: ${r.message}")
+                }
+            } catch (e: Throwable) { android.util.Log.e(tag, "preload TTS threw", e) }
             // Pre-warm ASR session to reduce first partial latency
             try {
                 val warmupSession = StreamingAsrSession(this@MainActivity)
                 warmupSession.start(System.nanoTime())
                 warmupSession.warmUpAsync()
-            } catch (_: Throwable) {}
+            } catch (e: Throwable) { android.util.Log.w("Vachak-ASR", "startup ASR warm-up threw (first mic press will cold-load)", e) }
         }
         setContent {
             // Adapt system bars to device dark/light setting — avoids contradicting user theme

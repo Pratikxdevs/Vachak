@@ -14,6 +14,7 @@ import com.vachak.engine.LanguagePair
 import com.vachak.ml.AudioCapturer
 import com.vachak.ml.LatencySample
 import com.vachak.ml.LatencyTracker
+import com.vachak.ml.VachakAudio
 import com.vachak.ml.StreamingAsrSession
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -136,7 +137,7 @@ class LiveViewModel @Inject constructor(
         viewModelScope.launch(pipelineDispatcher) {
             val session = StreamingAsrSession(context)
             session.start(t0)
-            try { session.warmUpAsync() } catch (_: Throwable) {}
+            try { session.warmUpAsync() } catch (e: Throwable) { android.util.Log.w("Vachak-ASR", "LiveViewModel warmUp threw (first decode will cold-load)", e) }
             audioCapturer.startRecording()
             // startRecording() NEVER throws — it fails silently. Detect it here or
             // UI shows "listening" forever with zero samples (emulator mic busy).
@@ -181,7 +182,7 @@ class LiveViewModel @Inject constructor(
                     try {
                         var off = 0
                         while (off < pcmFinal.size) {
-                            val end = minOf(off + 1600, pcmFinal.size)
+                            val end = minOf(off + VachakAudio.VAD_CHUNK_SAMPLES, pcmFinal.size)
                             session.pushAudio(pcmFinal.copyOfRange(off, end))
                             off = end
                         }
@@ -262,11 +263,24 @@ class LiveViewModel @Inject constructor(
                         tracker.markTtsBegin()
                         val pcmRes = engineProvider.tts.synthesize(translated, activeLang)
                         tracker.markAudioBegin()
+                        // Measured stages -> item footer + last-run holder (never canned).
+                        val stages = tracker.result().stageMs()
+                        val total = tracker.result().endToEndMs()?.toLong()
+                        com.vachak.ml.LastPipelineRun.publish(tracker)
                         withContext(Dispatchers.Main) {
+                            val i = LiveConversationStore.items.indexOfFirst { it.id == itemId }
+                            if (i != -1) {
+                                LiveConversationStore.items[i] = LiveConversationStore.items[i].copy(
+                                    asrMs = stages["asr"]?.toLong(),
+                                    mtMs = stages["translate"]?.toLong(),
+                                    ttsMs = stages["tts"]?.toLong(),
+                                    totalMs = total
+                                )
+                            }
                             when (pcmRes) {
                                 is EngineResult.Ok -> {
-                                    _uiState.value = _uiState.value.copy(ttsMessage = "Playing ${ActiveLanguage.label(activeLang)} audio • ${pcmRes.value.size} samples @22050Hz")
-                                    playPcmLocal(pcmRes.value, 22050)
+                                    _uiState.value = _uiState.value.copy(ttsMessage = "Playing ${ActiveLanguage.label(activeLang)} audio • ${pcmRes.value.size} samples @${VachakAudio.TTS_OUTPUT_HZ}Hz")
+                                    playPcmLocal(pcmRes.value, VachakAudio.TTS_OUTPUT_HZ)
                                 }
                                 is EngineResult.Err -> _uiState.value = _uiState.value.copy(ttsMessage = "TTS: ${pcmRes.message}")
                             }
@@ -343,7 +357,7 @@ class LiveViewModel @Inject constructor(
     }
 
     /** Offline AudioTrack playback for the VM-owned pipeline (mirrors LiveScreen.tryPlayPcm). */
-    private fun playPcmLocal(pcm: ShortArray, sampleRate: Int = 22050) {
+    private fun playPcmLocal(pcm: ShortArray, sampleRate: Int = VachakAudio.TTS_OUTPUT_HZ) {
         if (pcm.isEmpty()) return
         try {
             val minBuf = AudioTrack.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT)
