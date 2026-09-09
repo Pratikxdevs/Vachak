@@ -138,7 +138,7 @@ class LiveViewModel @Inject constructor(
             val session = StreamingAsrSession(context)
             session.start(t0)
             try { session.warmUpAsync() } catch (e: Throwable) { android.util.Log.w("Vachak-ASR", "LiveViewModel warmUp threw (first decode will cold-load)", e) }
-            audioCapturer.startRecording()
+            audioCapturer.startRecording(context)
             // startRecording() NEVER throws — it fails silently. Detect it here or
             // UI shows "listening" forever with zero samples (emulator mic busy).
             if (!audioCapturer.isRecording()) {
@@ -223,12 +223,14 @@ class LiveViewModel @Inject constructor(
                     val modelError = session?.lastDecodeError
                     val peakDb = com.vachak.ml.VachakAudio.rmsToDb(session?.maxRmsSeen ?: audioCapturer.peakRms)
                     val micSilent = (session?.maxRmsSeen ?: 0f) < com.vachak.ml.VachakAudio.DIGITAL_SILENCE_RMS && audioCapturer.peakRms < com.vachak.ml.VachakAudio.DIGITAL_SILENCE_RMS
-                    android.util.Log.e("Vachak-ASR", "stop empty: modelError=$modelError micSilent=$micSilent silentStart=${audioCapturer.silentStart} src=${audioCapturer.audioSourceUsed} ${session?.signalReport()}")
+                    android.util.Log.e("Vachak-ASR", "stop empty: modelError=$modelError micSilent=$micSilent silentStart=${audioCapturer.silentStart} src=${audioCapturer.audioSourceUsed} audit=${audioCapturer.lastMicAudit} ${session?.signalReport()}")
+                    val auditCulprit = audioCapturer.lastMicAudit?.messageForUser(pcmFinal.size, peakDb)
                     withContext(Dispatchers.Main) {
                         // Same three-way diagnosis as LiveScreen (see there).
                         _uiState.value = _uiState.value.copy(
                             asrError = when {
                                 modelError != null -> "[ASR:MODEL] Decode failed — $modelError"
+                                auditCulprit != null -> "[ASR:MIC] $auditCulprit"
                                 micSilent -> "[ASR:MIC] Microphone delivered silence (${pcmFinal.size} samples, peak $peakDb). Check hardware mute, Bluetooth route, or another app holding the mic."
                                 else -> "[ASR:VAD] Heard you (peak $peakDb) but no words decoded — speak closer and louder, then retry. (${pcmFinal.size} samples)"
                             },

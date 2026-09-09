@@ -283,7 +283,7 @@ fun LiveScreen(
                 } catch (e: Throwable) {
                     Log.e(TAG_ASR, "warmUpAsync failed", e)
                 }
-                audioCapturer.startRecording()
+                audioCapturer.startRecording(context)
                 // startRecording() NEVER throws — it fails silently. Detect it here or
                 // UI shows "listening" forever with zero samples (emulator mic busy).
                 if (!audioCapturer.isRecording()) {
@@ -472,7 +472,10 @@ fun LiveScreen(
                     val report = session?.signalReport() ?: "no session"
                     val peakDb = com.vachak.ml.VachakAudio.rmsToDb(session?.maxRmsSeen ?: audioCapturer.peakRms)
                     val micSilent = (session?.maxRmsSeen ?: 0f) < com.vachak.ml.VachakAudio.DIGITAL_SILENCE_RMS && audioCapturer.peakRms < com.vachak.ml.VachakAudio.DIGITAL_SILENCE_RMS
-                    Log.e(TAG_ASR, "stop empty: modelError=$modelError micSilent=$micSilent silentStart=${audioCapturer.silentStart} src=${audioCapturer.audioSourceUsed} $report pcm=${pcmFinal.size}")
+                    Log.e(TAG_ASR, "stop empty: modelError=$modelError micSilent=$micSilent silentStart=${audioCapturer.silentStart} src=${audioCapturer.audioSourceUsed} audit=${audioCapturer.lastMicAudit} $report pcm=${pcmFinal.size}")
+                    // OS audit first: a named culprit (mute / other app / call /
+                    // BT) beats the generic silence checklist every time.
+                    val auditCulprit = audioCapturer.lastMicAudit?.messageForUser(pcmFinal.size, peakDb)
                     withContext(Dispatchers.Main) {
                         partialTextState.value = ""
                         // Three-way diagnosis (never a bare "no speech" again):
@@ -480,6 +483,7 @@ fun LiveScreen(
                         // (muted route / BT / other app); VAD = audible but undecodable.
                         asrError = when {
                             modelError != null -> "[ASR:MODEL] Decode failed — $modelError"
+                            auditCulprit != null -> "[ASR:MIC] $auditCulprit"
                             micSilent -> "[ASR:MIC] Microphone delivered silence (${pcmFinal.size} samples, peak $peakDb). Check: hardware mute shutter? Bluetooth earpiece routed elsewhere? Another app holding the mic? Then retry."
                             else -> "[ASR:VAD] Heard you (peak $peakDb) but no words decoded — speak closer and louder, then retry. (${pcmFinal.size} samples)"
                         }

@@ -24,6 +24,38 @@ import kotlinx.coroutines.withTimeout
  * Uktam uses AssetManager OfflineNemo model.int8.onnx; Vachak uses filesDir via SherpaAssets null AssetManager — both offline.
  * Sequential only, one capturer at a time (mirrors Uktam's single AudioCapturer instance).
  */
+/**
+ * OS-level microphone audit snapshot (see [AudioCapturer.auditMic]).
+ * Any one of these makes the OS hand us digital zeros with permission granted.
+ */
+data class MicAuditResult(
+    val osMuted: Boolean,
+    val unmutedByUs: Boolean,
+    /** Audio sources of OTHER apps currently recording (empty = mic is ours alone). */
+    val otherRecorders: List<String>,
+    val inCall: Boolean,
+    val btScoOn: Boolean,
+    val inputDevices: List<String>
+) {
+    fun suspicious(): Boolean = osMuted || otherRecorders.isNotEmpty() || inCall || btScoOn
+
+    /**
+     * User-facing culprit, or null when the OS path looks clean (caller falls
+     * through to the generic hardware checklist). Never blank-guesses.
+     */
+    fun messageForUser(sampleCount: Int, peakDb: String): String? = when {
+        osMuted -> "System microphone is MUTED ($sampleCount samples, peak $peakDb). " +
+            "Unmute it (Quick Settings → Microphone, or the tablet's mute switch) and retry."
+        otherRecorders.isNotEmpty() -> "Another app is recording right now (${otherRecorders.take(2).joinToString()}), " +
+            "so this app gets silence ($sampleCount samples). Close it (voice assistant? recorder?) and retry."
+        inCall -> "Tablet is in a voice/video call, which owns the microphone " +
+            "($sampleCount samples of silence). End the call and retry."
+        btScoOn -> "Bluetooth audio is active but delivered silence ($sampleCount samples, peak $peakDb). " +
+            "Disconnect the earpiece (or speak into it, not the tablet) and retry."
+        else -> null
+    }
+}
+
 class AudioCapturer {
     private val sampleRate = 16000
     /** 14s cap = 224k samples at 16kHz — prevents unbounded doubling on 2GB RAM (hard limit from AGENTS.md). */
@@ -43,15 +75,102 @@ class AudioCapturer {
     /** True when every source probed digital silence — mic path suspect, not the speaker. */
     @Volatile var silentStart: Boolean = false
         private set
+    /** OS-level mic audit from the last start (mute / other recorders / call / route). */
+    @Volatile var lastMicAudit: MicAuditResult? = null
+        private set
+
+    /**
+     * OS-level microphone audit. Permission can be granted while the OS still
+     * hands us digital zeros: system mic mute, another app recording, an
+     * active call, or a dead Bluetooth route. All are detectable without any
+     * permission beyond what the manifest already holds — so detect them and
+     * say WHICH one instead of "no speech detected".
+     *
+     * Also attempts to release an OS software mute (user pressed mic = intent
+     * to record). Safe to call repeatedly; pure reads + one conditional write.
+     */
+    fun auditMic(context: android.content.Context): MicAuditResult {
+        val am = context.getSystemService(android.content.Context.AUDIO_SERVICE) as android.media.AudioManager
+        var osMuted = false
+        try {
+            osMuted = am.isMicrophoneMute
+        } catch (e: Exception) {
+            android.util.Log.w("Vachak-ASR", "mic audit: isMicrophoneMute unreadable: ${e.message}")
+        }
+        var unmutedByUs = false
+        if (osMuted) {
+            try {
+                am.isMicrophoneMute = false
+                osMuted = am.isMicrophoneMute
+                unmutedByUs = !osMuted
+                android.util.Log.w("Vachak-ASR", "mic audit: OS mic was muted; unmute attempt -> muted=$osMuted")
+            } catch (e: Exception) {
+                android.util.Log.w("Vachak-ASR", "mic audit: unmute failed (needs MODIFY_AUDIO_SETTINGS): ${e.message}")
+            }
+        }
+        var others: List<String> = emptyList()
+        // API 29+: without the guard this is a NoSuchMethodError (not an
+        // Exception — uncatchable by `catch (e: Exception)`) on Android 9,
+        // our minSdk. Guard + belt-and-braces Throwable catch.
+        if (android.os.Build.VERSION.SDK_INT >= 29) {
+            try {
+                others = am.activeRecordingConfigurations.map { "src=${it.audioSource}" }
+            } catch (t: Throwable) {
+                android.util.Log.w("Vachak-ASR", "mic audit: active recorders unreadable: ${t.message}")
+            }
+        }
+        var inCall = false
+        try {
+            inCall = am.mode == android.media.AudioManager.MODE_IN_CALL ||
+                am.mode == android.media.AudioManager.MODE_IN_COMMUNICATION
+        } catch (e: Exception) {
+            android.util.Log.w("Vachak-ASR", "mic audit: audio mode unreadable: ${e.message}")
+        }
+        var btSco = false
+        try {
+            btSco = am.isBluetoothScoOn
+        } catch (e: Exception) {
+            android.util.Log.w("Vachak-ASR", "mic audit: BT SCO state unreadable: ${e.message}")
+        }
+        var inputs: List<String> = emptyList()
+        try {
+            inputs = am.getDevices(android.media.AudioManager.GET_DEVICES_INPUTS)
+                .map { "${it.type}:${it.productName}" }
+        } catch (t: Throwable) {
+            android.util.Log.w("Vachak-ASR", "mic audit: input devices unreadable: ${t.message}")
+        }
+        val result = MicAuditResult(osMuted, unmutedByUs, others, inCall, btSco, inputs)
+        lastMicAudit = result
+        if (result.suspicious()) {
+            android.util.Log.w("Vachak-ASR", "mic audit SUSPICIOUS: $result")
+        } else {
+            android.util.Log.d("Vachak-ASR", "mic audit clean: $result")
+        }
+        return result
+    }
     private var shortBuffer = ShortArray(16000 * 10) // 10s initial, doubles on overflow (Uktam pattern) but capped at maxBufferSize
     private var bufferSize = 0
     private val bufferLock = Any()
     private var recordingJob: Job? = null
     private val coroutineScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
+    /**
+     * Preferred entry: audits the OS mic path first (mute / other recorders /
+     * call / route — the digital-silence culprits permission can't catch),
+     * then captures. Audit failures never block capture.
+     */
     @SuppressLint("MissingPermission")
-    fun startRecording() {
-        if (isRecording) {
+    fun startRecording(context: android.content.Context) {
+        try {
+            auditMic(context)
+        } catch (e: Exception) {
+            android.util.Log.w("Vachak-ASR", "mic audit threw, capturing anyway: ${e.message}")
+        }
+        startRecording()
+    }
+
+    @SuppressLint("MissingPermission")
+    fun startRecording() {        if (isRecording) {
             android.util.Log.d("Vachak-ASR", "startRecording ignored, already recording")
             return
         }

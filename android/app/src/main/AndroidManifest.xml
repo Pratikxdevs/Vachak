@@ -5,6 +5,9 @@
          The app must run with WiFi OFF for the SIH demo. Any network call is a bug. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <!-- Normal (install-granted, offline-safe): lets the app release an OS-level
+         microphone mute before capture instead of recording digital silence. -->
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 
     <application
         android:name=".VachakApplication"
