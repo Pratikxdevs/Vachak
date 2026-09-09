@@ -42,7 +42,7 @@ data class LiveUiState(
     val isListening: Boolean = false,
     val partialText: String = "",
     val committedText: String = "",
-    // Holds the active-target translation (Mundari by default, Santali if toggled).
+    // Holds the active-target translation (Santali by default, Mundari if toggled).
     // Named santaliText for compat with existing collectors; label via ActiveLanguage.
     val santaliText: String? = null,
     val latencyMs: Long? = null,
@@ -219,8 +219,14 @@ class LiveViewModel @Inject constructor(
                     }
                 }
                 if (finalCommitted.isBlank()) {
+                    val modelError = session?.lastDecodeError
                     withContext(Dispatchers.Main) {
-                        _uiState.value = _uiState.value.copy(asrError = "[ASR:VAD] No speech detected — speak closer to mic (${pcmFinal.size} samples @16000Hz)", isTranslating = false, partialText = "")
+                        // Throwing recognizer => MODEL failure, never VAD silence.
+                        _uiState.value = _uiState.value.copy(
+                            asrError = if (modelError != null) "[ASR:MODEL] Decode failed — $modelError"
+                            else "[ASR:VAD] No speech detected — speak closer to mic (${pcmFinal.size} samples @16000Hz)",
+                            isTranslating = false, partialText = ""
+                        )
                     }
                     tracker.markAsr("")
                     streamingSession = null

@@ -68,9 +68,9 @@ fun ConversationMessagePair(
     onPlayHindi: () -> Unit = {},
     onPlaySantali: () -> Unit = {},
     onRetry: () -> Unit = {},
-    // Active target language label — "Mundari" by default, "Santali (Ol Chiki)" if toggled.
+    // Active target language label — "Santali (Ol Chiki)" by default, "Mundari" if toggled.
     // Kept as a param (not read from ActiveLanguage directly) so previews/tests stay deterministic.
-    targetLabel: String = "Mundari",
+    targetLabel: String = "Santali (Ol Chiki)",
     modifier: Modifier = Modifier
 ) {
     val clipboard = LocalClipboardManager.current

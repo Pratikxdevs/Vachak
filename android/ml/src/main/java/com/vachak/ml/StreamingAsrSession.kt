@@ -68,6 +68,16 @@ class StreamingAsrSession(
     var currentPartial: String = ""
         private set
 
+    /**
+     * First model-decode failure message since [start], if any. A throwing
+     * recognizer (bad model asset, native shape mismatch, …) must NEVER
+     * disguise itself as VAD silence: callers check this when the committed
+     * text comes back empty and surface [MODEL_DECODE_FAILED] instead of
+     * "No speech detected". Reset on every [start].
+     */
+    var lastDecodeError: String? = null
+        private set
+
     private var segmentIdCounter = 0
     private var currentSegmentStartSample = 0
     private var currentSegmentSamples = mutableListOf<Short>()
@@ -97,6 +107,7 @@ class StreamingAsrSession(
     fun start(t0: Long = SystemClock.elapsedRealtimeNanos()) {
         t0Ns = t0
         firstPartialNs = null
+        lastDecodeError = null
         segmentLedger.clear()
         committedText = ""
         currentPartial = ""
@@ -226,8 +237,18 @@ class StreamingAsrSession(
 
         val startNs = SystemClock.elapsedRealtimeNanos()
         val txtRaw = if (testTranscriber != null) testTranscriber.invoke(windowShort).trim() else {
-            val floatPcm = FloatArray(windowShort.size) { windowShort[it] / 32768.0f }
-            directAsr.transcribe(floatPcm, sampleRate).text.trim()
+            try {
+                val floatPcm = FloatArray(windowShort.size) { windowShort[it] / 32768.0f }
+                directAsr.transcribe(floatPcm, sampleRate).text.trim()
+            } catch (e: Exception) {
+                // Model breakage, not silence: record it so finish()/callers
+                // report MODEL failure instead of "no speech detected".
+                if (lastDecodeError == null) {
+                    lastDecodeError = e.message?.take(160)
+                    Log.e(tagAsr, "ASR_PARTIAL id=$segmentIdCounter decode threw", e)
+                }
+                return currentPartial
+            }
         }
         val latencyMs = (SystemClock.elapsedRealtimeNanos() - startNs) / 1_000_000
         Log.d(tagAsr, "ASR_PARTIAL id=$segmentIdCounter latencyMs=$latencyMs text=\"$txtRaw\"")
@@ -289,8 +310,18 @@ class StreamingAsrSession(
         // Exactly ONE final decode for this segment (full segment, not window), commit exactly once
         val startNs = SystemClock.elapsedRealtimeNanos()
         val txt = if (testTranscriber != null) testTranscriber.invoke(pcm).trim() else {
-            val floatPcm = FloatArray(pcm.size) { pcm[it] / 32768.0f }
-            directAsr.transcribe(floatPcm, sampleRate).text.trim()
+            try {
+                val floatPcm = FloatArray(pcm.size) { pcm[it] / 32768.0f }
+                directAsr.transcribe(floatPcm, sampleRate).text.trim()
+            } catch (e: Exception) {
+                // Same contract as getPartial: a throwing model is a MODEL
+                // failure, never VAD silence. Commit nothing, record why.
+                if (lastDecodeError == null) {
+                    lastDecodeError = e.message?.take(160)
+                    Log.e(tagAsr, "ASR_FINAL id=$segmentIdCounter decode threw", e)
+                }
+                ""
+            }
         }
         val latencyMs = (SystemClock.elapsedRealtimeNanos() - startNs) / 1_000_000
         Log.d(tagVad, "SEGMENT_FINAL id=$segmentIdCounter startSample=$startSample endSample=$endSample durationMs=$durationMs finalized=true text=\"$txt\"")

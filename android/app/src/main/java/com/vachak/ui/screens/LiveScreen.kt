@@ -431,9 +431,17 @@ fun LiveScreen(
                     }
                 }
                 if (asrText.isBlank()) {
+                    val modelError = session?.lastDecodeError
                     withContext(Dispatchers.Main) {
                         partialTextState.value = ""
-                        asrError = "[ASR:VAD] No speech detected — speak closer to mic (${pcmFinal.size} samples @16000Hz)"
+                        // A throwing recognizer is a MODEL failure, never VAD
+                        // silence: report the recorded cause so the next break
+                        // is diagnosable from the error line alone.
+                        asrError = if (modelError != null) {
+                            "[ASR:MODEL] Decode failed — $modelError"
+                        } else {
+                            "[ASR:VAD] No speech detected — speak closer to mic (${pcmFinal.size} samples @16000Hz)"
+                        }
                         ttsMessage = null
                     }
                     Log.d(TAG_VAD, "VAD silence — empty for ${pcmFinal.size} samples")

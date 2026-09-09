@@ -51,9 +51,16 @@ class SherpaAsrAdapter(
             if (e <= s) return@mapNotNull null
             // Short PCM16 -> Float32 bridge: short/32768.0f (unifies :app ShortArray with :ml FloatArray)
             val floatSeg = FloatArray(e - s) { pcm16[s + it] / 32768.0f }
-            val asrResult = engine.transcribe(floatSeg, sampleRateHz)
-            Log.d("Vachak-ASR", "segment [${seg.startMs},${seg.endMs}] ${floatSeg.size} floats -> \"${asrResult.text}\" isFixture=${asrResult.isFixture}")
-            asrResult.text
+            try {
+                val asrResult = engine.transcribe(floatSeg, sampleRateHz)
+                Log.d("Vachak-ASR", "segment [${seg.startMs},${seg.endMs}] ${floatSeg.size} floats -> \"${asrResult.text}\" isFixture=${asrResult.isFixture}")
+                asrResult.text
+            } catch (ex: Exception) {
+                // A throwing model is a MODEL failure, never silence: fail the
+                // whole transcription with the cause instead of returning "".
+                Log.e("Vachak-ASR", "segment decode threw", ex)
+                return EngineResult.Err(EngineError.MODEL_DECODE_FAILED, "ASR decode failed: ${ex.message?.take(120)}")
+            }
         }.filter { it.isNotBlank() }
 
         val result = texts.joinToString(" ").trim()

@@ -6,12 +6,13 @@ import kotlinx.coroutines.flow.asStateFlow
 
 /**
  * Single source of truth for active translation language.
- * Mundari = unr_Deva (Karya Flores, DEFAULT), Santali (Ol Chiki) = sat_Olck.
+ * Santali (Ol Chiki) = sat_Olck (DEFAULT — this app delivers Santali
+ * instruction), Mundari = unr_Deva (Karya Flores).
  * Exposes StateFlow so every screen reacts without hard-coded LanguagePair.
- * Persists via caller (EngineProvider/PackManager) if needed; in-memory default unr_Deva.
+ * Persists via caller (EngineProvider/PackManager) if needed; in-memory default sat_Olck.
  */
 object ActiveLanguage {
-    private val _flow = MutableStateFlow("unr_Deva")
+    private val _flow = MutableStateFlow("sat_Olck")
     val flow: StateFlow<String> = _flow.asStateFlow()
 
     val current: String get() = _flow.value
