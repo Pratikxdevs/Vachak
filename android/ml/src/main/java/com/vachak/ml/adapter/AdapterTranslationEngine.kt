@@ -13,6 +13,9 @@ import com.vachak.engine.TranslationEngine
  * Base provides hin_Deva generic; adapters specialize to sat_Olck / mun_Deva.
  * Pack switching via LanguagePackManager active pack id.
  *
+ * Santali (sat_Olck) is the default target — this app delivers Santali
+ * instruction; Mundari stays one toggle away.
+ *
  * LoRA merge pending: ml/finetune/it2_mundari_lora_real (14M) must be merged into
  * ai4bharat/indictrans2-indic-indic-dist-320M via peft merge_and_unload -> /tmp/merged
  * -> modelpacks/stripped_mt_merged via ml/translation/scripts/merge_lora_to_ct2.py
@@ -21,7 +24,7 @@ import com.vachak.engine.TranslationEngine
  */
 class AdapterTranslationEngine(
     private val context: Context,
-    private var activeLang: String = "unr_Deva" // Mundari primary; Santali via toggle — both first-class adapters
+    private var activeLang: String = "sat_Olck" // Santali primary; Mundari via toggle — both first-class adapters
 ) : TranslationEngine {
     // Santali (sat_Olck): PROVEN ONNX INT8 bundle (in-APK, verified on-device).
     private val onnxSat = OnnxIndicTrans2Adapter(context)
