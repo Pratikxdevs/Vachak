@@ -256,4 +256,50 @@ class StreamingAsrSessionRegressionTest {
         session.start()
         assertEquals(null, session.lastDecodeError)
     }
+
+    private fun createThrowingVad(): VadAnalyzer = object : VadAnalyzer {
+        override fun accept(chunk: FloatArray) { throw RuntimeException("Silero native abort") }
+        override fun isSpeech(): Boolean = false
+        override fun popSegment(): VadSegment? = null
+        override fun flush() {}
+    }
+
+    @Test
+    fun test_throwingVad_rmsPathStillCommits() {
+        // A throwing neural VAD must never kill the energy-gated pipeline.
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val session = StreamingAsrSession(context, sampleRate = 16000, testTranscriber = { "नमस्ते" }, testVad = createThrowingVad())
+        session.start()
+        session.pushAudio(pcmFor(1, 16000))
+        assertEquals("नमस्ते", session.getPartial())
+        session.finalizeCurrentSegment(true)
+        assertEquals("नमस्ते", session.finish())
+        assertTrue("VAD failures counted, pipeline survived", session.vadFailures > 0)
+    }
+
+    @Test
+    fun test_digitalSilence_statsProveDeadMic() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val session = StreamingAsrSession(context, sampleRate = 16000, testTranscriber = { "never" }, testVad = createFakeVad())
+        session.start()
+        session.pushAudio(ShortArray(16000) { 0 })
+        session.pushAudio(ShortArray(16000) { 0 })
+        assertEquals("", session.finish())
+        assertEquals(2, session.chunksSeen)
+        assertEquals(0f, session.maxRmsSeen)
+        assertEquals(2, session.zeroChunks)
+        assertTrue(session.signalReport().contains("maxRms=0.0"))
+    }
+
+    @Test
+    fun test_loudSpeech_statsShowSignal() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val session = StreamingAsrSession(context, sampleRate = 16000, testTranscriber = { "है" }, testVad = createFakeVad())
+        session.start()
+        session.pushAudio(pcmFor(9, 16000))
+        session.finalizeCurrentSegment(true)
+        assertEquals("है", session.finish())
+        assertTrue("peak above speech gate", session.maxRmsSeen > 0.012f)
+        assertEquals(0, session.zeroChunks)
+    }
 }

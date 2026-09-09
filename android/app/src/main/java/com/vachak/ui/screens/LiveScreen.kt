@@ -86,6 +86,9 @@ fun LiveScreen(
     var latencyMs by remember { mutableStateOf<Long?>(null) }
     var ttsMessage by remember { mutableStateOf<String?>(null) }
     var showClearConfirm by remember { mutableStateOf(false) }
+    // Mic meter: polls the capturer's rolling RMS so the user SEES whether the
+    // mic hears them (vs staring at "Listening…" while streaming silence).
+    var meterRms by remember { mutableStateOf(0f) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
@@ -128,10 +131,14 @@ fun LiveScreen(
     var hasMicPermission by remember {
         mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED)
     }
+    // Tracks whether the system prompt was ever answered: distinguishes
+    // first-launch (Allow button) from permanent denial (Settings button).
+    var micAskedOnce by remember { mutableStateOf(hasMicPermission) }
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
         onResult = { isGranted ->
             hasMicPermission = isGranted
+            micAskedOnce = true
             Log.d(TAG_ASR, "permission result isGranted=$isGranted")
         }
     )
@@ -303,6 +310,19 @@ fun LiveScreen(
         }
     }
 
+    // Mic meter poll — only while listening (150ms cadence, cheap).
+    LaunchedEffect(isListening) {
+        if (!isListening) {
+            meterRms = 0f
+            return@LaunchedEffect
+        }
+        while (isListening) {
+            delay(150)
+            if (!isListening) break
+            meterRms = audioCapturer.lastRms
+        }
+    }
+
     // Live Hindi transcription — key feature: see as you speak (windowed 700ms, VAD retained, final offline at stop)
     // NOTE: each iteration is try/catch — if pushAudio/getPartial throws (e.g. native
     // recognizer not ready on emulator) the loop MUST survive, else the strip freezes
@@ -449,15 +469,19 @@ fun LiveScreen(
                 }
                 if (asrText.isBlank()) {
                     val modelError = session?.lastDecodeError
+                    val report = session?.signalReport() ?: "no session"
+                    val peakDb = com.vachak.ml.VachakAudio.rmsToDb(session?.maxRmsSeen ?: audioCapturer.peakRms)
+                    val micSilent = (session?.maxRmsSeen ?: 0f) < com.vachak.ml.VachakAudio.DIGITAL_SILENCE_RMS && audioCapturer.peakRms < com.vachak.ml.VachakAudio.DIGITAL_SILENCE_RMS
+                    Log.e(TAG_ASR, "stop empty: modelError=$modelError micSilent=$micSilent silentStart=${audioCapturer.silentStart} src=${audioCapturer.audioSourceUsed} $report pcm=${pcmFinal.size}")
                     withContext(Dispatchers.Main) {
                         partialTextState.value = ""
-                        // A throwing recognizer is a MODEL failure, never VAD
-                        // silence: report the recorded cause so the next break
-                        // is diagnosable from the error line alone.
-                        asrError = if (modelError != null) {
-                            "[ASR:MODEL] Decode failed — $modelError"
-                        } else {
-                            "[ASR:VAD] No speech detected — speak closer to mic (${pcmFinal.size} samples @16000Hz)"
+                        // Three-way diagnosis (never a bare "no speech" again):
+                        // MODEL = decoder threw; MIC = stream was digital silence
+                        // (muted route / BT / other app); VAD = audible but undecodable.
+                        asrError = when {
+                            modelError != null -> "[ASR:MODEL] Decode failed — $modelError"
+                            micSilent -> "[ASR:MIC] Microphone delivered silence (${pcmFinal.size} samples, peak $peakDb). Check: hardware mute shutter? Bluetooth earpiece routed elsewhere? Another app holding the mic? Then retry."
+                            else -> "[ASR:VAD] Heard you (peak $peakDb) but no words decoded — speak closer and louder, then retry. (${pcmFinal.size} samples)"
                         }
                         ttsMessage = null
                     }
@@ -576,11 +600,33 @@ fun LiveScreen(
                         }
                     }
                     if (!hasMicPermission) {
+                        // Permanent denial ("Don't ask again") makes the system
+                        // silently swallow requests — an "Allow" button that does
+                        // nothing. Detect it and deep-link to Settings instead.
+                        val activity = context as? android.app.Activity
+                        val permanentlyDenied = micAskedOnce && activity != null &&
+                            !androidx.core.app.ActivityCompat.shouldShowRequestPermissionRationale(
+                                activity, Manifest.permission.RECORD_AUDIO
+                            )
                         Surface(color = MaterialTheme.colorScheme.errorContainer, modifier = Modifier.fillMaxWidth()) {
                             Row(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Text("Microphone permission needed", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.error)
+                                Text(
+                                    if (permanentlyDenied) "Microphone blocked — enable it in Settings" else "Microphone permission needed",
+                                    style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.error
+                                )
                                 Spacer(Modifier.weight(1f))
-                                FilledTonalButton(onClick = { permissionLauncher.launch(Manifest.permission.RECORD_AUDIO) }) { Text("Allow") }
+                                if (permanentlyDenied && activity != null) {
+                                    FilledTonalButton(onClick = {
+                                        Log.d(TAG_ASR, "opening app Settings for mic permission")
+                                        val intent = android.content.Intent(
+                                            android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                            android.net.Uri.fromParts("package", context.packageName, null)
+                                        )
+                                        activity.startActivity(intent)
+                                    }) { Text("Open Settings") }
+                                } else {
+                                    FilledTonalButton(onClick = { permissionLauncher.launch(Manifest.permission.RECORD_AUDIO) }) { Text("Allow") }
+                                }
                             }
                         }
                     }
@@ -588,6 +634,10 @@ fun LiveScreen(
             }
 
             ModelStatusRow()
+            // Live mic meter — proves the mic hears the user while listening.
+            if (isListening) {
+                MicMeter(rms = meterRms)
+            }
             VoiceArea(
                 hasConversation = hasConversation,
                 isListening = isListening,
@@ -828,6 +878,32 @@ private fun ModelDot(info: com.vachak.ml.ModelInfo, label: String) {
         info.loadMs?.let {
             Text("${it}ms", style = MaterialTheme.typography.labelSmall, color = VachakColors.TextSecondary)
         }
+    }
+}
+
+@Composable
+private fun MicMeter(rms: Float) {
+    // -50dB floor .. 0dB ceiling mapped to 0..1; speech gate marked in text.
+    val db = if (rms <= 0f) -50f else (20 * kotlin.math.log10(rms)).coerceIn(-50f, 0f)
+    val fraction = ((db + 50f) / 50f).coerceIn(0f, 1f)
+    val hearing = rms > VachakAudio.VAD_RMS_THRESHOLD
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        LinearProgressIndicator(
+            progress = fraction,
+            modifier = Modifier.weight(1f).height(6.dp).clip(RoundedCornerShape(50)),
+            color = if (hearing) VachakColors.Success else VachakColors.TextSecondary,
+            trackColor = VachakColors.Border
+        )
+        Text(
+            if (hearing) "Hearing you ✓" else "Can't hear you…",
+            style = MaterialTheme.typography.labelSmall,
+            color = if (hearing) VachakColors.Success else VachakColors.TextSecondary,
+            maxLines = 1
+        )
     }
 }
 

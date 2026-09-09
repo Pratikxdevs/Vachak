@@ -31,6 +31,18 @@ class AudioCapturer {
     private var audioRecord: AudioRecord? = null
     @Volatile
     private var isRecording = false
+    /** Rolling RMS of the most recent read chunk — drives the UI mic meter. */
+    @Volatile var lastRms: Float = 0f
+        private set
+    /** Peak RMS since startRecording — distinguishes "spoke quietly" from "mic dead". */
+    @Volatile var peakRms: Float = 0f
+        private set
+    /** AudioSource that survived validation (or -1). */
+    @Volatile var audioSourceUsed: Int = -1
+        private set
+    /** True when every source probed digital silence — mic path suspect, not the speaker. */
+    @Volatile var silentStart: Boolean = false
+        private set
     private var shortBuffer = ShortArray(16000 * 10) // 10s initial, doubles on overflow (Uktam pattern) but capped at maxBufferSize
     private var bufferSize = 0
     private val bufferLock = Any()
@@ -65,40 +77,78 @@ class AudioCapturer {
         val isEmulator = android.os.Build.FINGERPRINT.contains("generic") || android.os.Build.MODEL.contains("sdk")
         val sources = if (isEmulator) listOf(MediaRecorder.AudioSource.MIC, MediaRecorder.AudioSource.VOICE_RECOGNITION)
                      else listOf(MediaRecorder.AudioSource.VOICE_RECOGNITION, MediaRecorder.AudioSource.MIC)
+        // Source validation: a source can INITIALIZE yet stream digital silence
+        // (unrouted OEM source, muted route). Probe ~400ms of real signal per
+        // source and keep the first live one; a dead source must never win by
+        // opening successfully. Probe audio is KEPT (appended to the buffer).
+        lastRms = 0f
+        peakRms = 0f
+        audioSourceUsed = -1
+        silentStart = false
         var record: AudioRecord? = null
-        var lastErr: Exception? = null
+        var silentRecord: AudioRecord? = null
+        var silentSrc = -1
+        var silentRms = -1f
         for (src in sources) {
-            record = try {
+            val candidate = try {
                 android.util.Log.d("Vachak-ASR", "Trying AudioSource $src (emulator=$isEmulator)")
                 AudioRecord(src, sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, minBufferSize)
             } catch (e: Exception) {
-                lastErr = e; android.util.Log.w("Vachak-ASR", "AudioRecord $src failed", e); null
+                android.util.Log.w("Vachak-ASR", "AudioRecord $src failed", e); null
             }
-            if (record != null && record.state == AudioRecord.STATE_INITIALIZED) break
-            try { record?.release() } catch (_: Exception) {}
+            if (candidate == null || candidate.state != AudioRecord.STATE_INITIALIZED) {
+                try { candidate?.release() } catch (_: Exception) { /* best-effort cleanup */ }
+                continue
+            }
+            try {
+                candidate.startRecording()
+            } catch (e: Exception) {
+                android.util.Log.w("Vachak-ASR", "AudioRecord $src startRecording failed", e)
+                try { candidate.release() } catch (_: Exception) { /* best-effort cleanup */ }
+                continue
+            }
+            val probeRms = probeSignal(candidate)
+            android.util.Log.d("Vachak-ASR", "AudioSource $src probe rms=$probeRms (${VachakAudio.rmsToDb(probeRms)})")
+            if (probeRms >= VachakAudio.DIGITAL_SILENCE_RMS) {
+                try { silentRecord?.release() } catch (_: Exception) { /* best-effort cleanup */ }
+                silentRecord = null
+                record = candidate
+                audioSourceUsed = src
+                silentStart = false
+                break
+            }
+            android.util.Log.w("Vachak-ASR", "AudioSource $src streams digital silence — trying next source")
+            if (probeRms > silentRms) {
+                try { silentRecord?.release() } catch (_: Exception) { /* best-effort cleanup */ }
+                silentRecord = candidate
+                silentSrc = src
+                silentRms = probeRms
+            } else {
+                try { candidate.release() } catch (_: Exception) { /* best-effort cleanup */ }
+            }
             record = null
         }
         if (record == null) {
-            android.util.Log.e("Vachak-ASR", "AudioRecord creation failed all sources", lastErr)
-            return
+            // Every source silent (or failed): keep the loudest so capture still
+            // runs, but flag it — the stop path reports MIC instead of VAD.
+            if (silentRecord != null) {
+                android.util.Log.e("Vachak-ASR", "ALL sources digital silence (best=$silentSrc rms=$silentRms) — keeping it, flagging silentStart")
+                record = silentRecord
+                audioSourceUsed = silentSrc
+                silentStart = true
+            } else {
+                android.util.Log.e("Vachak-ASR", "AudioRecord creation failed all sources")
+                return
+            }
         }
         if (record.state != AudioRecord.STATE_INITIALIZED) {
             android.util.Log.e("Vachak-ASR", "AudioRecord not initialized state=${record.state}")
-            try { record.release() } catch (_: Exception) {}
+            try { record.release() } catch (_: Exception) { /* best-effort cleanup */ }
             return
         }
         audioRecord = record
-
-        try {
-            record.startRecording()
-        } catch (e: Exception) {
-            android.util.Log.e("Vachak-ASR", "startRecording failed", e)
-            try { record.release() } catch (_: Exception) {}
-            audioRecord = null
-            return
-        }
         isRecording = true
-        android.util.Log.d("Vachak-ASR", "AudioRecord started, isRecording=true")
+        android.util.Log.d("Vachak-ASR", "AudioRecord started src=$audioSourceUsed silentStart=$silentStart, isRecording=true")
 
         recordingJob = coroutineScope.launch {
             val readBuffer = ShortArray(1024)
@@ -106,6 +156,15 @@ class AudioCapturer {
             while (isActive && isRecording) {
                 val readResult = record.read(readBuffer, 0, readBuffer.size)
                 if (readResult > 0) {
+                    // Rolling level for the UI mic meter + peak for stop-path diagnosis.
+                    var sum = 0.0
+                    for (i in 0 until readResult) {
+                        val v = readBuffer[i] / 32768.0
+                        sum += v * v
+                    }
+                    val chunkRms = kotlin.math.sqrt(sum / readResult).toFloat()
+                    lastRms = chunkRms
+                    if (chunkRms > peakRms) peakRms = chunkRms
                     synchronized(bufferLock) {
                         if (bufferSize >= maxBufferSize) {
                             android.util.Log.w("Vachak-ASR", "AudioCapturer capped at 14s maxBufferSize=$maxBufferSize samples, dropping $readResult samples (2GB RAM limit, sequential ASR→MT→TTS)")
@@ -146,6 +205,45 @@ class AudioCapturer {
             }
             android.util.Log.d("Vachak-ASR", "recordingJob ended isActive=$isActive isRecording=$isRecording bufferSize=$bufferSize")
         }
+    }
+
+    /**
+     * Startup probe: blocking-read up to [VachakAudio.SOURCE_PROBE_SAMPLES] (~400ms)
+     * with a deadline, APPEND it to the capture buffer (no audio lost), and
+     * return its RMS. Lets the caller reject sources that open fine but stream
+     * digital silence. Runs on the caller's IO thread.
+     */
+    private fun probeSignal(record: AudioRecord): Float {
+        val want = VachakAudio.SOURCE_PROBE_SAMPLES
+        val tmp = ShortArray(1024)
+        var got = 0
+        var sum = 0.0
+        val deadlineMs = android.os.SystemClock.elapsedRealtime() + 900
+        while (got < want && android.os.SystemClock.elapsedRealtime() < deadlineMs) {
+            val n = try {
+                record.read(tmp, 0, minOf(tmp.size, want - got), AudioRecord.READ_BLOCKING)
+            } catch (e: Exception) {
+                android.util.Log.w("Vachak-ASR", "probe read failed: ${e.message}")
+                break
+            }
+            if (n <= 0) break
+            for (i in 0 until n) {
+                val v = tmp[i] / 32768.0
+                sum += v * v
+            }
+            synchronized(bufferLock) {
+                if (bufferSize < maxBufferSize) {
+                    val toCopy = minOf(n, maxBufferSize - bufferSize)
+                    System.arraycopy(tmp, 0, shortBuffer, bufferSize, toCopy)
+                    bufferSize += toCopy
+                }
+            }
+            got += n
+        }
+        val rms = if (got > 0) kotlin.math.sqrt(sum / got).toFloat() else 0f
+        lastRms = rms
+        if (rms > peakRms) peakRms = rms
+        return rms
     }
 
     suspend fun stopAndGetFloatArray(): FloatArray = withContext(Dispatchers.IO) {

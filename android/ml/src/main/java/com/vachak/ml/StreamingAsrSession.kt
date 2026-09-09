@@ -78,6 +78,22 @@ class StreamingAsrSession(
     var lastDecodeError: String? = null
         private set
 
+    /** Signal diagnostics: proves whether the mic delivered anything at all. */
+    var chunksSeen: Int = 0
+        private set
+    var maxRmsSeen: Float = 0f
+        private set
+    var zeroChunks: Int = 0
+        private set
+    var vadFailures: Int = 0
+        private set
+
+    /** One-line signal autopsy for logs and stop-path messages. */
+    fun signalReport(): String =
+        "chunks=$chunksSeen maxRms=$maxRmsSeen (${VachakAudio.rmsToDb(maxRmsSeen)}) " +
+            "zeroChunks=$zeroChunks vadFailures=$vadFailures segments=${segmentLedger.size}" +
+            (lastDecodeError?.let { " decodeError=${it.take(80)}" } ?: "")
+
     private var segmentIdCounter = 0
     private var currentSegmentStartSample = 0
     private var currentSegmentSamples = mutableListOf<Short>()
@@ -120,6 +136,10 @@ class StreamingAsrSession(
         silenceMs = 0
         speechStartSample = null
         lastChunk = null
+        chunksSeen = 0
+        maxRmsSeen = 0f
+        zeroChunks = 0
+        vadFailures = 0
         // Lightweight start: DO NOT block UI with model IO. Warm-up is offloaded to Dispatchers.IO.
         if (testTranscriber != null) {
             Log.d(tagAsr, "StreamingAsrSession start t0=${t0Ns} test mode — skipping native warm mode=$streamingModeLabel windowSamples=$windowSamples")
@@ -159,8 +179,20 @@ class StreamingAsrSession(
         val chunkMs = chunk.size * 1000 / sampleRate
         val floatChunk = FloatArray(chunk.size) { chunk[it] / 32768.0f }
         val rms = rms(floatChunk)
+        // Signal accounting FIRST (independent of any model): this is what
+        // distinguishes "mic dead" from "VAD unsplittable" after the fact.
+        chunksSeen++
+        if (rms > maxRmsSeen) maxRmsSeen = rms
+        if (rms < VachakAudio.DIGITAL_SILENCE_RMS) zeroChunks++
         val isSpeechChunk = rms > vadRmsThreshold
-        vad.accept(floatChunk)
+        // Silero must never gate the RMS path: if the neural VAD throws on a
+        // chunk, count it and continue with energy endpointing alone.
+        try {
+            vad.accept(floatChunk)
+        } catch (e: Exception) {
+            vadFailures++
+            if (vadFailures <= 3) Log.e(tagVad, "VAD accept threw (RMS path continues) #$vadFailures", e)
+        }
         totalSamplesSeen += chunk.size
 
         if (!hasSpeech) {
@@ -208,8 +240,13 @@ class StreamingAsrSession(
             finalizedLogs.add(seg)
         }
         var v: VadSegment? = null
-        while (vad.popSegment()?.also { v = it } != null) {
-            Log.d(tagVad, "VAD internal pop segment samples=${v!!.samples.size} startSec=${v!!.startSec} endSec=${v!!.endSec} (internal, not used for committed — normalized)")
+        try {
+            while (vad.popSegment()?.also { v = it } != null) {
+                Log.d(tagVad, "VAD internal pop segment samples=${v!!.samples.size} startSec=${v!!.startSec} endSec=${v!!.endSec} (internal, not used for committed — normalized)")
+            }
+        } catch (e: Exception) {
+            vadFailures++
+            Log.e(tagVad, "VAD popSegment threw (drained part skipped)", e)
         }
         return finalizedLogs
     }
@@ -361,8 +398,13 @@ class StreamingAsrSession(
         }
         try { vad.flush() } catch (e: Exception) { Log.w(tagVad, "vad.flush failed (VAD state may leak into next segment)", e) }
         var seg: VadSegment? = null
-        while (vad.popSegment()?.also { seg = it } != null) {
-            Log.d(tagVad, "finish drain VAD internal pop ${seg!!.samples.size} samples")
+        try {
+            while (vad.popSegment()?.also { seg = it } != null) {
+                Log.d(tagVad, "finish drain VAD internal pop ${seg!!.samples.size} samples")
+            }
+        } catch (e: Exception) {
+            vadFailures++
+            Log.e(tagVad, "finish drain popSegment threw", e)
         }
         val finalNs = SystemClock.elapsedRealtimeNanos()
         val totalMs = (finalNs - (t0Ns ?: finalNs)) / 1_000_000

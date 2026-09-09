@@ -37,4 +37,15 @@ object VachakAudio {
 
     /** Bounded streaming window (tail re-decode, never whole history). */
     const val STREAM_WINDOW_SEC = 3
+
+    /** Below this RMS a stream is digital silence (true zeros / muted route),
+     * not quiet speech — room noise floor on a live mic never reads this low. */
+    const val DIGITAL_SILENCE_RMS = 0.0005f
+
+    /** Startup probe per audio source (~400ms) to reject silently-dead sources. */
+    const val SOURCE_PROBE_SAMPLES = 6400
+
+    /** Human dB for logs/UI ("-38dB", "-∞dB"). */
+    fun rmsToDb(rms: Float): String =
+        if (rms <= 0f) "-∞dB" else "${(20 * kotlin.math.log10(rms)).toInt()}dB"
 }

@@ -221,11 +221,17 @@ class LiveViewModel @Inject constructor(
                 }
                 if (finalCommitted.isBlank()) {
                     val modelError = session?.lastDecodeError
+                    val peakDb = com.vachak.ml.VachakAudio.rmsToDb(session?.maxRmsSeen ?: audioCapturer.peakRms)
+                    val micSilent = (session?.maxRmsSeen ?: 0f) < com.vachak.ml.VachakAudio.DIGITAL_SILENCE_RMS && audioCapturer.peakRms < com.vachak.ml.VachakAudio.DIGITAL_SILENCE_RMS
+                    android.util.Log.e("Vachak-ASR", "stop empty: modelError=$modelError micSilent=$micSilent silentStart=${audioCapturer.silentStart} src=${audioCapturer.audioSourceUsed} ${session?.signalReport()}")
                     withContext(Dispatchers.Main) {
-                        // Throwing recognizer => MODEL failure, never VAD silence.
+                        // Same three-way diagnosis as LiveScreen (see there).
                         _uiState.value = _uiState.value.copy(
-                            asrError = if (modelError != null) "[ASR:MODEL] Decode failed — $modelError"
-                            else "[ASR:VAD] No speech detected — speak closer to mic (${pcmFinal.size} samples @16000Hz)",
+                            asrError = when {
+                                modelError != null -> "[ASR:MODEL] Decode failed — $modelError"
+                                micSilent -> "[ASR:MIC] Microphone delivered silence (${pcmFinal.size} samples, peak $peakDb). Check hardware mute, Bluetooth route, or another app holding the mic."
+                                else -> "[ASR:VAD] Heard you (peak $peakDb) but no words decoded — speak closer and louder, then retry. (${pcmFinal.size} samples)"
+                            },
                             isTranslating = false, partialText = ""
                         )
                     }
