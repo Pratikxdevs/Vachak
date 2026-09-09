@@ -234,4 +234,26 @@ class StreamingAsrSessionRegressionTest {
         assertEquals("क्या कर रहे हो", session.segmentRecords[1].finalText)
         assertEquals("आप कैसे हो", session.segmentRecords[2].finalText)
     }
+
+    @Test
+    fun test_throwingModel_recordsDecodeError_neverDisguisedAsVadSilence() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val throwing: (ShortArray) -> String = { throw RuntimeException("INVALID_ARGUMENT : Invalid rank for input") }
+        val session = StreamingAsrSession(context, sampleRate = 16000, testTranscriber = throwing, testVad = createFakeVad())
+        session.start()
+        assertEquals(null, session.lastDecodeError)
+        session.pushAudio(pcmFor(1, 16000))
+        // Partial path: must not propagate, must record the cause.
+        assertEquals("", session.getPartial())
+        assertTrue(session.lastDecodeError?.contains("INVALID_ARGUMENT") == true)
+        // Final path: must not propagate either; commit stays empty WITH cause.
+        val log = session.finalizeCurrentSegment(true)
+        assertTrue(log.finalized)
+        assertEquals("", session.committedText)
+        assertEquals("", session.finish())
+        assertTrue(session.lastDecodeError?.contains("INVALID_ARGUMENT") == true)
+        // Next session starts clean.
+        session.start()
+        assertEquals(null, session.lastDecodeError)
+    }
 }
