@@ -415,7 +415,14 @@ class OnnxIndicTrans2Adapter(
         }
     }
 
-    private fun loadBpe(srcJson: File, tgtJson: File) {
+    /** Visible for tests: (srcVocab, merges, tgtIds) sizes after [loadBpe]. */
+    internal fun bpeStats(): Triple<Int, Int, Int> = Triple(srcVocab.size, mergeRank.size, tgtIdToToken.size)
+
+    internal fun loadBpe(srcJson: File, tgtJson: File) {
+        // Binary codec cache: the 47MB JSON parse dominates MT load (~1.7s).
+        // First run parses + writes the cache; later runs memory-map it in a
+        // fraction of the time. JSON stays the source of truth (size-stamped).
+        if (tryLoadCodecCache(srcJson, tgtJson)) return
         android.util.Log.d("Vachak-MT", "ONNX loading BPE codec (245k merges, may take seconds, once)")
         val t0 = android.os.SystemClock.elapsedRealtimeNanos()
         val vocab = HashMap<String, Int>(140000)
@@ -512,6 +519,79 @@ class OnnxIndicTrans2Adapter(
         tgtIdToToken = rev
         val ms = (android.os.SystemClock.elapsedRealtimeNanos() - t0) / 1_000_000
         android.util.Log.d("Vachak-MT", "ONNX BPE ready vocab=${vocab.size} merges=${ranks.size} tgtIds=${rev.size} in ${ms}ms")
+        writeCodecCache(srcJson, tgtJson, vocab, added, ranks, pairs, maxId)
+    }
+
+    private fun codecCacheFile(srcJson: File): File =
+        File(srcJson.parentFile, "bpe_codec.bin")
+
+    /** Fast path: binary codec snapshot. Returns false (fall back to JSON) on any doubt. */
+    private fun tryLoadCodecCache(srcJson: File, tgtJson: File): Boolean {
+        val cache = codecCacheFile(srcJson)
+        if (!cache.exists()) return false
+        val t0 = android.os.SystemClock.elapsedRealtimeNanos()
+        try {
+            java.io.DataInputStream(java.io.BufferedInputStream(cache.inputStream())).use { inp ->
+                if (inp.readUTF() != "VCHKBPE1") return false
+                if (inp.readInt() != 1) return false
+                if (inp.readLong() != srcJson.length() || inp.readLong() != tgtJson.length()) {
+                    android.util.Log.d("Vachak-MT", "codec cache stale (asset sizes changed) — re-parsing JSON")
+                    return false
+                }
+                val vocab = HashMap<String, Int>(140000)
+                repeat(inp.readInt()) { vocab[inp.readUTF()] = inp.readInt() }
+                val ranks = HashMap<String, Int>(250000)
+                repeat(inp.readInt()) { ranks[inp.readUTF()] = inp.readInt() }
+                val added = HashMap<String, Int>()
+                repeat(inp.readInt()) { added[inp.readUTF()] = inp.readInt() }
+                val maxId = inp.readInt()
+                val rev = MutableList(maxId + 1) { "" }
+                repeat(inp.readInt()) {
+                    val id = inp.readInt()
+                    val tok = inp.readUTF()
+                    if (id in rev.indices) rev[id] = tok
+                }
+                srcVocab = vocab
+                srcAdded = added
+                mergeRank = ranks
+                tgtIdToToken = rev
+            }
+            val ms = (android.os.SystemClock.elapsedRealtimeNanos() - t0) / 1_000_000
+            android.util.Log.d("Vachak-MT", "ONNX BPE codec cache hit in ${ms}ms")
+            return true
+        } catch (e: Exception) {
+            android.util.Log.w("Vachak-MT", "codec cache unreadable, re-parsing JSON: ${e.message}")
+            try { cache.delete() } catch (_: Exception) { /* best-effort cleanup */ }
+            return false
+        }
+    }
+
+    /** Best-effort write after a successful JSON parse. Never fails the load. */
+    private fun writeCodecCache(
+        srcJson: File, tgtJson: File,
+        vocab: Map<String, Int>, added: Map<String, Int>,
+        ranks: Map<String, Int>, tgtPairs: List<Pair<Int, String>>, tgtMaxId: Int
+    ) {
+        try {
+            java.io.DataOutputStream(java.io.BufferedOutputStream(codecCacheFile(srcJson).outputStream())).use { out ->
+                out.writeUTF("VCHKBPE1")
+                out.writeInt(1)
+                out.writeLong(srcJson.length())
+                out.writeLong(tgtJson.length())
+                out.writeInt(vocab.size)
+                for ((k, v) in vocab) { out.writeUTF(k); out.writeInt(v) }
+                out.writeInt(ranks.size)
+                for ((k, v) in ranks) { out.writeUTF(k); out.writeInt(v) }
+                out.writeInt(added.size)
+                for ((k, v) in added) { out.writeUTF(k); out.writeInt(v) }
+                out.writeInt(tgtMaxId)
+                out.writeInt(tgtPairs.size)
+                for ((id, tok) in tgtPairs) { out.writeInt(id); out.writeUTF(tok) }
+            }
+            android.util.Log.d("Vachak-MT", "codec cache written")
+        } catch (e: Exception) {
+            android.util.Log.w("Vachak-MT", "codec cache write failed (parse result still valid): ${e.message}")
+        }
     }
 
 }

@@ -81,7 +81,10 @@ object SherpaAssets {
      */
     private fun manifestEntries(outDir: File): Map<String, Long> =
         outDir.walkTopDown()
-            .filter { it.isFile && it.name != MANIFEST }
+            // .vachak_manifest is the manifest itself; bpe_codec.bin is a runtime
+            // cache written AFTER extraction (OnnxIndicTrans2Adapter) — neither
+            // must invalidate the manifest, or every launch re-copies 370MB.
+            .filter { it.isFile && it.name != MANIFEST && it.name != "bpe_codec.bin" }
             .associate { it.relativeTo(outDir).path to it.length() }
 
     private fun writeManifest(context: Context, subdir: String, outDir: File) {

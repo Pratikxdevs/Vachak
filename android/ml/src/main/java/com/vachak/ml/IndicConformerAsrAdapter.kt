@@ -130,6 +130,9 @@ class IndicConformerAsrAdapter(
     override fun transcribe(samples: FloatArray, sampleRate: Int): AsrResult {
         ensureLoaded()
         val startNs = android.os.SystemClock.elapsedRealtimeNanos()
+        // Expected frames ≈ samples/160 (10ms shift): lets any downstream
+        // ORT shape error be attributed to exact input bounds from logcat alone.
+        Log.d(tag, "decode ${samples.size} samples @ $sampleRate Hz (~${samples.size / 160} frames)")
         val stream = recognizer!!.createStream()
         stream.acceptWaveform(samples, sampleRate)
         recognizer!!.decode(stream)

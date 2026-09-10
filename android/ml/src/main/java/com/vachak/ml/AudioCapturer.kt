@@ -35,9 +35,15 @@ data class MicAuditResult(
     val otherRecorders: List<String>,
     val inCall: Boolean,
     val btScoOn: Boolean,
-    val inputDevices: List<String>
+    val inputDevices: List<String>,
+    /** App-op state for RECORD_AUDIO: allowed / IGNORED / ERRORED / default / unknown. */
+    val appOpMode: String = "unknown",
+    /** Framework microphone list (empty = OS sees no microphone hardware). */
+    val micList: List<String> = emptyList(),
+    val hasMicFeature: Boolean = true
 ) {
-    fun suspicious(): Boolean = osMuted || otherRecorders.isNotEmpty() || inCall || btScoOn
+    fun suspicious(): Boolean = osMuted || otherRecorders.isNotEmpty() || inCall || btScoOn ||
+        appOpMode == "IGNORED" || appOpMode == "DENIED" || micList.isEmpty() || !hasMicFeature
 
     /**
      * User-facing culprit, or null when the OS path looks clean (caller falls
@@ -46,12 +52,19 @@ data class MicAuditResult(
     fun messageForUser(sampleCount: Int, peakDb: String): String? = when {
         osMuted -> "System microphone is MUTED ($sampleCount samples, peak $peakDb). " +
             "Unmute it (Quick Settings → Microphone, or the tablet's mute switch) and retry."
+        appOpMode == "IGNORED" || appOpMode == "ERRORED" ->
+            "System is blocking this app's microphone ($appOpMode, $sampleCount samples of silence). " +
+                "Check Settings → Apps → Vachak → Permissions → Microphone, and any privacy-guard app, then retry."
         otherRecorders.isNotEmpty() -> "Another app is recording right now (${otherRecorders.take(2).joinToString()}), " +
             "so this app gets silence ($sampleCount samples). Close it (voice assistant? recorder?) and retry."
         inCall -> "Tablet is in a voice/video call, which owns the microphone " +
             "($sampleCount samples of silence). End the call and retry."
         btScoOn -> "Bluetooth audio is active but delivered silence ($sampleCount samples, peak $peakDb). " +
             "Disconnect the earpiece (or speak into it, not the tablet) and retry."
+        // Hardware inference LAST: an empty framework mic list usually means no
+        // visible hardware, but explicit culprits above always win.
+        !hasMicFeature || micList.isEmpty() -> "Tablet exposes no microphone to apps " +
+            "(hardware list empty, $sampleCount samples). Check for a hardware mute shutter or dongle, then retry."
         else -> null
     }
 }
@@ -139,7 +152,45 @@ class AudioCapturer {
         } catch (t: Throwable) {
             android.util.Log.w("Vachak-ASR", "mic audit: input devices unreadable: ${t.message}")
         }
-        val result = MicAuditResult(osMuted, unmutedByUs, others, inCall, btSco, inputs)
+        // App-op check: permission can report GRANTED while the app-op is set to
+        // IGNORE (privacy-guard apps, OEM managers) — AudioRecord then opens yet
+        // streams zeros. No permission needed to read our own op state.
+        var appOpMode = "unknown"
+        // unsafeCheckOpNoThrow is API 29+; without the guard this NoSuchMethodErrors
+        // (not an Exception) on Android 9, our minSdk.
+        if (android.os.Build.VERSION.SDK_INT >= 29) {
+            try {
+                val appOps = context.getSystemService(android.content.Context.APP_OPS_SERVICE) as android.app.AppOpsManager
+                val mode = appOps.unsafeCheckOpNoThrow(
+                    android.app.AppOpsManager.OPSTR_RECORD_AUDIO,
+                    android.os.Process.myUid(), context.packageName
+                )
+            appOpMode = when (mode) {
+                android.app.AppOpsManager.MODE_ALLOWED -> "allowed"
+                android.app.AppOpsManager.MODE_IGNORED -> "IGNORED"
+                android.app.AppOpsManager.MODE_ERRORED -> "ERRORED"
+                android.app.AppOpsManager.MODE_DEFAULT -> "default"
+                else -> "mode=$mode"
+            }
+            } catch (t: Throwable) {
+                android.util.Log.w("Vachak-ASR", "mic audit: app-op unreadable: ${t.message}")
+            }
+        }
+        // Hardware visibility: framework-level microphone list + feature flag.
+        // Empty list / missing feature = the OS sees no microphone at all.
+        var micList: List<String> = emptyList()
+        try {
+            micList = am.microphones.map { "${it.type}:${it.address}" }
+        } catch (t: Throwable) {
+            android.util.Log.w("Vachak-ASR", "mic audit: microphone list unreadable: ${t.message}")
+        }
+        var hasMicFeature = true
+        try {
+            hasMicFeature = context.packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_MICROPHONE)
+        } catch (t: Throwable) {
+            android.util.Log.w("Vachak-ASR", "mic audit: mic feature flag unreadable: ${t.message}")
+        }
+        val result = MicAuditResult(osMuted, unmutedByUs, others, inCall, btSco, inputs, appOpMode, micList, hasMicFeature)
         lastMicAudit = result
         if (result.suspicious()) {
             android.util.Log.w("Vachak-ASR", "mic audit SUSPICIOUS: $result")

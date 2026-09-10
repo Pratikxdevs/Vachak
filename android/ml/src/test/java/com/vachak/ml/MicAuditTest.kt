@@ -24,8 +24,12 @@ class MicAuditTest {
         // Robolectric shadows: no mute, no recorders, no call.
         assertFalse(audit.osMuted)
         assertFalse(audit.inCall)
-        assertFalse(audit.suspicious())
-        assertNull(audit.messageForUser(16000, "-76dB"))
+        assertTrue(audit.appOpMode.isNotEmpty())
+        // micList under shadows may be empty (counts as suspicious by design);
+        // the invariant is coherence: empty hardware list must be suspicious.
+        if (audit.micList.isEmpty()) {
+            assertTrue(audit.suspicious())
+        }
     }
 
     @Test
@@ -38,7 +42,17 @@ class MicAuditTest {
         assertTrue(call.messageForUser(100, "-76dB")!!.contains("call"))
         val bt = MicAuditResult(false, false, emptyList(), false, true, emptyList())
         assertTrue(bt.messageForUser(100, "-76dB")!!.contains("Bluetooth"))
-        val clean = MicAuditResult(false, false, emptyList(), false, false, listOf("1:Built-In Mic"))
+        val clean = MicAuditResult(false, false, emptyList(), false, false, listOf("1:Built-In Mic"), appOpMode = "allowed", micList = listOf("1:mic"))
+        assertNull(clean.messageForUser(100, "-20dB"))
+    }
+
+    @Test
+    fun messageForUser_namesAppOpAndMissingHardware() {
+        val ignored = MicAuditResult(false, false, emptyList(), false, false, emptyList(), appOpMode = "IGNORED")
+        assertTrue(ignored.messageForUser(100, "-76dB")!!.contains("blocking"))
+        val noHw = MicAuditResult(false, false, emptyList(), false, false, emptyList(), appOpMode = "allowed", micList = emptyList())
+        assertTrue(noHw.messageForUser(100, "-76dB")!!.contains("no microphone"))
+        val clean = MicAuditResult(false, false, emptyList(), false, false, listOf("1:x"), appOpMode = "allowed", micList = listOf("1:y"))
         assertNull(clean.messageForUser(100, "-20dB"))
     }
 }

@@ -30,6 +30,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
@@ -41,6 +42,8 @@ import javax.inject.Inject
  */
 data class LiveUiState(
     val isListening: Boolean = false,
+    /** Stop tapped, pipeline draining (finish decode can take seconds). */
+    val isStopping: Boolean = false,
     val partialText: String = "",
     val committedText: String = "",
     // Holds the active-target translation (Santali by default, Mundari if toggled).
@@ -85,6 +88,14 @@ class LiveViewModel @Inject constructor(
     private var t0Ns: Long? = null
     private var debounceJob: Job? = null
     private var manualHindiFlow = MutableStateFlow("")
+    /** Samples already fed to the session (partial loop + stop tail share it — never double-feed). */
+    private var lastPushedSample: Int = 0
+    private var partialJob: Job? = null
+    private var meterJob: Job? = null
+
+    /** Live mic level for the meter (polled off-Main; collectors only re-render the meter). */
+    private val _meterRms = MutableStateFlow(0f)
+    val meterRms = _meterRms.asStateFlow()
 
     init {
         // Debounce 600ms live typed translation moved to VM
@@ -157,12 +168,82 @@ class LiveViewModel @Inject constructor(
             withContext(Dispatchers.Main) {
                 streamingSession = session
             }
+            lastPushedSample = 0
+            startPartialLoop()
+            startMeterLoop()
             try { session.warmUpAsync() } catch (e: Throwable) { android.util.Log.w("Vachak-ASR", "LiveViewModel warmUp threw (first decode will cold-load)", e) }
         }
     }
 
+    /**
+     * Live-subtitle loop (was LiveScreen's LaunchedEffect): every 700ms feeds
+     * fresh capture into the session and publishes partials. Owned here so the
+     * stop path can cancel it BEFORE pushing the tail (no double-feed, ever).
+     */
+    private fun startPartialLoop() {
+        partialJob?.cancel()
+        partialJob = viewModelScope.launch(Dispatchers.Default) {
+            var errShown = false
+            while (isActive) {
+                delay(com.vachak.ml.VachakAudio.PARTIAL_DECODE_MS)
+                val session = streamingSession ?: continue
+                val snap = try {
+                    withContext(Dispatchers.Default) { audioCapturer.snapshotShortArray() }
+                } catch (e: Exception) {
+                    android.util.Log.e("Vachak-ASR", "VM partial snapshot failed", e)
+                    continue
+                }
+                if (snap.size <= lastPushedSample) continue
+                val chunk = snap.copyOfRange(lastPushedSample, snap.size)
+                lastPushedSample = snap.size
+                try {
+                    session.pushAudio(chunk)
+                    val partial = session.getPartial()
+                    if (partial.isNotBlank()) {
+                        errShown = false
+                        _uiState.value = _uiState.value.copy(partialText = partial)
+                        if (_uiState.value.asrError?.startsWith("[ASR:LIVE]") == true) {
+                            _uiState.value = _uiState.value.copy(asrError = null)
+                        }
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("Vachak-ASR", "VM partial iteration failed (loop survives)", e)
+                    if (!errShown) {
+                        errShown = true
+                        _uiState.value = _uiState.value.copy(asrError = "[ASR:LIVE] ${e.message?.take(80)} — still listening…")
+                    }
+                }
+            }
+        }
+    }
+
+    /** 150ms mic-level poll for the meter (cheap volatile read). */
+    private fun startMeterLoop() {
+        meterJob?.cancel()
+        _meterRms.value = 0f
+        meterJob = viewModelScope.launch {
+            while (isActive) {
+                delay(150)
+                _meterRms.value = audioCapturer.lastRms
+            }
+        }
+    }
+
+    private fun stopLoops() {
+        partialJob?.cancel()
+        partialJob = null
+        meterJob?.cancel()
+        meterJob = null
+        _meterRms.value = 0f
+    }
+
     fun onStop(onCommitted: ((String) -> Unit)? = null) {
-        _uiState.value = _uiState.value.copy(isListening = false, isTranslating = true)
+        // Snapshot BEFORE clearing: the stop-clear wipes partialText, which
+        // used to starve the fallback below (recoverable partials -> VAD-silence).
+        val preStopPartial = _uiState.value.partialText.trim()
+        // Loops stop FIRST so the tail push below can't double-feed the session.
+        stopLoops()
+        _uiState.value = _uiState.value.copy(isListening = false, isStopping = true, isTranslating = true, partialText = "")
         viewModelScope.launch(pipelineDispatcher) {
             pipelineMutex.withLock {
                 val tracker = LatencyTracker(LatencySample(runId = "live-${SystemClock.elapsedRealtimeNanos()}"))
@@ -177,16 +258,14 @@ class LiveViewModel @Inject constructor(
                 val session = streamingSession
                 var finalCommitted = ""
                 if (session != null) {
-                    // This ViewModel has no live partial loop, so the session is
-                    // empty at stop time — feed the capture in 100ms VAD chunks
-                    // (mirrors LiveScreen's tail-push; chunked so Silero/RMS
-                    // endpointing segments instead of gating one giant buffer).
+                    // Tail ONLY from where the partial loop stopped (shared
+                    // lastPushedSample — never re-feed from 0, never double-decode).
                     try {
-                        var off = 0
-                        while (off < pcmFinal.size) {
-                            val end = minOf(off + VachakAudio.VAD_CHUNK_SAMPLES, pcmFinal.size)
-                            session.pushAudio(pcmFinal.copyOfRange(off, end))
-                            off = end
+                        if (pcmFinal.size > lastPushedSample) {
+                            val tail = pcmFinal.copyOfRange(lastPushedSample, pcmFinal.size)
+                            android.util.Log.d("Vachak-ASR", "LiveViewModel pushing tail ${tail.size} samples (already pushed $lastPushedSample)")
+                            session.pushAudio(tail)
+                            lastPushedSample = pcmFinal.size
                         }
                     } catch (e: Exception) {
                         android.util.Log.e("Vachak-ASR", "LiveViewModel session push failed", e)
@@ -197,12 +276,12 @@ class LiveViewModel @Inject constructor(
                         android.util.Log.e("Vachak-ASR", "LiveViewModel session.finish failed", e)
                         finalCommitted = ""
                     }
-                    // Fallback: committed empty but live partial had text (VAD miss)
+                    // Fallback: committed empty but live partial had text (VAD miss).
+                    // Uses the pre-stop snapshot (the live field is already cleared).
                     if (finalCommitted.isBlank()) {
-                        val partialFallback = _uiState.value.partialText.trim()
-                        if (partialFallback.isNotBlank()) {
-                            android.util.Log.w("Vachak-ASR", "LiveViewModel committed empty, partial fallback \"$partialFallback\"")
-                            finalCommitted = partialFallback
+                        if (preStopPartial.isNotBlank()) {
+                            android.util.Log.w("Vachak-ASR", "LiveViewModel committed empty, partial fallback \"$preStopPartial\"")
+                            finalCommitted = preStopPartial
                         }
                     }
                     android.util.Log.d("Vachak-ASR", "LiveViewModel streaming finish committed=\"$finalCommitted\" pcmFinal=${pcmFinal.size}")
@@ -314,7 +393,7 @@ class LiveViewModel @Inject constructor(
                 }
                 val totalMs = (SystemClock.elapsedRealtimeNanos() - sessionT0) / 1_000_000
                 withContext(Dispatchers.Main) {
-                    _uiState.value = _uiState.value.copy(latencyMs = totalMs, isTranslating = false, partialText = "")
+                    _uiState.value = _uiState.value.copy(latencyMs = totalMs, isTranslating = false, isStopping = false, partialText = "")
                     android.util.Log.d("Vachak-Latency", "VOICE END total ${totalMs}ms (${if (totalMs < 3000) "< 3s ✓" else "≥ 3s ⚠"})")
                     onCommitted?.invoke(finalCommitted)
                     streamingSession = null
@@ -330,20 +409,163 @@ class LiveViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(committedText = text)
     }
 
-    fun onRetry(hindi: String) {
+    /**
+     * Typed Hindi → translate → conversation + TTS. The single typed path
+     * (screen's old translateAndAppend retired here): sequential under the
+     * pipeline Mutex, 30s MT bound, measured timings on the item.
+     */
+    fun commitTyped(hindi: String) {
+        val trimmed = hindi.trim()
+        if (trimmed.isBlank()) return
         viewModelScope.launch(pipelineDispatcher) {
             pipelineMutex.withLock {
-                _uiState.value = _uiState.value.copy(isTranslating = true, error = null)
-                val activeLang = ActiveLanguage.current
-                val mt = engineProvider.translation.translate(hindi, LanguagePair("hi", activeLang))
+                val itemId = "msg-${SystemClock.elapsedRealtimeNanos()}"
                 withContext(Dispatchers.Main) {
+                    LiveConversationStore.items.add(
+                        ConversationItem(
+                            id = itemId, hindiText = trimmed, santaliText = null,
+                            timestampMillis = System.currentTimeMillis(), isTranslating = true
+                        )
+                    )
+                    _uiState.value = _uiState.value.copy(isTranslating = true, error = null)
+                }
+                val tracker = LatencyTracker(LatencySample(runId = "typed-${SystemClock.elapsedRealtimeNanos()}")).also { it.markSpeechBegin() }
+                val activeLang = ActiveLanguage.current
+                val mt = try {
+                    kotlinx.coroutines.withTimeout(30_000) {
+                        engineProvider.translation.translate(trimmed, LanguagePair("hi", activeLang))
+                    }
+                } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+                    android.util.Log.e("Vachak-MT", "typed MT timed out after 30s", e)
+                    EngineResult.Err(com.vachak.engine.EngineError.TIMEOUT, "Translation timed out (30s) — tap retry")
+                }
+                when (mt) {
+                    is EngineResult.Ok -> {
+                        tracker.markTranslate(mt.value)
+                        withContext(Dispatchers.Main) {
+                            val idx = LiveConversationStore.items.indexOfFirst { it.id == itemId }
+                            if (idx != -1) {
+                                LiveConversationStore.items[idx] = LiveConversationStore.items[idx].copy(
+                                    santaliText = mt.value, isTranslating = false, error = null
+                                )
+                            }
+                            _uiState.value = _uiState.value.copy(santaliText = mt.value, error = null)
+                        }
+                        tracker.markTtsBegin()
+                        val pcmRes = engineProvider.tts.synthesize(mt.value, activeLang)
+                        tracker.markAudioBegin()
+                        val stages = tracker.result().stageMs()
+                        val total = tracker.result().endToEndMs()?.toLong()
+                        com.vachak.ml.LastPipelineRun.publish(tracker)
+                        when (pcmRes) {
+                            is EngineResult.Ok -> {
+                                playPcmLocal(pcmRes.value, VachakAudio.TTS_OUTPUT_HZ)
+                                withContext(Dispatchers.Main) {
+                                    val i = LiveConversationStore.items.indexOfFirst { it.id == itemId }
+                                    if (i != -1) {
+                                        LiveConversationStore.items[i] = LiveConversationStore.items[i].copy(
+                                            mtMs = stages["translate"]?.toLong(),
+                                            ttsMs = stages["tts"]?.toLong(),
+                                            totalMs = total
+                                        )
+                                    }
+                                    _uiState.value = _uiState.value.copy(
+                                        isTranslating = false,
+                                        ttsMessage = "Playing ${ActiveLanguage.label(activeLang)} audio • ${pcmRes.value.size} samples"
+                                    )
+                                }
+                            }
+                            is EngineResult.Err -> withContext(Dispatchers.Main) {
+                                _uiState.value = _uiState.value.copy(isTranslating = false, ttsMessage = "TTS: ${pcmRes.message}")
+                            }
+                        }
+                    }
+                    is EngineResult.Err -> {
+                        android.util.Log.e("Vachak-MT", "typed MT failed ${mt.code}: ${mt.message}")
+                        withContext(Dispatchers.Main) {
+                            val idx = LiveConversationStore.items.indexOfFirst { it.id == itemId }
+                            if (idx != -1) {
+                                LiveConversationStore.items[idx] = LiveConversationStore.items[idx].copy(
+                                    isTranslating = false, error = mt.message
+                                )
+                            }
+                            _uiState.value = _uiState.value.copy(isTranslating = false, error = mt.message)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Store-aware translation retry for a conversation item (replaces the
+     * screen-local retry that bypassed the pipeline Mutex).
+     */
+    fun retryItem(itemId: String, hindi: String) {
+        viewModelScope.launch(pipelineDispatcher) {
+            pipelineMutex.withLock {
+                withContext(Dispatchers.Main) {
+                    val idx = LiveConversationStore.items.indexOfFirst { it.id == itemId }
+                    if (idx != -1) {
+                        LiveConversationStore.items[idx] = LiveConversationStore.items[idx].copy(isTranslating = true, error = null)
+                    }
+                    _uiState.value = _uiState.value.copy(isTranslating = true, error = null)
+                }
+                val activeLang = ActiveLanguage.current
+                val mt = try {
+                    kotlinx.coroutines.withTimeout(30_000) {
+                        engineProvider.translation.translate(hindi, LanguagePair("hi", activeLang))
+                    }
+                } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+                    EngineResult.Err(com.vachak.engine.EngineError.TIMEOUT, "Translation timed out (30s) — tap retry")
+                }
+                withContext(Dispatchers.Main) {
+                    val i = LiveConversationStore.items.indexOfFirst { it.id == itemId }
+                    if (i != -1) {
+                        when (mt) {
+                            is EngineResult.Ok -> LiveConversationStore.items[i] =
+                                LiveConversationStore.items[i].copy(santaliText = mt.value, isTranslating = false, error = null)
+                            is EngineResult.Err -> LiveConversationStore.items[i] =
+                                LiveConversationStore.items[i].copy(isTranslating = false, error = mt.message)
+                        }
+                    }
                     when (mt) {
-                        is EngineResult.Ok -> _uiState.value = _uiState.value.copy(santaliText = mt.value, isTranslating = false, error = null)
+                        is EngineResult.Ok -> _uiState.value = _uiState.value.copy(isTranslating = false, error = null)
                         is EngineResult.Err -> _uiState.value = _uiState.value.copy(isTranslating = false, error = mt.message)
                     }
                 }
             }
         }
+    }
+
+    /**
+     * Speak any text through TTS + local playback (message Play buttons, live
+     * preview Play). Runs on IO, never the pipeline dispatcher (playback
+     * outlasts inference; holding the Mutex would stall the pipeline).
+     */
+    fun playText(text: String, lang: String) {
+        if (text.isBlank()) return
+        viewModelScope.launch(Dispatchers.IO) {
+            val pcmRes = engineProvider.tts.synthesize(text, lang)
+            when (pcmRes) {
+                is EngineResult.Ok -> {
+                    playPcmLocal(pcmRes.value, VachakAudio.TTS_OUTPUT_HZ)
+                    withContext(Dispatchers.Main) {
+                        _uiState.value = _uiState.value.copy(
+                            ttsMessage = "Playing ${ActiveLanguage.label(lang)} audio • ${pcmRes.value.size} samples"
+                        )
+                    }
+                }
+                is EngineResult.Err -> withContext(Dispatchers.Main) {
+                    _uiState.value = _uiState.value.copy(ttsMessage = "TTS: ${pcmRes.message}")
+                }
+            }
+        }
+    }
+
+    /** Clear transient error lines (debug dialog Dismiss). Next action re-arms them. */
+    fun dismissErrors() {
+        _uiState.value = _uiState.value.copy(asrError = null, error = null, livePreviewError = null, ttsMessage = null)
     }
 
     fun ensureAdapterExtractedDebug(): String? {
@@ -358,8 +580,9 @@ class LiveViewModel @Inject constructor(
 
     fun forceReleaseMic() {
         try {
+            stopLoops()
             _isCapturing.value = false
-            _uiState.value = _uiState.value.copy(isListening = false)
+            _uiState.value = _uiState.value.copy(isListening = false, isStopping = false)
             audioCapturer.release()
             android.util.Log.d("Vachak-ASR", "LiveViewModel.forceReleaseMic() done")
         } catch (e: Exception) {

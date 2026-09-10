@@ -21,6 +21,7 @@ import com.vachak.sync.PackManager
 import com.vachak.ui.components.VachakSection
 import com.vachak.ui.theme.VachakColors
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
@@ -40,6 +41,8 @@ fun DiagnosticsScreen(
     var liveFree by remember { mutableStateOf<String?>(null) }
     var activeAdapterBadge by remember { mutableStateOf<String?>(null) }
     var packShaLine by remember { mutableStateOf<String?>(null) }
+    var asrFingerprint by remember { mutableStateOf<String?>(null) }
+    var fingerprintBusy by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val activeLang by engine.activeLanguage.collectAsState()
     LaunchedEffect(activeLang) {
@@ -149,6 +152,34 @@ fun DiagnosticsScreen(
             packShaLine?.let { Text(it, style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, color = MaterialTheme.colorScheme.onSurfaceVariant) }
             Text("Log: adb logcat -s Vachak-MT | grep AdapterEngine → present=true for both langs", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text("Validator: ${if (ActiveLanguage.isOlChiki(activeLang)) "Ol Chiki U+1C50–U+1C7F tick" else "Deva tick"} per language", style = MaterialTheme.typography.labelSmall, color = if (ActiveLanguage.isOlChiki(activeLang)) VachakColors.OfflineGreen else MaterialTheme.colorScheme.onSurfaceVariant)
+            HorizontalDivider()
+            Text(
+                "ASR model fingerprint: exact bytes on THIS device (catches stale filesDir models surviving updates).",
+                style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    onClick = {
+                        fingerprintBusy = true
+                        asrFingerprint = null
+                        kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+                            val dir = java.io.File(context.filesDir, "vachak_models/asr")
+                            val fp = if (java.io.File(dir, "model.onnx").exists() || java.io.File(dir, "model.int8.onnx").exists()) {
+                                com.vachak.ml.AsrModelFingerprint.read(dir)
+                            } else {
+                                android.util.Log.w("Vachak-Diag", "fingerprint: filesDir ASR not extracted yet")
+                                null
+                            }
+                            withContext(Dispatchers.Main) {
+                                asrFingerprint = fp?.toString() ?: "ASR not extracted yet — run Live mic once, then retry."
+                                fingerprintBusy = false
+                            }
+                        }
+                    },
+                    enabled = !fingerprintBusy
+                ) { Text(if (fingerprintBusy) "Reading…" else "Fingerprint ASR model") }
+            }
+            asrFingerprint?.let { Text(it, style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace) }
         }
 
         VachakSection(title = "Resource Budget", icon = Icons.Outlined.Memory) {
