@@ -113,7 +113,10 @@ fun DiagnosticsScreen(
 
     Column(modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text("Diagnostics", style = MaterialTheme.typography.headlineSmall)
-        Text("LatencyTracker • Sequential pipeline • 2GB / 500MB budgets", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            "Build ${com.vachak.BuildConfig.GIT_SHA} • LatencyTracker • Sequential pipeline • 2GB / 500MB budgets",
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
         // DRAFT watermark — curriculum is AUTHOR-DRAFT until SME sign-off (see curriculum/lessons/sat_lessons.json meta.content_status)
         Surface(color = MaterialTheme.colorScheme.errorContainer, shape = MaterialTheme.shapes.small, modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {

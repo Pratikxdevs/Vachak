@@ -14,6 +14,12 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"
+        // Build provenance: short git SHA baked in so any tablet can answer
+        // "which build is installed" (Diagnostics + startup log). Never guess again.
+        val gitSha = providers.exec {
+            commandLine("git", "rev-parse", "--short=12", "HEAD")
+        }.standardOutput.asText.get().trim().ifEmpty { "unknown" }
+        buildConfigField("String", "GIT_SHA", "\"$gitSha\"")
         // ABI strategy: arm64-v8a first (2GB RAM tablet target). x86_64 is added for the
         // dev emulator (mt4_test) so the arm64-only native libs can be exercised on x86_64.
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }

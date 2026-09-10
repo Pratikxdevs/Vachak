@@ -87,6 +87,15 @@ class IndicConformerAsrAdapter(
         }
         ModelStatus.loadingAsr("NEMO Hindi ($baseDir)")
         val t0 = android.os.SystemClock.elapsedRealtimeNanos()
+        // Model byte identity (cheap stat, no load): a stale filesDir model
+        // from an old install has a DIFFERENT size than the bundled one.
+        // Expected (fixed layout): model.onnx = 140451639 bytes.
+        try {
+            val f = java.io.File("$baseDir/model.onnx")
+            Log.d(tag, "ASR model file: ${f.absolutePath} bytes=${if (f.exists()) f.length() else "MISSING"}")
+        } catch (e: Exception) {
+            Log.w(tag, "ASR model stat failed: ${e.message}")
+        }
         Log.d(tag, "creating OfflineRecognizer (NEMO, dir=$baseDir)")
         // Models are extracted to the filesystem (filesDir) or pack dir, so pass null AssetManager.
         try {

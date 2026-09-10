@@ -77,6 +77,7 @@ class MainActivity : ComponentActivity() {
 
         // Log device info for debugging
         android.util.Log.d("Vachak-Native", "Device ABI: ${android.os.Build.SUPPORTED_ABIS.joinToString()}")
+        android.util.Log.d("Vachak-Native", "App build: ${com.vachak.BuildConfig.GIT_SHA}")
         android.util.Log.d("Vachak-Native", "Android version: ${android.os.Build.VERSION.RELEASE} (API ${android.os.Build.VERSION.SDK_INT})")
         // Log refresh rate for diagnostics
         @Suppress("DEPRECATION")
