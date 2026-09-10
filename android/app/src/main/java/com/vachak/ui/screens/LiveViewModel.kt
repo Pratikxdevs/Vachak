@@ -137,7 +137,8 @@ class LiveViewModel @Inject constructor(
         viewModelScope.launch(pipelineDispatcher) {
             val session = StreamingAsrSession(context)
             session.start(t0)
-            try { session.warmUpAsync() } catch (e: Throwable) { android.util.Log.w("Vachak-ASR", "LiveViewModel warmUp threw (first decode will cold-load)", e) }
+            // Capture FIRST, warm second (same rationale as LiveScreen: meter
+            // alive + audio accumulating during the seconds-long warm-up).
             audioCapturer.startRecording(context)
             // startRecording() NEVER throws — it fails silently. Detect it here or
             // UI shows "listening" forever with zero samples (emulator mic busy).
@@ -156,6 +157,7 @@ class LiveViewModel @Inject constructor(
             withContext(Dispatchers.Main) {
                 streamingSession = session
             }
+            try { session.warmUpAsync() } catch (e: Throwable) { android.util.Log.w("Vachak-ASR", "LiveViewModel warmUp threw (first decode will cold-load)", e) }
         }
     }
 
@@ -231,7 +233,7 @@ class LiveViewModel @Inject constructor(
                             asrError = when {
                                 modelError != null -> "[ASR:MODEL] Decode failed — $modelError"
                                 auditCulprit != null -> "[ASR:MIC] $auditCulprit"
-                                micSilent -> "[ASR:MIC] Microphone delivered silence (${pcmFinal.size} samples, peak $peakDb). Check hardware mute, Bluetooth route, or another app holding the mic."
+                                micSilent -> "[ASR:MIC] Microphone delivered silence (${pcmFinal.size} samples, peak $peakDb). Check Quick Settings mic toggle, hardware mute, Bluetooth route, or another app holding the mic."
                                 else -> "[ASR:VAD] Heard you (peak $peakDb) but no words decoded — speak closer and louder, then retry. (${pcmFinal.size} samples)"
                             },
                             isTranslating = false, partialText = ""
@@ -245,8 +247,14 @@ class LiveViewModel @Inject constructor(
                 withContext(Dispatchers.Main) { _uiState.value = _uiState.value.copy(asrError = null) }
                 tracker.markAsr(finalCommitted)
                 val activeLang = ActiveLanguage.current
-                val mtStart = SystemClock.elapsedRealtimeNanos()
-                val mt = engineProvider.translation.translate(finalCommitted, LanguagePair("hi", activeLang))
+                val mt = try {
+                    kotlinx.coroutines.withTimeout(30_000) {
+                        engineProvider.translation.translate(finalCommitted, LanguagePair("hi", activeLang))
+                    }
+                } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+                    android.util.Log.e("Vachak-MT", "MT timed out after 30s", e)
+                    EngineResult.Err(com.vachak.engine.EngineError.TIMEOUT, "Translation timed out (30s) — tap retry")
+                }
                 val translated: String?
                 when (mt) {
                     is EngineResult.Ok -> {
@@ -275,22 +283,25 @@ class LiveViewModel @Inject constructor(
                         val stages = tracker.result().stageMs()
                         val total = tracker.result().endToEndMs()?.toLong()
                         com.vachak.ml.LastPipelineRun.publish(tracker)
-                        withContext(Dispatchers.Main) {
-                            val i = LiveConversationStore.items.indexOfFirst { it.id == itemId }
-                            if (i != -1) {
-                                LiveConversationStore.items[i] = LiveConversationStore.items[i].copy(
-                                    asrMs = stages["asr"]?.toLong(),
-                                    mtMs = stages["translate"]?.toLong(),
-                                    ttsMs = stages["tts"]?.toLong(),
-                                    totalMs = total
-                                )
-                            }
-                            when (pcmRes) {
-                                is EngineResult.Ok -> {
+                        // Playback stays on IO: AudioTrack.write blocks up to seconds (ANR on Main).
+                        when (pcmRes) {
+                            is EngineResult.Ok -> {
+                                playPcmLocal(pcmRes.value, VachakAudio.TTS_OUTPUT_HZ)
+                                withContext(Dispatchers.Main) {
+                                    val i = LiveConversationStore.items.indexOfFirst { it.id == itemId }
+                                    if (i != -1) {
+                                        LiveConversationStore.items[i] = LiveConversationStore.items[i].copy(
+                                            asrMs = stages["asr"]?.toLong(),
+                                            mtMs = stages["translate"]?.toLong(),
+                                            ttsMs = stages["tts"]?.toLong(),
+                                            totalMs = total
+                                        )
+                                    }
                                     _uiState.value = _uiState.value.copy(ttsMessage = "Playing ${ActiveLanguage.label(activeLang)} audio • ${pcmRes.value.size} samples @${VachakAudio.TTS_OUTPUT_HZ}Hz")
-                                    playPcmLocal(pcmRes.value, VachakAudio.TTS_OUTPUT_HZ)
                                 }
-                                is EngineResult.Err -> _uiState.value = _uiState.value.copy(ttsMessage = "TTS: ${pcmRes.message}")
+                            }
+                            is EngineResult.Err -> withContext(Dispatchers.Main) {
+                                _uiState.value = _uiState.value.copy(ttsMessage = "TTS: ${pcmRes.message}")
                             }
                         }
                     }

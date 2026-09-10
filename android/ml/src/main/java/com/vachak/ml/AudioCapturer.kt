@@ -192,10 +192,17 @@ class AudioCapturer {
             return
         }
 
-        // Emulator fix: VOICE_RECOGNITION fails on x86_64 emulator, fallback to MIC
+        // Emulator fix: VOICE_RECOGNITION fails on x86_64 emulator, fallback to MIC.
+        // Order matters: some tablets route ONLY specific sources, so exhaust
+        // all four before declaring silence (UNPROCESSED needs API 24+, minSdk 28 OK).
         val isEmulator = android.os.Build.FINGERPRINT.contains("generic") || android.os.Build.MODEL.contains("sdk")
         val sources = if (isEmulator) listOf(MediaRecorder.AudioSource.MIC, MediaRecorder.AudioSource.VOICE_RECOGNITION)
-                     else listOf(MediaRecorder.AudioSource.VOICE_RECOGNITION, MediaRecorder.AudioSource.MIC)
+                     else listOf(
+                         MediaRecorder.AudioSource.VOICE_RECOGNITION,
+                         MediaRecorder.AudioSource.MIC,
+                         MediaRecorder.AudioSource.UNPROCESSED,
+                         MediaRecorder.AudioSource.VOICE_COMMUNICATION
+                     )
         // Source validation: a source can INITIALIZE yet stream digital silence
         // (unrouted OEM source, muted route). Probe ~400ms of real signal per
         // source and keep the first live one; a dead source must never win by
@@ -267,6 +274,14 @@ class AudioCapturer {
         }
         audioRecord = record
         isRecording = true
+        // Log the ACTUAL route (not the requested source): answers "which mic
+        // are we really on" in logcat without any extra permission.
+        try {
+            val routed = record.routedDevice
+            android.util.Log.d("Vachak-ASR", "AudioRecord routed: type=${routed?.type} name=${routed?.productName}")
+        } catch (t: Throwable) {
+            android.util.Log.w("Vachak-ASR", "routed device unreadable: ${t.message}")
+        }
         android.util.Log.d("Vachak-ASR", "AudioRecord started src=$audioSourceUsed silentStart=$silentStart, isRecording=true")
 
         recordingJob = coroutineScope.launch {

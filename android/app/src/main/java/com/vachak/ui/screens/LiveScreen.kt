@@ -190,7 +190,16 @@ fun LiveScreen(
         val tr = tracker ?: LatencyTracker(LatencySample(runId = "typed-${SystemClock.elapsedRealtimeNanos()}")).also { it.markSpeechBegin() }
         scope.launch(Dispatchers.IO) {
             val mtStart = SystemClock.elapsedRealtimeNanos()
-            val mt = engine.translation.translate(hindi, LanguagePair("hi", activeLang))
+            // Bounded: a hung MT must never disable the mic forever (30s is
+            // generous — healthy inference is <1s; the error path owns the UI).
+            val mt = try {
+                kotlinx.coroutines.withTimeout(30_000) {
+                    engine.translation.translate(hindi, LanguagePair("hi", activeLang))
+                }
+            } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+                Log.e(TAG_MT, "MT timed out after 30s", e)
+                EngineResult.Err(com.vachak.engine.EngineError.TIMEOUT, "Translation timed out (30s) — tap retry")
+            }
             val translated: String?
             val err: String?
             when (mt) {
@@ -230,22 +239,25 @@ fun LiveScreen(
                         val stages = tr.result().stageMs()
                         val total = tr.result().endToEndMs()?.toLong()
                         LastPipelineRun.publish(tr)
-                        withContext(Dispatchers.Main) {
-                            val i = LiveConversationStore.items.indexOfFirst { it.id == id }
-                            if (i != -1) {
-                                LiveConversationStore.items[i] = LiveConversationStore.items[i].copy(
-                                    asrMs = stages["asr"]?.toLong(),
-                                    mtMs = stages["translate"]?.toLong(),
-                                    ttsMs = stages["tts"]?.toLong(),
-                                    totalMs = total
-                                )
-                            }
-                            when (pcmRes) {
-                                is EngineResult.Ok -> {
-                                    tryPlayPcm(pcmRes.value, VachakAudio.TTS_OUTPUT_HZ)
+                        // Playback stays on IO: AudioTrack.write blocks up to seconds (ANR on Main).
+                        when (pcmRes) {
+                            is EngineResult.Ok -> {
+                                tryPlayPcm(pcmRes.value, VachakAudio.TTS_OUTPUT_HZ)
+                                withContext(Dispatchers.Main) {
+                                    val i = LiveConversationStore.items.indexOfFirst { it.id == id }
+                                    if (i != -1) {
+                                        LiveConversationStore.items[i] = LiveConversationStore.items[i].copy(
+                                            asrMs = stages["asr"]?.toLong(),
+                                            mtMs = stages["translate"]?.toLong(),
+                                            ttsMs = stages["tts"]?.toLong(),
+                                            totalMs = total
+                                        )
+                                    }
                                     ttsMessage = "Playing ${ActiveLanguage.label(activeLang)} audio • ${pcmRes.value.size} samples @${VachakAudio.TTS_OUTPUT_HZ}Hz"
                                 }
-                                is EngineResult.Err -> {
+                            }
+                            is EngineResult.Err -> {
+                                withContext(Dispatchers.Main) {
                                     ttsMessage = "TTS: ${pcmRes.message}"
                                 }
                             }
@@ -259,6 +271,16 @@ fun LiveScreen(
     fun startRecordingUktamStyle() {
         if (isListening || isStopping) {
             Log.d(TAG_ASR, "start ignored isListening=$isListening isStopping=$isStopping")
+            return
+        }
+        // Sequential-RAM rule: never capture while a translate is in flight
+        // (prevents MT/TTS + fresh capture running parallel + t0Ns/lastPushed
+        // races). Tell the user instead of swallowing the tap.
+        if (isTranslating) {
+            Log.d(TAG_ASR, "start ignored: translation still running")
+            scope.launch(Dispatchers.Main) {
+                snackbarHostState.showSnackbar("Finishing translation — tap mic again in a moment")
+            }
             return
         }
         val t0 = SystemClock.elapsedRealtimeNanos()
@@ -276,13 +298,10 @@ fun LiveScreen(
             try {
                 val session = StreamingAsrSession(context)
                 session.start(t0)
-                // Heavy model warm-up + AudioRecord creation off UI thread
-                try {
-                    session.warmUpAsync()
-                    Log.d(TAG_ASR, "warmUpAsync done")
-                } catch (e: Throwable) {
-                    Log.e(TAG_ASR, "warmUpAsync failed", e)
-                }
+                // Capture FIRST, warm second: warm-up loads 140MB (seconds) and
+                // audio must accumulate + meter must move during it — the old
+                // warm-then-capture order showed a flat meter for seconds on
+                // every cold start, indistinguishable from a dead mic.
                 audioCapturer.startRecording(context)
                 // startRecording() NEVER throws — it fails silently. Detect it here or
                 // UI shows "listening" forever with zero samples (emulator mic busy).
@@ -297,7 +316,14 @@ fun LiveScreen(
                 }
                 withContext(Dispatchers.Main) {
                     streamingSession = session
-                    Log.d(TAG_ASR, "mic + ASR warm-up ready t0=$t0")
+                    Log.d(TAG_ASR, "mic capturing t0=$t0 (warm-up continues in background)")
+                }
+                // Heavy model warm-up off UI thread, AFTER capture is running.
+                try {
+                    session.warmUpAsync()
+                    Log.d(TAG_ASR, "warmUpAsync done")
+                } catch (e: Throwable) {
+                    Log.e(TAG_ASR, "warmUpAsync failed", e)
                 }
             } catch (e: Exception) {
                 Log.e(TAG_ASR, "startRecording failed", e)
@@ -384,11 +410,18 @@ fun LiveScreen(
     fun stopRecordingAndProcessUktamStyle() {
         if (isStopping) {
             Log.d(TAG_ASR, "stop ignored, already stopping")
+            scope.launch(Dispatchers.Main) {
+                snackbarHostState.showSnackbar("Finishing previous recording…")
+            }
             return
         }
         val wasListening = isListening
         isListening = false
         isStopping = true
+        // Snapshot BEFORE the stop-clear: setting isListening=false wipes
+        // partialTextState on next recomposition, which used to starve the
+        // fallback below (recoverable partials degraded to VAD-silence).
+        val preStopPartial = partialTextState.value.trim()
         // NOTE: isTranslating is owned by translateAndAppend. isStopping keeps the
         // Stop button enabled while session.finish() decodes (slow on emulator),
         // so the mic can never look stuck.
@@ -460,8 +493,9 @@ fun LiveScreen(
                 }
                 var asrText = finalCommitted
                 // Fallback: committed empty but live partial had text (VAD threshold miss) — use it.
+                // (preStopPartial: the live strip may already be cleared by now.)
                 if (asrText.isBlank()) {
-                    val partialFallback = partialTextState.value.trim()
+                    val partialFallback = preStopPartial.ifBlank { partialTextState.value.trim() }
                     if (partialFallback.isNotBlank()) {
                         Log.w(TAG_ASR, "committed empty but partial fallback \"$partialFallback\" pcmFinal=${pcmFinal.size}")
                         asrText = partialFallback
@@ -484,7 +518,7 @@ fun LiveScreen(
                         asrError = when {
                             modelError != null -> "[ASR:MODEL] Decode failed — $modelError"
                             auditCulprit != null -> "[ASR:MIC] $auditCulprit"
-                            micSilent -> "[ASR:MIC] Microphone delivered silence (${pcmFinal.size} samples, peak $peakDb). Check: hardware mute shutter? Bluetooth earpiece routed elsewhere? Another app holding the mic? Then retry."
+                            micSilent -> "[ASR:MIC] Microphone delivered silence (${pcmFinal.size} samples, peak $peakDb). Check: Quick Settings microphone toggle OFF? Hardware mute shutter? Bluetooth earpiece routed elsewhere? Another app holding the mic? Then retry."
                             else -> "[ASR:VAD] Heard you (peak $peakDb) but no words decoded — speak closer and louder, then retry. (${pcmFinal.size} samples)"
                         }
                         ttsMessage = null
@@ -517,11 +551,13 @@ fun LiveScreen(
                 }
             } finally {
                 // GUARANTEE: mic state always resets — button can never stay dead.
+                // (Unconditional: the old `if (!isTranslating)` was a tautology that
+                // left the mic disabled forever after a hung MT.)
                 withContext(Dispatchers.Main) {
                     isStopping = false
                     streamingSession = null
-                    if (!isTranslating) isTranslating = false
-                    Log.d(TAG_ASR, "stop finally isStopping=false isTranslating=$isTranslating")
+                    isTranslating = false
+                    Log.d(TAG_ASR, "stop finally isStopping=false isTranslating=false")
                 }
             }
         }

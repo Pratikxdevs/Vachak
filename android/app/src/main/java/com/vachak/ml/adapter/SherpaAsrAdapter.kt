@@ -29,8 +29,11 @@ class SherpaAsrAdapter(
             real = adapter
             // Actually warm the 140MB recognizer now (IO thread) so the first
             // mic press transcribes immediately — "model always live".
-            // Status (READY/ERROR) is recorded by the adapter itself.
-            adapter.warmUpIfNeeded()
+            // Status (READY/ERROR) is recorded by the adapter itself; a failed
+            // warm-up is an honest Err, never a silent OK (preload must not lie).
+            if (!adapter.warmUpIfNeeded()) {
+                throw IllegalStateException("ASR warm-up failed — see logcat Vachak-ASR")
+            }
         }.fold(
             onSuccess = { EngineResult.Ok(Unit) },
             onFailure = { e -> EngineResult.Err(EngineError.MODEL_LOAD_FAILED, e.message ?: "asr load failed") }

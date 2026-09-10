@@ -52,7 +52,10 @@ class SherpaTtsAdapter(
                     val created = SherpaOnnxTtsAdapter(context!!, packDir = packDir)
                     cachedAdapter = created
                     // Warm now (IO thread) so first Play has no cold-load pause.
-                    created.warmUpIfNeeded()
+                    // A failed warm-up is an honest Err, never a silent OK.
+                    if (!created.warmUpIfNeeded()) {
+                        throw IllegalStateException("TTS warm-up failed — see logcat Vachak-TTS")
+                    }
                     Log.d(tag, "loadModel packDir=$packDir -> OK"); EngineResult.Ok(Unit)
                 }.fold(
                     onSuccess = { it },

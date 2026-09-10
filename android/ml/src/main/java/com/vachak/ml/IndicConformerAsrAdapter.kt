@@ -106,13 +106,24 @@ class IndicConformerAsrAdapter(
         }
     }
 
-    /** Non-blocking warm-up to be called off the UI thread (IO). */
-    fun warmUpIfNeeded() {
-        try {
+    /**
+     * Non-blocking warm-up to be called off the UI thread (IO).
+     * @return true when the recognizer is ready; false records ModelStatus ERROR.
+     * Callers (loadModel) must propagate false as Err — a silent true here is
+     * what used to let preload report OK on a broken model.
+     */
+    fun warmUpIfNeeded(): Boolean {
+        return try {
             ensureLoaded()
-        } catch (e: Exception) {
-            // Status already recorded as ERROR by ensureLoaded; log once here.
-            Log.w(tag, "warmUp failed: ${e.message}")
+            true
+        } catch (t: Throwable) {
+            // Best-effort path: even native Errors (missing .so on exotic ABIs)
+            // must not escape warm-up. Status already ERROR if ensureLoaded got far enough.
+            if (ModelStatus.asr.value.state != ModelState.ERROR) {
+                ModelStatus.setAsr(ModelInfo(ModelState.ERROR, "ASR warm-up failed: ${t.message?.take(140)}"))
+            }
+            Log.w(tag, "warmUp failed: ${t.message}")
+            false
         }
     }
 

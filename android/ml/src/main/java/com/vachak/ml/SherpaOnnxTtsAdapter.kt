@@ -128,20 +128,23 @@ class SherpaOnnxTtsAdapter(
     /** Non-blocking warm-up off the UI thread (IO): resolves + creates the
      * OfflineTts so first Play has no cold-load pause. Status recorded.
      * Placeholder shim models are NEVER handed to the native layer here
-     * (native hard-abort risk); they report text-only READY instead. */
-    fun warmUpIfNeeded() {
+     * (native hard-abort risk); they report text-only READY instead.
+     * @return true when warmed or known-placeholder; false on real failure. */
+    fun warmUpIfNeeded(): Boolean {
         try {
             if (isShim()) {
                 ModelStatus.setTts(
                     ModelInfo(ModelState.READY, "placeholder voice (55-token shim) — text-only mode", degraded = true)
                 )
                 Log.w(tag, "warmUp: placeholder voice — native load skipped (synthesis disabled until trained VITS ships)")
-                return
+                return true
             }
             ensureLoaded()
-        } catch (e: Exception) {
-            // Status already ERROR via ensureLoaded; log once here.
-            Log.w(tag, "warmUp failed: ${e.message}")
+            return true
+        } catch (t: Throwable) {
+            // Best-effort path: swallow even native Errors here (see ASR twin).
+            Log.w(tag, "warmUp failed: ${t.message}")
+            return false
         }
     }
 
@@ -155,6 +158,19 @@ class SherpaOnnxTtsAdapter(
     @Synchronized
     private fun ensureLoaded(): OfflineTts {
         if (tts != null) return tts!!
+        try {
+            return ensureLoadedInner()
+        } catch (t: Throwable) {
+            // Whole-body guard: ANY failure (missing files, native Errors on
+            // exotic ABIs, Robolectric JVM) settles status to ERROR instead of
+            // stranding it at LOADING forever. Rethrown: callers decide.
+            ModelStatus.setTts(ModelInfo(ModelState.ERROR, "TTS load failed: ${t.message?.take(140)}"))
+            Log.e(tag, "OfflineTts ensureLoaded failed", t)
+            throw t
+        }
+    }
+
+    private fun ensureLoadedInner(): OfflineTts {
         val baseDir = resolveBaseDir()
         resolvedBaseDir = baseDir
         // Guard: model.onnx must exist; fail fast with clear log if not
@@ -189,13 +205,7 @@ class SherpaOnnxTtsAdapter(
             // Models are extracted to the filesystem (filesDir) or are already in pack dir,
             // so pass null AssetManager (fs path) as fixed in P0.
             val t0 = android.os.SystemClock.elapsedRealtimeNanos()
-            try {
-                tts = OfflineTts(null, config)
-            } catch (e: Exception) {
-                ModelStatus.setTts(ModelInfo(ModelState.ERROR, "TTS load failed: ${e.message?.take(140)}"))
-                Log.e(tag, "OfflineTts creation failed (dir=$baseDir)", e)
-                throw e
-            }
+            tts = OfflineTts(null, config)
             val ms = (android.os.SystemClock.elapsedRealtimeNanos() - t0) / 1_000_000
             ModelStatus.setTts(ModelInfo(ModelState.READY, voiceDetail, ms, degradedVoice))
             Log.d(tag, "OfflineTts ready in ${ms}ms (baseDir=$baseDir, pack=${packDir != null})")
