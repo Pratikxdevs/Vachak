@@ -18,6 +18,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.vachak.ui.theme.VachakColors
+import com.vachak.ui.theme.cardShadow
 
 /** Script choice for reading surfaces: Hindi (Deva) / English (romanized
  *  gloss, clearly a transliteration — the pack ships no English text) /
@@ -62,7 +63,7 @@ fun GradeCard(
     modifier: Modifier = Modifier
 ) {
     Surface(
-        modifier = modifier.width(140.dp).heightIn(min = 120.dp).clickable(onClick = onClick),
+        modifier = modifier.width(140.dp).heightIn(min = 120.dp).clickable(onClick = onClick).cardShadow(RoundedCornerShape(20.dp)),
         shape = RoundedCornerShape(20.dp),
         color = VachakColors.SoftLavender,
         border = androidx.compose.foundation.BorderStroke(1.dp, VachakColors.Lavender100)
@@ -95,11 +96,12 @@ fun FlashcardDeckCard(
     modifier: Modifier = Modifier
 ) {
     Surface(
-        modifier = modifier.width(160.dp).height(180.dp).clickable(onClick = onClick),
+        modifier = modifier.width(160.dp).height(180.dp).clickable(onClick = onClick).cardShadow(RoundedCornerShape(20.dp)),
         shape = RoundedCornerShape(20.dp),
         color = Color.White,
         border = androidx.compose.foundation.BorderStroke(1.dp, VachakColors.Border),
-        shadowElevation = 0.dp
+        shadowElevation = 0.dp,
+        tonalElevation = 0.dp
     ) {
         Column(modifier = Modifier.padding(16.dp).fillMaxSize(), verticalArrangement = Arrangement.SpaceBetween) {
             Surface(shape = RoundedCornerShape(14.dp), color = VachakColors.Lavender100, modifier = Modifier.size(48.dp)) {

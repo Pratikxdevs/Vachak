@@ -282,7 +282,7 @@ fun VachakApp(
                             )
                         }
                         composable(NavRoute.ManagePacks.route) {
-                            ManagePacksScreen()
+                            ManagePacksScreen(onBack = { navController.popBackStack() })
                         }
                         composable(NavRoute.Diagnostics.route) {
                             com.vachak.ui.screens.DiagnosticsScreen(engine = engine)

@@ -2,6 +2,7 @@ package com.vachak.ui.screens
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -24,12 +25,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.vachak.engine.EngineProvider
+import com.vachak.ui.components.BreadcrumbTrail
 import com.vachak.ui.components.HomeSectionHeader
 import com.vachak.ui.components.ScriptChoice
 import com.vachak.ui.components.ScriptToggle
 import com.vachak.ui.content.PackContentReader
 import com.vachak.ui.navigation.loadPackSummary
 import com.vachak.ui.theme.VachakColors
+import com.vachak.ui.theme.cardShadow
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -114,6 +117,7 @@ fun ChapterScreen(
             Row(modifier = Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 8.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 IconButton(onClick = onBack, modifier = Modifier.size(48.dp)) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back", tint = VachakColors.TextPrimary) }
                 Column(modifier = Modifier.weight(1f)) {
+                    BreadcrumbTrail(listOf("Learn", "Grade $grade"))
                     Text(metaTitle, style = MaterialTheme.typography.titleLarge, color = VachakColors.TextPrimary, fontWeight = FontWeight.Bold, maxLines = 2)
                     Text(
                         if (metaSubject.isNotBlank()) "Grade $grade • $metaSubject" else "Grade $grade",
@@ -211,7 +215,9 @@ private fun ChapterContent(
                                 runCatching { bmp.asImageBitmap() }.getOrNull()
                                     ?: return@items,
                                 contentDescription = null,
-                                modifier = Modifier.size(width = 200.dp, height = 140.dp).clip(RoundedCornerShape(16.dp)),
+                                modifier = Modifier.size(width = 200.dp, height = 140.dp)
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .border(1.dp, Color.Black.copy(alpha = 0.1f), RoundedCornerShape(16.dp)),
                                 contentScale = androidx.compose.ui.layout.ContentScale.Crop
                             )
                         }
@@ -318,7 +324,15 @@ private fun PracticeCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Surface(shape = RoundedCornerShape(20.dp), color = Color.White, border = androidx.compose.foundation.BorderStroke(1.dp, VachakColors.Border), modifier = modifier, onClick = onClick) {
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = Color.White,
+        border = androidx.compose.foundation.BorderStroke(1.dp, VachakColors.Border),
+        shadowElevation = 0.dp,
+        tonalElevation = 0.dp,
+        modifier = modifier.cardShadow(RoundedCornerShape(20.dp)),
+        onClick = onClick
+    ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Icon(icon, contentDescription = null, tint = VachakColors.DeepLavender, modifier = Modifier.size(24.dp))
             Text(title, style = MaterialTheme.typography.bodyMedium, color = VachakColors.TextPrimary, fontWeight = FontWeight.SemiBold)

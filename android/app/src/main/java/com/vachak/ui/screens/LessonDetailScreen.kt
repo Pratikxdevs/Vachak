@@ -25,6 +25,8 @@ import com.vachak.engine.Lesson
 import com.vachak.engine.Outcome
 import com.vachak.engine.QuizEngine
 import com.vachak.ui.theme.VachakColors
+import com.vachak.ui.theme.cardShadow
+import com.vachak.ui.components.BreadcrumbTrail
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -126,7 +128,8 @@ fun LessonDetailScreen(
         Surface(color = Color.White, shadowElevation = 0.dp, tonalElevation = 0.dp) {
             Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 IconButton(onClick = onBack, modifier = Modifier.size(44.dp)) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, null, tint = VachakColors.TextPrimary) }
-                Column(modifier = Modifier.weight(1f)) {
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    BreadcrumbTrail(listOf("Learn", lesson?.let { "Grade ${it.grade}" } ?: "Lesson"))
                     Text(lesson?.title ?: "Lesson", style = MaterialTheme.typography.titleMedium, color = VachakColors.TextPrimary, fontWeight = FontWeight.SemiBold, maxLines = 1)
                     Text(
                         lesson?.let { "Grade ${it.grade} • ${ActiveLanguage.label(activeLang)}" } ?: "Loading…",
@@ -244,7 +247,7 @@ fun LessonDetailScreen(
                         }
                         outcomes.forEach { oc ->
                             item {
-                                Surface(shape = RoundedCornerShape(16.dp), color = Color.White, border = androidx.compose.foundation.BorderStroke(1.dp, VachakColors.Border), modifier = Modifier.fillMaxWidth()) {
+                                Surface(shape = RoundedCornerShape(16.dp), color = Color.White, border = androidx.compose.foundation.BorderStroke(1.dp, VachakColors.Border), shadowElevation = 0.dp, tonalElevation = 0.dp, modifier = Modifier.fillMaxWidth().cardShadow(RoundedCornerShape(16.dp))) {
                                     Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                                         Icon(
                                             if (oc.nipunMapped) Icons.Outlined.Verified else Icons.Outlined.Circle,

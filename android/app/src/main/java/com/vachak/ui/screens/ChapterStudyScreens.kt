@@ -14,6 +14,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.vachak.engine.EngineProvider
+import com.vachak.ui.components.BreadcrumbTrail
 import com.vachak.ui.content.PackContentReader
 import com.vachak.ui.navigation.loadPackSummary
 import com.vachak.ui.theme.VachakColors
@@ -63,11 +64,12 @@ private fun loadBundle(grade: Int, slug: String): BundleUi {
 }
 
 @Composable
-private fun StudySubHeader(title: String, subtitle: String, count: String?, onBack: () -> Unit) {
+private fun StudySubHeader(title: String, subtitle: String, count: String?, trail: List<String>, onBack: () -> Unit) {
     Surface(color = Color.White, shadowElevation = 0.dp, tonalElevation = 0.dp) {
         Row(modifier = Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 8.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             IconButton(onClick = onBack, modifier = Modifier.size(48.dp)) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back", tint = VachakColors.TextPrimary) }
-            Column(modifier = Modifier.weight(1f)) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                BreadcrumbTrail(trail)
                 Text(title, style = MaterialTheme.typography.titleMedium, color = VachakColors.TextPrimary, fontWeight = FontWeight.SemiBold, maxLines = 1)
                 Text(subtitle, style = MaterialTheme.typography.bodySmall, color = VachakColors.TextSecondary, maxLines = 1)
             }
@@ -123,6 +125,7 @@ fun ChapterWorksheetScreen(
             title = "Worksheet",
             subtitle = "Grade $grade • $chapterTitle",
             count = bundle?.questions?.takeIf { it.isNotEmpty() }?.let { "${it.size} items" },
+            trail = listOf("Learn", "Grade $grade"),
             onBack = onBack
         )
         when (ui) {
@@ -165,6 +168,7 @@ fun ChapterDeckScreen(
             title = "Flashcards",
             subtitle = "Grade $grade • $chapterTitle",
             count = bundle?.cards?.takeIf { it.isNotEmpty() }?.let { "${it.size} cards" },
+            trail = listOf("Learn", "Grade $grade"),
             onBack = onBack
         )
         when (ui) {

@@ -1,6 +1,7 @@
 package com.vachak.ui.screens
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -19,6 +20,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.vachak.ui.content.PackContentReader
 import com.vachak.ui.theme.VachakColors
+import com.vachak.ui.theme.cardShadow
 
 /**
  * Shared renderers for installed-pack worksheets and decks.
@@ -35,7 +37,7 @@ fun PackWorksheetView(questions: List<PackQuestionAlias>) {
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         items(questions, key = { it.id }) { q ->
-            Surface(shape = RoundedCornerShape(16.dp), color = Color.White, border = androidx.compose.foundation.BorderStroke(1.dp, VachakColors.Border), modifier = Modifier.fillMaxWidth()) {
+            Surface(shape = RoundedCornerShape(16.dp), color = Color.White, border = androidx.compose.foundation.BorderStroke(1.dp, VachakColors.Border), shadowElevation = 0.dp, tonalElevation = 0.dp, modifier = Modifier.fillMaxWidth().cardShadow(RoundedCornerShape(16.dp))) {
                 Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                         Surface(shape = RoundedCornerShape(50), color = VachakColors.SoftLavender) {
@@ -95,14 +97,15 @@ fun PackDeckView(grade: Int, cards: List<PackCardAlias>) {
         }
     }
     Column(modifier = Modifier.fillMaxSize().verticalScroll(androidx.compose.foundation.rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        Surface(
-            modifier = Modifier.fillMaxWidth().heightIn(min = 320.dp, max = 520.dp),
-            shape = RoundedCornerShape(24.dp),
-            color = Color.White,
-            border = androidx.compose.foundation.BorderStroke(1.dp, VachakColors.Border),
-            shadowElevation = 0.dp,
-            onClick = { flipped = !flipped }
-        ) {
+            Surface(
+                modifier = Modifier.fillMaxWidth().heightIn(min = 320.dp, max = 520.dp).cardShadow(RoundedCornerShape(24.dp)),
+                shape = RoundedCornerShape(24.dp),
+                color = Color.White,
+                border = androidx.compose.foundation.BorderStroke(1.dp, VachakColors.Border),
+                shadowElevation = 0.dp,
+                tonalElevation = 0.dp,
+                onClick = { flipped = !flipped }
+            ) {
             Column(modifier = Modifier.fillMaxSize().padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
                     if (flipped) "Ol Chiki" else "Santali (Deva)",
@@ -119,7 +122,9 @@ fun PackDeckView(grade: Int, cards: List<PackCardAlias>) {
                     Image(
                         bmp.asImageBitmap(),
                         contentDescription = null,
-                        modifier = Modifier.fillMaxWidth().weight(1f, fill = false).heightIn(min = 160.dp, max = 280.dp).clip(RoundedCornerShape(16.dp)),
+                        modifier = Modifier.fillMaxWidth().weight(1f, fill = false).heightIn(min = 160.dp, max = 280.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .border(1.dp, Color.Black.copy(alpha = 0.1f), RoundedCornerShape(16.dp)),
                         contentScale = androidx.compose.ui.layout.ContentScale.Fit
                     )
                 }
@@ -129,9 +134,9 @@ fun PackDeckView(grade: Int, cards: List<PackCardAlias>) {
                 )
             }
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            OutlinedButton(onClick = { if (idx > 0) { idx--; flipped = false } }, enabled = idx > 0, shape = RoundedCornerShape(50)) { Text("Previous") }
-            Text("${idx + 1} / ${cards.size}", style = MaterialTheme.typography.labelMedium, color = VachakColors.TextPrimary, fontWeight = FontWeight.SemiBold)
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                OutlinedButton(onClick = { if (idx > 0) { idx--; flipped = false } }, enabled = idx > 0, shape = RoundedCornerShape(50)) { Text("Previous") }
+                Text("${idx + 1} / ${cards.size}", style = MaterialTheme.typography.labelMedium, color = VachakColors.TextPrimary, fontWeight = FontWeight.SemiBold, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
             Button(onClick = { if (idx < cards.lastIndex) { idx++; flipped = false } }, enabled = idx < cards.lastIndex, shape = RoundedCornerShape(50), colors = ButtonDefaults.buttonColors(containerColor = VachakColors.PrimaryDark, contentColor = Color.White)) { Text("Next") }
         }
     }

@@ -19,6 +19,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.vachak.engine.EngineProvider
 import com.vachak.engine.Lesson
+import com.vachak.ui.components.BreadcrumbTrail
 import com.vachak.ui.components.HomeSectionHeader
 import com.vachak.ui.content.PackContentReader
 import com.vachak.ui.navigation.PackGrade
@@ -95,6 +96,7 @@ fun GradeScreen(
             Row(modifier = Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 8.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 IconButton(onClick = onBack, modifier = Modifier.size(48.dp)) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back", tint = VachakColors.TextPrimary) }
                 Column(modifier = Modifier.weight(1f)) {
+                    BreadcrumbTrail(listOf("Learn", "Grade $grade"))
                     Text("Grade $grade", style = MaterialTheme.typography.titleLarge, color = VachakColors.TextPrimary, fontWeight = FontWeight.Bold, maxLines = 1)
                     val n = pack?.chapterTitles.orEmpty().distinctBy { it.slug }.size
                     Text(
