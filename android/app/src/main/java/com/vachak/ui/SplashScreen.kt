@@ -1,6 +1,5 @@
 package com.vachak.ui
 
-import android.graphics.Matrix
 import android.graphics.SurfaceTexture
 import android.media.MediaPlayer
 import android.view.Surface
@@ -10,7 +9,12 @@ import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -18,6 +22,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.viewinterop.AndroidView
@@ -33,9 +38,10 @@ private val EaseSnap = CubicBezierEasing(0.2f, 0f, 0f, 1f)
  * preload underneath (MainActivity's sequential preload is untouched — the
  * video covers it, it never gates on it). Muted (classroom-appropriate).
  *
- * Natural centered fit: whole video visible, aspect preserved, centered on
- * black. On completion (or error, or a 30s safety cap) the video fades out
- * over 600ms into the app. No fixed-duration splash.
+ * Natural 9:16 stage: the video box itself is 9:16 (the source's own
+ *  ratio), centered, as large as the screen allows. No stretch, no crop —
+ *  the pixels are shown exactly as authored. On completion (or error, or a
+ *  30s safety cap) the video fades out over 600ms into the app.
  */
 @Composable
 fun VideoSplash(onDone: () -> Unit) {
@@ -63,65 +69,67 @@ fun VideoSplash(onDone: () -> Unit) {
         exit = fadeOut(animationSpec = tween(durationMillis = 600, easing = EaseSnap)),
         label = "splashFade"
     ) {
-        AndroidView(
-            factory = { ctx ->
-                TextureView(ctx).apply {
-                    surfaceTextureListener = object : TextureView.SurfaceTextureListener {
-                        override fun onSurfaceTextureAvailable(st: SurfaceTexture, w: Int, h: Int) {
-                            try {
-                                player.reset()
-                                val afd = ctx.resources.openRawResourceFd(R.raw.loadingscreen)
-                                player.setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
-                                afd.close()
-                                player.setSurface(Surface(st))
-                                player.setVolume(0f, 0f)
-                                player.isLooping = false
-                                player.setOnPreparedListener { mp ->
-                                    // Natural fit: whole video, centered, aspect
-                                    // preserved. No crop, no stretch.
-                                    val vw = mp.videoWidth.toFloat()
-                                    val vh = mp.videoHeight.toFloat()
-                                    if (vw > 0 && vh > 0 && w > 0 && h > 0) {
-                                        val scale = minOf(w / vw, h / vh)
-                                        val dx = (w - vw * scale) / 2f
-                                        val dy = (h - vh * scale) / 2f
-                                        val m = Matrix()
-                                        m.setScale(scale, scale)
-                                        m.postTranslate(dx, dy)
-                                        setTransform(m)
+        // 9:16 stage, centered: fills height on tall phones, fills width on
+        // wider screens — the video is never stretched or cropped.
+        BoxWithConstraints(
+            modifier = Modifier.fillMaxSize().background(Color.Black),
+            contentAlignment = Alignment.Center
+        ) {
+            val useWidth = maxWidth / maxHeight < 9f / 16f
+            val stage = if (useWidth) {
+                Modifier.fillMaxWidth().aspectRatio(9f / 16f)
+            } else {
+                Modifier.fillMaxHeight().aspectRatio(9f / 16f)
+            }
+            Box(modifier = stage) {
+                AndroidView(
+                    factory = { ctx ->
+                        TextureView(ctx).apply {
+                            surfaceTextureListener = object : TextureView.SurfaceTextureListener {
+                                override fun onSurfaceTextureAvailable(st: SurfaceTexture, w: Int, h: Int) {
+                                    try {
+                                        player.reset()
+                                        val afd = ctx.resources.openRawResourceFd(R.raw.loadingscreen)
+                                        player.setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
+                                        afd.close()
+                                        player.setSurface(Surface(st))
+                                        player.setVolume(0f, 0f)
+                                        player.isLooping = false
+                                        player.setOnPreparedListener { mp ->
+                                            VachakLog.d("Vachak-Splash", "video prepared ${mp.videoWidth}x${mp.videoHeight} — playing once")
+                                            mp.start()
+                                        }
+                                        player.setOnCompletionListener { finish("completed") }
+                                        player.setOnErrorListener { _, what, extra ->
+                                            VachakLog.e("Vachak-Splash", "video error what=$what extra=$extra — skipping")
+                                            finish("error")
+                                            true
+                                        }
+                                        player.prepareAsync()
+                                    } catch (e: Exception) {
+                                        VachakLog.e("Vachak-Splash", "video setup threw — skipping", e)
+                                        finish("error")
                                     }
-                                    VachakLog.d("Vachak-Splash", "video prepared ${mp.videoWidth}x${mp.videoHeight} — playing once")
-                                    mp.start()
                                 }
-                                player.setOnCompletionListener { finish("completed") }
-                                player.setOnErrorListener { _, what, extra ->
-                                    VachakLog.e("Vachak-Splash", "video error what=$what extra=$extra — skipping")
-                                    finish("error")
-                                    true
-                                }
-                                player.prepareAsync()
-                            } catch (e: Exception) {
-                                VachakLog.e("Vachak-Splash", "video setup threw — skipping", e)
-                                finish("error")
+
+                                override fun onSurfaceTextureSizeChanged(st: SurfaceTexture, w: Int, h: Int) = Unit
+                                override fun onSurfaceTextureDestroyed(st: SurfaceTexture): Boolean = true
+                                override fun onSurfaceTextureUpdated(st: SurfaceTexture) = Unit
                             }
                         }
-
-                        override fun onSurfaceTextureSizeChanged(st: SurfaceTexture, w: Int, h: Int) = Unit
-                        override fun onSurfaceTextureDestroyed(st: SurfaceTexture): Boolean = true
-                        override fun onSurfaceTextureUpdated(st: SurfaceTexture) = Unit
-                    }
-                }
-            },
-            onRelease = {
-                if (!playerReleased) {
-                    playerReleased = true
-                    try {
-                        player.stop()
-                    } catch (_: Exception) {}
-                    player.release()
-                }
-            },
-            modifier = Modifier.fillMaxSize().background(Color.Black)
-        )
+                    },
+                    onRelease = {
+                        if (!playerReleased) {
+                            playerReleased = true
+                            try {
+                                player.stop()
+                            } catch (_: Exception) {}
+                            player.release()
+                        }
+                    },
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+        }
     }
 }
