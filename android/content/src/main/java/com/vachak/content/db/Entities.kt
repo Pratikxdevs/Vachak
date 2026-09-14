@@ -78,3 +78,43 @@ data class FlashcardEntity(
     val imagePath: String, // e.g. flashcard/assets/number_1.png
     val sequence: Int
 )
+
+@Entity(
+    tableName = "activities",
+    foreignKeys = [ForeignKey(
+        entity = LessonEntity::class,
+        parentColumns = ["id"],
+        childColumns = ["lessonId"],
+        onDelete = ForeignKey.CASCADE
+    )],
+    indices = [Index("lessonId")]
+)
+data class ActivityEntity(
+    @PrimaryKey val id: String,
+    val lessonId: String,
+    val titleHi: String,
+    val instructionHi: String,
+    val instructionSatOlChiki: String,
+    val audioSatPath: String? = null, // filesDir audio when Santhali voice ships; null = TTS-on-demand
+    val materials: String = "",
+    val sequence: Int = 0
+)
+
+@Entity(
+    tableName = "assessment_prompts",
+    foreignKeys = [ForeignKey(
+        entity = LessonEntity::class,
+        parentColumns = ["id"],
+        childColumns = ["lessonId"],
+        onDelete = ForeignKey.CASCADE
+    )],
+    indices = [Index("lessonId")]
+)
+data class AssessmentPromptEntity(
+    @PrimaryKey val id: String,
+    val lessonId: String,
+    val promptHi: String,
+    val promptSatOlChiki: String,
+    val audioSatPath: String? = null,
+    val expectedResponse: String = ""
+)

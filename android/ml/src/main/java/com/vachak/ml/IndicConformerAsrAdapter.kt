@@ -2,154 +2,177 @@ package com.vachak.ml
 
 import android.content.Context
 import android.util.Log
-import com.k2fsa.sherpa.onnx.FeatureConfig
 import com.k2fsa.sherpa.onnx.OfflineModelConfig
+import com.k2fsa.sherpa.onnx.OfflineNemoEncDecCtcModelConfig
 import com.k2fsa.sherpa.onnx.OfflineRecognizer
 import com.k2fsa.sherpa.onnx.OfflineRecognizerConfig
-import com.k2fsa.sherpa.onnx.OfflineNemoEncDecCtcModelConfig
+import com.k2fsa.sherpa.onnx.OfflineStream
 
 /**
- * Hindi ASR via sherpa-onnx NEMO CTC 134M int8 (Uktam hi).
- * Offline, 16kHz, null AssetManager via SherpaAssets, 1 thread for 2GB.
+ * REAL ASR via the vendored sherpa-onnx AAR (k2-fsa/sherpa-onnx, Apache-2.0), built
+ * over the cloned reference repo's Android API.
+ *
+ * Model: `vachak_models/asr/model.onnx` — a NeMo EncDecCTCModelBPE (5113 nodes,
+ * opset17, quantized to int8/int4, metadata `model_type=EncDecCTCModelBPE`,
+ * `subsampling_factor=4`, vocab 5633). Its declared input is `audio_signal`
+ * `[B, 80, T]` (channel-first, the original AI4Bharat export) — this is what
+ * sherpa-onnx feeds it: `OfflineNemoEncDecCtcModel::Forward` computes fbank
+ * as (B,T,80) and applies `Transpose12` itself, `(B, T, C) -> (B, C, T)`.
+ * (A Sep-2026 `fix_asr_input_layout.py` wrongly rewrote the graph to [B,T,80];
+ * reverted by `scripts/revert_asr_layout_fix.py` after device logcat proved
+ * every decode threw `index: 2 Got: <T> Expected: 80`.)
+ *
+ * This adapter therefore drives the model through sherpa-onnx's
+ * [OfflineRecognizer] + [OfflineNemoEncDecCtcModelConfig], which owns the
+ * feature extraction, Transpose12, CTC greedy decode and token->text mapping.
+ * It does NOT hand features to a bare ORT session: that path would need the
+ * caller to replicate sherpa's fbank + transpose exactly.
+ *
+ * Assets: `model.onnx` (NeMo CTC), `tokens.txt` (5633 BPE tokens). Extracted to
+ * filesDir via [SherpaAssets.prepare]. numThreads=1 (2GB RAM bound). No network.
+ *
+ * Provenance: `ml/asr/` training run -> `models/indicconformer-hi.onnx` ->
+ * `android/assets/vachak_models/asr/`. See `THIRD_PARTY_NOTICES.md:Phase 3` and
+ * `docs/MODEL_AND_DATA_PROVENANCE.md:P3`.
  */
 class IndicConformerAsrAdapter(
     private val context: Context,
-    private val modelDir: String = "asr"
+    private val modelDir: String = "asr",
+    private val sampleRate: Int = 16000
 ) : AsrAdapter {
-
     private var recognizer: OfflineRecognizer? = null
+    private var loaded = false
     private val tag = "Vachak-ASR"
 
     companion object {
-        @Volatile private var sharedRecognizer: OfflineRecognizer? = null
-        @Volatile private var sharedBaseDir: String? = null
+        /**
+         * Process-wide recognizer: the 140MB load happens ONCE and is reused
+         * by every mic press / session / adapter instance. Before this, each
+         * StreamingAsrSession built its own adapter + recognizer (2.7-4s load
+         * per Start, 140MB churn each time) — the biggest slice of
+         * time-to-first-partial. Guarded by [sharedLock]; decode callers
+         * synchronize on it too (native recognizer is not thread-safe, and
+         * the pipeline is sequential anyway). Only a successfully created
+         * recognizer is cached — a failed load never poisons later presses.
+         */
         private val sharedLock = Any()
-    }
+        private var sharedRecognizer: OfflineRecognizer? = null
+        private var sharedModelPath: String? = null
 
-    private fun buildConfig(baseDir: String): OfflineRecognizerConfig {
-        val nemoPath = when {
-            java.io.File("$baseDir/model.onnx").exists() -> "$baseDir/model.onnx"
-            java.io.File("$baseDir/model.int8.onnx").exists() -> "$baseDir/model.int8.onnx"
-            else -> "$baseDir/model.onnx"
-        }
-        Log.d(tag, "buildConfig NEMO dir=$baseDir model=$nemoPath")
-        val modelConfig = OfflineModelConfig(
-            numThreads = 1,
-            tokens = "$baseDir/tokens.txt"
-        ).apply {
-            nemo = OfflineNemoEncDecCtcModelConfig(model = nemoPath)
-        }
-        return OfflineRecognizerConfig(
-            featConfig = FeatureConfig(sampleRate = 16000, featureDim = 80),
-            modelConfig = modelConfig
-        )
-    }
-
-    private fun resolveBaseDir(): String {
-        try {
-            val packAsr = com.vachak.sync.PackManager.getActivePackFor(context, modelDir)
-            if (packAsr != null && java.io.File("$packAsr/tokens.txt").exists()) {
-                Log.d(tag, "using PackManager active ASR dir: $packAsr")
-                return packAsr
-            }
-            val activePack = com.vachak.sync.PackManager.getActivePack(context)
-            if (activePack != null) {
-                val cand = java.io.File(activePack, "vachak_models/$modelDir")
-                if (cand.isDirectory && java.io.File(cand, "tokens.txt").exists()) {
-                    Log.d(tag, "using active pack vachak_models/$modelDir: ${cand.absolutePath}")
-                    return cand.absolutePath
-                }
-            }
-        } catch (e: Exception) {
-            Log.w(tag, "pack ASR resolution failed, falling back to bundled assets: ${e.message}")
-        }
-        return SherpaAssets.prepare(context, modelDir)
-    }
-
-    fun reloadFromPack() {
-        recognizer?.let { try { /* OfflineRecognizer native handle will be recreated */ } catch (_: Exception) {} }
-        recognizer = null
-        Log.d(tag, "reloadFromPack: cleared recognizer for pack switch")
-    }
-
-    @Synchronized
-    private fun ensureLoaded() {
-        if (recognizer != null) return
-        // Fast-path reuse of process-wide shared recognizer (avoids 100MB reload on every mic press -> UI lag).
-        val baseDir = resolveBaseDir()
-        synchronized(sharedLock) {
-            if (sharedRecognizer != null && sharedBaseDir == baseDir) {
-                recognizer = sharedRecognizer
-                Log.d(tag, "reusing shared OfflineRecognizer dir=$baseDir")
-                ModelStatus.setAsr(ModelInfo(ModelState.READY, "shared recognizer ($baseDir)"))
-                return
-            }
-        }
-        ModelStatus.loadingAsr("NEMO Hindi ($baseDir)")
-        val t0 = android.os.SystemClock.elapsedRealtimeNanos()
-        // Model byte identity (cheap stat, no load): a stale filesDir model
-        // from an old install has a DIFFERENT size than the bundled one.
-        // Expected (fixed layout): model.onnx = 140451639 bytes.
-        try {
-            val f = java.io.File("$baseDir/model.onnx")
-            Log.d(tag, "ASR model file: ${f.absolutePath} bytes=${if (f.exists()) f.length() else "MISSING"}")
-        } catch (e: Exception) {
-            Log.w(tag, "ASR model stat failed: ${e.message}")
-        }
-        Log.d(tag, "creating OfflineRecognizer (NEMO, dir=$baseDir)")
-        // Models are extracted to the filesystem (filesDir) or pack dir, so pass null AssetManager.
-        try {
-            val created = OfflineRecognizer(null, buildConfig(baseDir))
-            recognizer = created
+        fun shared(modelPath: String, tokensPath: String, threads: Int, tag: String): OfflineRecognizer =
             synchronized(sharedLock) {
+                val cur = sharedRecognizer
+                if (cur != null && sharedModelPath == modelPath) return cur
+                if (cur != null) {
+                    runCatching { cur.release() }
+                    sharedRecognizer = null
+                }
+                val config = OfflineRecognizerConfig(
+                    modelConfig = OfflineModelConfig(
+                        nemo = OfflineNemoEncDecCtcModelConfig(model = modelPath),
+                        numThreads = threads,
+                        tokens = tokensPath
+                    )
+                )
+                Log.d(tag, "creating SHARED OfflineRecognizer (NEMO CTC, model=$modelPath, threads=$threads)")
+                val created = OfflineRecognizer(null, config)
                 sharedRecognizer = created
-                sharedBaseDir = baseDir
+                sharedModelPath = modelPath
+                created
             }
-            val ms = (android.os.SystemClock.elapsedRealtimeNanos() - t0) / 1_000_000
-            ModelStatus.setAsr(ModelInfo(ModelState.READY, "NEMO Hindi 134M ($baseDir)", ms))
-            Log.d(tag, "OfflineRecognizer ready in ${ms}ms (cached for reuse)")
-        } catch (e: Exception) {
-            ModelStatus.setAsr(ModelInfo(ModelState.ERROR, "ASR load failed: ${e.message?.take(140)}"))
-            Log.e(tag, "OfflineRecognizer creation failed (dir=$baseDir)", e)
-            throw e
-        }
+
+        /** True once the shared recognizer is resident (partials may decode). */
+        fun isSharedWarm(): Boolean = synchronized(sharedLock) { sharedRecognizer != null }
+
+        /** Serializes decodes across sessions sharing the recognizer. */
+        fun <T> withSharedLock(block: () -> T): T = synchronized(sharedLock) { block() }
     }
 
     /**
-     * Non-blocking warm-up to be called off the UI thread (IO).
-     * @return true when the recognizer is ready; false records ModelStatus ERROR.
-     * Callers (loadModel) must propagate false as Err — a silent true here is
-     * what used to let preload report OK on a broken model.
+     * True when the resolved ASR model is the bundled NeMo CTC graph (always true
+     * for the shipped `model.onnx`). Callers use this to decide whether to attempt
+     * a native decode or surface an honest MODEL_NOT_LOADED-style message.
+     */
+    fun isShim(): Boolean = false
+
+    /**
+     * Non-blocking warm-up off the UI thread (IO): resolves + creates the
+     * OfflineRecognizer so first decode has no cold-load pause.
+     * @return true when warmed; false on real failure.
      */
     fun warmUpIfNeeded(): Boolean {
         return try {
             ensureLoaded()
             true
         } catch (t: Throwable) {
-            // Best-effort path: even native Errors (missing .so on exotic ABIs)
-            // must not escape warm-up. Status already ERROR if ensureLoaded got far enough.
-            if (ModelStatus.asr.value.state != ModelState.ERROR) {
-                ModelStatus.setAsr(ModelInfo(ModelState.ERROR, "ASR warm-up failed: ${t.message?.take(140)}"))
-            }
+            // Honesty contract: a failed warm-up reports false AND ModelStatus.ERROR
+            // (never a fake OK, never a swallowed throw). Under Robolectric there
+            // are no native sherpa libs, so this is the expected clean failure.
+            ModelStatus.setAsr(ModelInfo(ModelState.ERROR, "ASR warm-up failed: ${t.message?.take(140)}"))
             Log.w(tag, "warmUp failed: ${t.message}")
             false
         }
     }
 
+    @Synchronized
+    private fun ensureLoaded() {
+        if (loaded) return
+        val baseDir = SherpaAssets.prepare(context, modelDir)
+        val modelPath = "$baseDir/model.onnx"
+        val tokensPath = "$baseDir/tokens.txt"
+        if (!java.io.File(modelPath).exists()) {
+            Log.e(tag, "ASR model.onnx not found at $modelPath")
+            throw IllegalStateException("ASR model.onnx missing at $modelPath")
+        }
+        if (!java.io.File(tokensPath).exists()) {
+            Log.e(tag, "ASR tokens.txt not found at $tokensPath")
+            throw IllegalStateException("ASR tokens.txt missing at $tokensPath")
+        }
+        val t0 = android.os.SystemClock.elapsedRealtimeNanos()
+        // UI-observable "model live" state: the ASR dot + mic button read
+        // this. Previously only the ERROR path reported, so ASR never showed
+        // READY even while transcribing fine.
+        if (!isSharedWarm()) ModelStatus.loadingAsr("Conformer Hindi ASR (140MB)")
+        // 2 threads: conformer matmuls scale ~1.6x vs 1 thread on multi-core
+        // (emulator + 2GB tablets); threads share weights, no extra RAM, and
+        // the pipeline is still sequential (one model at a time).
+        val threads = minOf(2, Runtime.getRuntime().availableProcessors().coerceAtLeast(1))
+        // Models are extracted to filesDir, so pass null AssetManager (fs path).
+        // Shared process-wide: first press loads, every later press reuses.
+        recognizer = shared(modelPath, tokensPath, threads, tag)
+        val ms = (android.os.SystemClock.elapsedRealtimeNanos() - t0) / 1_000_000
+        ModelStatus.setAsr(ModelInfo(ModelState.READY, "Conformer live — ready for capture", ms))
+        Log.d(tag, "OfflineRecognizer ready in ${ms}ms (baseDir=$baseDir, shared=${isSharedWarm()})")
+        loaded = true
+    }
+
+    /** True when this adapter can decode without a cold load. */
+    fun isLoaded(): Boolean = loaded || isSharedWarm()
+
+    /**
+     * Transcribe one speech segment (float PCM at [sampleRate]) to Hindi text.
+     *
+     * Drives the sherpa-onnx OfflineRecognizer: createStream -> acceptWaveform
+     * -> decode -> getResult. The recognizer owns fbank + Transpose12 into the
+     * [B,80,T] layout the NeMo graph expects, so the float PCM is passed
+     * straight in — no manual transpose.
+     */
     override fun transcribe(samples: FloatArray, sampleRate: Int): AsrResult {
         ensureLoaded()
         val startNs = android.os.SystemClock.elapsedRealtimeNanos()
-        // Expected frames ≈ samples/160 (10ms shift): lets any downstream
-        // ORT shape error be attributed to exact input bounds from logcat alone.
         Log.d(tag, "decode ${samples.size} samples @ $sampleRate Hz (~${samples.size / 160} frames)")
-        val stream = recognizer!!.createStream()
-        stream.acceptWaveform(samples, sampleRate)
-        recognizer!!.decode(stream)
-        val text = recognizer!!.getResult(stream).text
-        stream.release()
+        // Serialized on the shared lock: the process-wide recognizer is not
+        // thread-safe, and partial + final decodes must never overlap.
+        val result = withSharedLock {
+            val stream: OfflineStream = recognizer!!.createStream()
+            stream.acceptWaveform(samples, sampleRate)
+            recognizer!!.decode(stream)
+            recognizer!!.getResult(stream)
+        }
+        val text = result.text.trim()
         val latencyMs = (android.os.SystemClock.elapsedRealtimeNanos() - startNs) / 1_000_000f
-        Log.d(tag, "transcribed ${samples.size} samples @ $sampleRate Hz -> \"$text\" (${latencyMs}ms)")
-        Log.d("Vachak-Latency", "ASR decode ${latencyMs}ms for ${samples.size} samples")
-        return AsrResult(text = text, confidence = 1.0f, isFixture = false)
+        Log.d(tag, "transcribed ${samples.size} samples @ $sampleRate Hz -> \"$text\" (${latencyMs}ms, tokens=${result.tokens.size})")
+        if (latencyMs > 1000) Log.w("Vachak-Latency", "ASR latency ${latencyMs}ms exceeds 1000ms budget")
+        return AsrResult(text = text, confidence = 0.0f, isFixture = false)
     }
 }

@@ -10,9 +10,12 @@ import androidx.compose.material.icons.automirrored.outlined.VolumeUp
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
@@ -88,15 +91,21 @@ fun ConversationMessagePair(
     modifier: Modifier = Modifier
 ) {
     val clipboard = LocalClipboardManager.current
-    Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    // Pair reads as one unit: tight gap, no rule line (Operate: less chrome).
+    Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         // Hindi block — soft lavender
         Surface(shape = RoundedCornerShape(16.dp), color = VachakColors.SoftLavender, modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     Text("Hindi", style = MaterialTheme.typography.labelSmall, color = VachakColors.Lavender700, fontWeight = FontWeight.SemiBold, letterSpacing = 0.8.sp)
                     Text(fmt(item.timestampMillis), style = MaterialTheme.typography.labelSmall, color = VachakColors.TextSecondary)
                 }
                 Text(item.hindiText, style = MaterialTheme.typography.bodyMedium, color = VachakColors.TextPrimary, fontSize = 16.sp, lineHeight = 22.sp)
+                // Romanized gloss (mock fidelity): deterministic lookup, clearly a gloss.
+                val hindiGloss = remember(item.hindiText) { com.vachak.ui.text.Romanize.devanagari(item.hindiText) }
+                if (hindiGloss.isNotBlank() && hindiGloss != item.hindiText) {
+                    Text(hindiGloss, style = MaterialTheme.typography.bodySmall, color = VachakColors.TextSecondary, fontSize = 13.sp, lineHeight = 18.sp)
+                }
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                     TextButton(onClick = onPlayHindi, contentPadding = PaddingValues(0.dp)) {
                         Icon(Icons.AutoMirrored.Outlined.VolumeUp, null, tint = VachakColors.DeepLavender, modifier = Modifier.size(18.dp))
@@ -111,11 +120,9 @@ fun ConversationMessagePair(
                 }
             }
         }
-        // divider
-        HorizontalDivider(color = VachakColors.Border.copy(alpha = 0.5f), thickness = 0.8.dp, modifier = Modifier.padding(horizontal = 8.dp))
         // Target-language block — near-white / pale lavender
         Surface(shape = RoundedCornerShape(16.dp), color = Color.White, border = androidx.compose.foundation.BorderStroke(1.dp, VachakColors.Border), modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(targetLabel, style = MaterialTheme.typography.labelSmall, color = VachakColors.Lavender600, fontWeight = FontWeight.SemiBold, letterSpacing = 0.8.sp)
                 when {
                     item.isTranslating -> {
@@ -131,6 +138,17 @@ fun ConversationMessagePair(
                     }
                     item.santaliText != null -> {
                         Text(item.santaliText, style = MaterialTheme.typography.bodyMedium, color = VachakColors.TextPrimary, fontSize = 16.sp, lineHeight = 22.sp)
+                        // Phase 4: MT→TTS wait shows progress, never a hung-looking finished row.
+                        if (item.isSynthesizing) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                                CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp, color = VachakColors.Lavender600)
+                                Text("Synthesizing voice…", style = MaterialTheme.typography.bodySmall, color = VachakColors.TextSecondary)
+                            }
+                        }
+                        val targetGloss = remember(item.santaliText) { com.vachak.ui.text.Romanize.auto(item.santaliText ?: "") }
+                        if (targetGloss.isNotBlank() && targetGloss != item.santaliText) {
+                            Text(targetGloss, style = MaterialTheme.typography.bodySmall, color = VachakColors.TextSecondary, fontSize = 13.sp, lineHeight = 18.sp)
+                        }
                         // Measured pipeline timings for this item (null until the run completes).
                         if (item.asrMs != null || item.mtMs != null || item.ttsMs != null || item.totalMs != null) {
                             Text(
@@ -165,6 +183,8 @@ fun LiveInputBar(
     onTextChange: (String) -> Unit,
     onTranslate: () -> Unit,
     enabled: Boolean = true,
+    focusRequester: androidx.compose.ui.focus.FocusRequester? = null,
+    onFocusChange: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Surface(shape = RoundedCornerShape(20.dp), color = Color.White, border = androidx.compose.foundation.BorderStroke(1.dp, VachakColors.Border), tonalElevation = 0.dp, shadowElevation = 0.dp, modifier = modifier.fillMaxWidth()) {
@@ -174,7 +194,9 @@ fun LiveInputBar(
                 onValueChange = onTextChange,
                 placeholder = { Text("Type in Hindi…", color = VachakColors.TextSecondary) },
                 leadingIcon = { Icon(Icons.Outlined.Keyboard, null, tint = VachakColors.TextSecondary, modifier = Modifier.size(20.dp)) },
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1f)
+                    .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
+                    .onFocusChanged { onFocusChange(it.isFocused) },
                 shape = RoundedCornerShape(20.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = VachakColors.Lavender300,

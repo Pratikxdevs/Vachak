@@ -10,6 +10,8 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.lifecycleScope
@@ -18,6 +20,7 @@ import com.vachak.ml.StreamingAsrSession
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
 /**
  * Entry point. Injects the engine set via EngineProvider. To ship real models, change ONLY
@@ -59,6 +62,14 @@ class MainActivity : ComponentActivity() {
         android.util.Log.d("Vachak-ASR", "MainActivity mic permission result=$granted")
     }
 
+    /**
+     * SINGLE shared engine set (Hilt @Singleton, same instance LiveViewModel
+     * injects). A local `EngineProvider.real(this)` here used to build a
+     * SECOND full set, loading every 140-357MB model twice and doubling 2GB
+     * RAM pressure + ~20s of load time. Never construct engines here.
+     */
+    @Inject lateinit var engine: EngineProvider
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // Request mic permission immediately on launch (emulator needs explicit prompt)
@@ -88,12 +99,18 @@ class MainActivity : ComponentActivity() {
         }
         android.util.Log.d("Vachak-Native", "Display refreshRate: ${displayRefresh}Hz, preferredModeId=${window.attributes.preferredDisplayModeId}")
 
-        val engine = EngineProvider.real(this)
+        val engine = this.engine
         // Background model preparation — preload heavy ONNX/sherpa assets off Main, not blocking first frame.
         // Results are LOGGED WITH CAUSES (never swallowed): a red model here
         // explains every downstream failure. Live state in ModelStatus.
         lifecycleScope.launch(Dispatchers.IO) {
             val tag = "Vachak-Models"
+            // First-run: install APK-bundled content packs (v0.2.0 curriculum).
+            // No-op on later launches; content screens unlock once present.
+            try {
+                val installed = com.vachak.sync.PackInstaller(this@MainActivity).ensureBundledPacks()
+                if (installed.isNotEmpty()) android.util.Log.d(tag, "bundled packs installed: $installed")
+            } catch (e: Throwable) { android.util.Log.e(tag, "bundled pack install threw", e) }
             try {
                 when (val r = engine.translation.loadModel("")) {
                     is com.vachak.engine.EngineResult.Ok -> android.util.Log.d(tag, "preload MT: OK")
@@ -102,7 +119,10 @@ class MainActivity : ComponentActivity() {
             } catch (e: Throwable) { android.util.Log.e(tag, "preload MT threw", e) }
             try {
                 when (val r = engine.asr.loadModel("")) {
-                    is com.vachak.engine.EngineResult.Ok -> android.util.Log.d(tag, "preload ASR: OK")
+                    is com.vachak.engine.EngineResult.Ok -> {
+                        android.util.Log.d(tag, "preload ASR: OK (conformer shared, held for process lifetime)")
+                        android.util.Log.d("Vachak-ASR", "ASR live — ready for capture")
+                    }
                     is com.vachak.engine.EngineResult.Err -> android.util.Log.e(tag, "preload ASR failed [${r.code}]: ${r.message}")
                 }
             } catch (e: Throwable) { android.util.Log.e(tag, "preload ASR threw", e) }
@@ -120,6 +140,19 @@ class MainActivity : ComponentActivity() {
             } catch (e: Throwable) { android.util.Log.w("Vachak-ASR", "startup ASR warm-up threw (first mic press will cold-load)", e) }
         }
         setContent {
+            // Fixed 4s splash then interactive (latency plan Phase 0):
+            // cold MT 8-11s + ASR 2.7-4s keeps loading in background after the
+            // splash; mic stays gated on ModelStatus until READY (see LiveScreen
+            // guardedStart + "Warming models…"), so first tap never cold-loads
+            // silently. Sequential preload order unchanged (2GB RAM rule).
+            var showSplash by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(true) }
+            androidx.compose.runtime.LaunchedEffect(Unit) {
+                kotlinx.coroutines.delay(4000)
+                showSplash = false
+            }
+            if (showSplash) {
+                com.vachak.ui.SplashScreen()
+            } else {
             // Adapt system bars to device dark/light setting — avoids contradicting user theme
             // isSystemInDarkTheme() respects Settings > Display > Dark theme / scheduled dark mode
             val darkTheme = isSystemInDarkTheme()
@@ -134,6 +167,7 @@ class MainActivity : ComponentActivity() {
             }
             // Auth bypassed per transformation plan — direct to SaaS app
             VachakApp(engine = engine)
+            }
         }
     }
 

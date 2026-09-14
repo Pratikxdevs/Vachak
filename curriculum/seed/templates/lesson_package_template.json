@@ -1,0 +1,48 @@
+{
+  "_comment": "ONE file per lesson. Fill Hindi from the textbook; Santhali yourself if you can, else leave santhali_* empty and MT drafts it for validator review. Never invent: every Hindi string must be traceable to BOOK + CHAPTER below.",
+  "id": "G1-LIT-READ-001",
+  "grade": 1,
+  "domain": "literacy | numeracy",
+  "sub_skill": "oral | reading | writing | numeracy-topic (e.g. counting)",
+  "learning_outcome_id": "LO-SAT-G1-... (from curriculum/outcomes/nipun.json, or NEW-… if none fits)",
+  "source": { "book": "Exact book title + edition", "chapter": "Chapter name/number", "page": "12-14" },
+  "title_hi": "",
+  "title_sat": "",
+  "estimated_minutes": 30,
+
+  "lesson_script": {
+    "text_hi": "Teacher says/does, step by step (2-8 sentences).",
+    "text_sat": ""
+  },
+
+  "activities": [
+    {
+      "id": "G1-LIT-READ-001-A1",
+      "title_hi": "",
+      "instruction_hi": "What the children do.",
+      "instruction_sat": "",
+      "materials": "e.g. chalk, picture cards",
+      "sequence": 1
+    }
+  ],
+
+  "assessments": [
+    {
+      "id": "G1-LIT-READ-001-Q1",
+      "prompt_hi": "How the teacher checks understanding.",
+      "prompt_sat": "",
+      "expected_response": "What counts as correct."
+    }
+  ],
+
+  "worksheet": {
+    "title": "",
+    "questions": [
+      { "type": "trace | match | fill_blank | sequence | greater_less | ...", "prompt_hi": "", "prompt_sat": "", "answer": "" }
+    ]
+  },
+
+  "flashcards": [
+    { "front_hi": "", "back_sat": "", "image": "existing asset path OR needed:<description>" }
+  ]
+}

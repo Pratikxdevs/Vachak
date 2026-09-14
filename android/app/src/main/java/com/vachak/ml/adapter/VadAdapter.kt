@@ -43,10 +43,15 @@ class SherpaVadDetector(
     private val context: android.content.Context,
     private val sampleRate: Int = 16000
 ) : VadDetector {
+    // Phase 2: ONE analyzer per detector instead of one per detect() call.
+    // The old code rebuilt SherpaOnnxVadAnalyzer every call (SherpaAssets
+    // extract-check + Vad native create per transcription). Safe because the
+    // pipeline is sequential (Mutex): detect() calls never overlap, and
+    // SherpaOnnxVadAnalyzer.ensure() is @Synchronized for the rest.
+    private val analyzer by lazy { com.vachak.ml.SherpaOnnxVadAnalyzer(context, "vad", sampleRate) }
     override fun detect(pcm16: ShortArray, sampleRateHz: Int): List<SpeechSegment> {
         require(sampleRateHz == sampleRate) { "SherpaVadDetector requires $sampleRate Hz (got $sampleRateHz)" }
         if (pcm16.isEmpty()) return emptyList()
-        val analyzer = com.vachak.ml.SherpaOnnxVadAnalyzer(context, "vad", sampleRate)
         // Chunked Float conversion — mirrors VadStream.runMicrophoneVad chunk size 100ms
         val chunkMs = 100
         val chunkSamples = (chunkMs / 1000f * sampleRate).toInt()

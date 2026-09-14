@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- Offline worksheet PDFs (filesDir/worksheets). Shared read-only with
+         external viewers via FileProvider; never leaves the device. -->
+    <files-path name="worksheets" path="worksheets/" />
+</paths>

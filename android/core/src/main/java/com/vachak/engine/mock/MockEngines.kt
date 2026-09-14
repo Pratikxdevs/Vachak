@@ -10,7 +10,10 @@ import com.vachak.engine.*
  * via EngineProvider without changing any UI code.
  */
 object MockTranslationEngine : TranslationEngine {
-    override fun supports(pair: LanguagePair) = pair.source == "hi" && pair.target == "mund"
+    // Accept Mundari legacy + Santali/Unr aliases so the Orchestrator default
+    // (sat_Olck) works on the mock path; output stays clearly fake.
+    override fun supports(pair: LanguagePair) = pair.source == "hi" &&
+        pair.target in setOf("mund", "mun", "mundari", "sat_Olck", "sat", "unr_Deva", "unr", "mun_Deva")
     override fun loadModel(packId: String) = EngineResult.Ok(Unit)
     override fun translate(text: String, pair: LanguagePair): EngineResult<String> =
         if (supports(pair)) EngineResult.Ok("[DEV-FIXTURE-mund] $text")
@@ -28,7 +31,7 @@ object MockAsrEngine : ASREngine {
 }
 
 object MockTtsEngine : TTSEngine {
-    override fun supports(language: String) = language == "mund"
+    override fun supports(language: String) = language in setOf("mund", "sat_Olck", "sat", "unr_Deva", "unr", "mun_Deva", "mun", "mundari")
     override fun loadModel(packId: String) = EngineResult.Ok(Unit)
     override fun synthesize(text: String, language: String): EngineResult<ShortArray> {
         if (!supports(language)) return EngineResult.Err(EngineError.UNSUPPORTED_LANGUAGE, language)

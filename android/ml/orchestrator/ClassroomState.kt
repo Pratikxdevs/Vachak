@@ -13,7 +13,7 @@ data class ClassroomState(
     var grade: Int? = null,
     var subject: String? = null,
     var sourceLanguage: String = "hi",
-    var targetLanguage: String = "mund",
+    var targetLanguage: String = "sat_Olck",
     var transcript: String? = null,        // recognized Hindi
     var translation: String? = null,       // translated Mundari / Ol Chiki
     var studentResponse: String? = null,

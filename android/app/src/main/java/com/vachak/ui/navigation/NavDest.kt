@@ -23,6 +23,23 @@ sealed class NavDest(
 
     companion object {
         val all: List<NavDest> get() = listOf(Home, Live, Curriculum, Tools, Settings, Diagnostics)
-        fun fromRoute(route: String?) = all.find { it.route == route } ?: Home
+        /** Bottom-nav highlight root for any destination route, including nested
+         *  Learn (learn/grade/…/chapter/…/worksheet, learn/lesson/…) and Tools
+         *  (tools/worksheets|flashcards|saved) sub-routes. Unknown routes fall
+         *  back to Home only when they match nothing — never for a learn route. */
+        fun fromRoute(route: String?): NavDest {
+            if (route == null) return Home
+            val root = route.substringBefore("/")
+            return when {
+                route == Home.route || root == "home" -> Home
+                route == Live.route || root == "live" -> Live
+                route == Curriculum.route || root == "curriculum" || root == "learn" -> Curriculum
+                route == Tools.route || root == "tools" -> Tools
+                route == Settings.route || root == "settings" -> Settings
+                route == ManagePacks.route || root == "packs" -> ManagePacks
+                route == Diagnostics.route || root == "diagnostics" -> Diagnostics
+                else -> all.find { it.route == route } ?: Home
+            }
+        }
     }
 }

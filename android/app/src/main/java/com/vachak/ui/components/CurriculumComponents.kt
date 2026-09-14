@@ -19,6 +19,41 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.vachak.ui.theme.VachakColors
 
+/** Script choice for reading surfaces: Hindi (Deva) / English (romanized
+ *  gloss, clearly a transliteration — the pack ships no English text) /
+ *  Santali (Ol Chiki). One component used on every reading page. */
+enum class ScriptChoice { HI, EN, SAT }
+
+@Composable
+fun ScriptToggle(
+    selected: ScriptChoice,
+    onSelect: (ScriptChoice) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(modifier = modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        ScriptChoice.values().forEach { c ->
+            val label = when (c) {
+                ScriptChoice.HI -> "हिंदी"
+                ScriptChoice.EN -> "EN"
+                ScriptChoice.SAT -> "ᱥᱟᱱᱛᱟᱲᱤ"
+            }
+            FilterChip(
+                selected = selected == c,
+                onClick = { onSelect(c) },
+                label = {
+                    Text(
+                        label,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = if (selected == c) FontWeight.SemiBold else FontWeight.Normal,
+                        maxLines = 1
+                    )
+                },
+                modifier = Modifier.weight(1f)
+            )
+        }
+    }
+}
+
 @Composable
 fun GradeCard(
     grade: Int,

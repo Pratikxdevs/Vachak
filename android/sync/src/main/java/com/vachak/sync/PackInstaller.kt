@@ -64,17 +64,39 @@ class PackInstaller(private val context: Context) {
             val version = manifestJson.optString("version", "")
             val language = manifestJson.optString("language", "sat_Olck")
             if (version.isBlank()) return EngineResult.Err(EngineError.INVALID_INPUT, "manifest version blank")
-            // Validate manifest has sha256 fields
+            // Validate manifest has file entries: models[] (model packs) and/or
+            // curriculum_files[] (content packs like sat_Olck-v0.2.0).
+            // Plain null handling (no smart-cast chains): lengths first.
             val models = manifestJson.optJSONArray("models")
-            if (models == null || models.length() == 0) return EngineResult.Err(EngineError.INVALID_INPUT, "manifest models empty")
+            val currFiles = manifestJson.optJSONArray("curriculum_files")
+            val modelLen = if (models == null) 0 else models.length()
+            val currLen = if (currFiles == null) 0 else currFiles.length()
+            if (modelLen == 0 && currLen == 0) {
+                return EngineResult.Err(EngineError.INVALID_INPUT, "manifest models empty")
+            }
 
-            // Verify per-file sha256 where provided — recompute from zip entries
-            for (i in 0 until models.length()) {
-                val obj = models.getJSONObject(i)
+            // Verify per-file sha256 where provided — recompute from zip entries.
+            // Two plain loops (models, then curriculum files) sharing one body shape.
+            for (i in 0 until modelLen) {
+                val obj = models!!.getJSONObject(i)
                 val path = obj.optString("path")
                 val expectedSha = obj.optString("sha256")
                 if (path.isBlank() || expectedSha.isBlank()) continue
                 val entry = zip.getEntry(path) ?: continue // some entries may be optional; still verify if present
+                val data = zip.getInputStream(entry).readBytes()
+                val actual = sha256(data)
+                if (actual != expectedSha) {
+                    zip.close()
+                    Log.e(tag, "sha256 mismatch for $path expected $expectedSha got $actual")
+                    return EngineResult.Err(EngineError.IO_ERROR, "sha256 mismatch for $path")
+                }
+            }
+            for (i in 0 until currLen) {
+                val obj = currFiles!!.getJSONObject(i)
+                val path = obj.optString("path")
+                val expectedSha = obj.optString("sha256")
+                if (path.isBlank() || expectedSha.isBlank()) continue
+                val entry = zip.getEntry(path) ?: continue
                 val data = zip.getInputStream(entry).readBytes()
                 val actual = sha256(data)
                 if (actual != expectedSha) {
@@ -169,6 +191,62 @@ class PackInstaller(private val context: Context) {
         }
     }
 
+    suspend fun ensureBundledPacks(): List<String> =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val done = mutableListOf<String>()
+            val names = try {
+                context.assets.list("packs")?.filter { it.endsWith(".vachakpack") }.orEmpty()
+            } catch (_: Exception) { emptyList() }
+            for (name in names) {
+                try {
+                    val id = readPackIdFromAsset(name) ?: continue
+                    val already = try {
+                        PackDatabase.getInstance(context).packDao().getById(id) != null
+                    } catch (_: Exception) { false }
+                    if (already) continue
+                    android.util.Log.d(tag, "bundled pack missing, installing $name")
+                    val tmp = File(context.cacheDir, "bundled_$name")
+                    context.assets.open("packs/$name").use { ins ->
+                        tmp.outputStream().use { out -> ins.copyTo(out) }
+                    }
+                    when (val r = installFromFile(tmp)) {
+                        is EngineResult.Ok -> {
+                            android.util.Log.d(tag, "bundled pack installed ${r.value.id}")
+                            done.add(r.value.id)
+                        }
+                        is EngineResult.Err ->
+                            android.util.Log.e(tag, "bundled pack install failed $name: ${r.message}")
+                    }
+                    tmp.delete()
+                } catch (e: Exception) {
+                    android.util.Log.e(tag, "bundled pack $name threw", e)
+                }
+            }
+            done
+        }
+
+    /** Reads pack id ("<language>-v<version>") from a zip's manifest without extracting. */
+    private fun readPackIdFromAsset(assetName: String): String? {
+        return try {
+            context.assets.open("packs/$assetName").use { ins ->
+                ZipInputStream(ins).use { zis ->
+                    var entry = zis.nextEntry
+                    while (entry != null) {
+                        if (entry.name == "manifest.json") {
+                            val obj = JSONObject(zis.readBytes().toString(Charsets.UTF_8))
+                            val language = obj.optString("language", "")
+                            val version = obj.optString("version", "")
+                            if (language.isNotBlank() && version.isNotBlank()) return "$language-v$version"
+                            return null
+                        }
+                        entry = zis.nextEntry
+                    }
+                    null
+                }
+            }
+        } catch (_: Exception) { null }
+    }
+
     /** Validate that pack manifest sha matches recomputed file shas without extracting. */
     fun validatePackFile(file: File): Boolean {
         return try {
@@ -176,23 +254,34 @@ class PackInstaller(private val context: Context) {
             val manifestEntry = zip.getEntry("manifest.json") ?: return false
             val manifestBytes = zip.getInputStream(manifestEntry).readBytes()
             val manifestJson = JSONObject(String(manifestBytes, Charsets.UTF_8))
-            val models = manifestJson.optJSONArray("models") ?: return false
-            for (i in 0 until models.length()) {
-                val obj = models.getJSONObject(i)
-                val path = obj.optString("path")
-                val expected = obj.optString("sha256")
-                if (path.isBlank() || expected.isBlank()) continue
-                val entry = zip.getEntry(path) ?: continue
-                val actual = sha256(zip.getInputStream(entry).readBytes())
-                if (actual != expected) {
-                    zip.close(); return false
-                }
+            val models = manifestJson.optJSONArray("models")
+            val currFiles = manifestJson.optJSONArray("curriculum_files")
+            val modelLen = if (models == null) 0 else models.length()
+            val currLen = if (currFiles == null) 0 else currFiles.length()
+            if (modelLen == 0 && currLen == 0) return false
+            for (i in 0 until modelLen) {
+                val obj = models!!.getJSONObject(i)
+                if (!shaMatches(zip, obj)) { zip.close(); return false }
+            }
+            for (i in 0 until currLen) {
+                val obj = currFiles!!.getJSONObject(i)
+                if (!shaMatches(zip, obj)) { zip.close(); return false }
             }
             zip.close(); true
         } catch (e: Exception) {
             Log.w(tag, "validatePackFile(${file.name}) failed: ${e.message}")
             false
         }
+    }
+
+    /** Single manifest entry sha check against zip bytes. Blank path/sha = skip. */
+    private fun shaMatches(zip: java.util.zip.ZipFile, obj: org.json.JSONObject): Boolean {
+        val path = obj.optString("path")
+        val expected = obj.optString("sha256")
+        if (path.isBlank() || expected.isBlank()) return true
+        val entry = zip.getEntry(path) ?: return true
+        val actual = sha256(zip.getInputStream(entry).readBytes())
+        return actual == expected
     }
 
     private fun sha256(data: ByteArray): String {

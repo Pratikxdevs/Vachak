@@ -54,9 +54,14 @@ fun DiagnosticsScreen(
         } else {
             val stages = run.stageMs()
             val total = run.endToEndMs()
+            // Phase 4: TTS number is ttsSynthMs() (blocking generate runs
+            // between markTtsBegin/markAudioBegin). stages["tts"] is only the
+            // MT-done -> synth-start gap and reads ~0ms — showing it made TTS
+            // look artificially free.
+            val ttsMs = run.ttsSynthMs()
             val verdict = if ((total ?: Float.MAX_VALUE) < 3000) "✓ <3s" else "⚠ ≥3s"
             "ASR ${stages["asr"]?.toLong() ?: "-"}ms • MT ${stages["translate"]?.toLong() ?: "-"}ms • " +
-                "TTS ${stages["tts"]?.toLong() ?: "-"}ms • Total ${total?.toLong() ?: "-"}ms $verdict (run ${run.runId.takeLast(6)})"
+                "TTS ${ttsMs?.toLong() ?: "-"}ms • Total ${total?.toLong() ?: "-"}ms $verdict (run ${run.runId.takeLast(6)})"
         }
         // active adapter badge via AdapterTranslationEngine
         try {
@@ -189,7 +194,7 @@ fun DiagnosticsScreen(
             liveStorage?.let { Text(it, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace) }
             liveDb?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
             liveFree?.let { Text(it, style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-            Text("RAM: sequential single-model residency, numThreads=1 (no live gauge — see logcat Vachak-Latency)", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("RAM: sequential single-model residency (ASR ≤2 threads, MT ≤4, shared weights — see logcat Vachak-Latency)", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(4.dp))
             HorizontalDivider()
         }

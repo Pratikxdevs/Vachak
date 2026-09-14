@@ -20,9 +20,10 @@ android {
             commandLine("git", "rev-parse", "--short=12", "HEAD")
         }.standardOutput.asText.get().trim().ifEmpty { "unknown" }
         buildConfigField("String", "GIT_SHA", "\"$gitSha\"")
-        // ABI strategy: arm64-v8a first (2GB RAM tablet target). x86_64 is added for the
-        // dev emulator (mt4_test) so the arm64-only native libs can be exercised on x86_64.
-        ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
+        // ABI strategy: arm64-v8a (2GB RAM tablet target) + x86_64
+        // (emulator / dev tablets). The x86_64 sherpa .so set adds ~40MB,
+        // so release device APKs stay lean via per-ABI splits if needed.
+        ndk { abiFilters.clear(); abiFilters.add("arm64-v8a"); abiFilters.add("x86_64") }
         // JUnit4 instrumented tests (BothAdaptersTest, TranslationEngineTest).
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

@@ -1,0 +1,9 @@
+I Vachak-TTS: using asset TTS dir: /cz/Vachak/models (fine-tuned VITS, live)
+D Vachak-TTS: using Ol Chiki char tokens - espeak-ng-data not required (dataDir="")
+D Vachak-TTS: creating OfflineTts (dir=/cz/Vachak/models, model=/cz/Vachak/models/vits-sat.onnx, dataDir="", packDir=null)
+D Vachak-TTS: OfflineTts ready (baseDir=/cz/Vachak/models, pack=False) in 959ms
+D Vachak-TTS: synthesized "ᱪᱮᱦᱟᱨ" -> 10855 samples @ 22050 Hz
+D Vachak-TTS: synthesized "ᱪᱮᱦᱟᱨ ᱥᱮᱱᱚᱜ ᱠᱚ?" -> 14336 samples @ 22050 Hz
+D Vachak-TTS: synthesized "ᱥᱮᱱᱚᱜ ᱠᱚ ᱪᱮᱦᱟᱨ" -> 9984 samples @ 22050 Hz
+D Vachak-TTS: audible check PASS: all >200ms, latency <1000ms
+# via=sherpa_onnx fine-tuned-VITS is_final_voice=True (Santali VITS, live)

@@ -24,6 +24,30 @@ object SherpaAssets {
     private const val TAG = "Vachak-Assets"
     const val ASSET_ROOT = "vachak_models"
     private const val MANIFEST = ".vachak_manifest"
+
+    /**
+     * Asset generation per subdir. Bump when bundled assets change so a stale
+     * filesDir copy (kept across `install -r` upgrades) re-extracts once instead
+     * of serving the old model forever. The manifest only records file sizes, so
+     * without this an old copy + old manifest always "matches".
+     * tts v2 = 38-token sprint VITS (was v1 55-token shim).
+     */
+    fun assetVersion(subdir: String): Int = when (subdir) {
+        "tts" -> 2
+        else -> 1
+    }
+
+    /** True when the extracted dir was written by the current asset generation.
+     * Internal for tests (unit-test sandbox has no bundled assets to copy). */
+    internal fun isCurrentGeneration(outDir: File, subdir: String): Boolean =
+        manifestVersionOk(outDir, subdir)
+
+    private fun manifestVersionOk(outDir: File, subdir: String): Boolean {
+        return try {
+            val first = File(outDir, MANIFEST).bufferedReader().readLine() ?: ""
+            first.contains("manifest v${assetVersion(subdir)}")
+        } catch (_: Exception) { false }
+    }
     @Volatile private var prepared = mutableSetOf<String>()
     private val lock = Any()
 
@@ -32,7 +56,8 @@ object SherpaAssets {
         // Fast-path: if already prepared in this process and tokens still present, skip IO.
         val key = "$ASSET_ROOT/$subdir"
         synchronized(lock) {
-            if (prepared.contains(key) && File(outDir, "tokens.txt").exists()) {
+            if (prepared.contains(key) && File(outDir, "tokens.txt").exists()
+                && manifestVersionOk(outDir, subdir)) {
                 Log.d(TAG, "prepare cached hit: $key -> ${outDir.absolutePath}")
                 return outDir.absolutePath
             }
@@ -92,7 +117,7 @@ object SherpaAssets {
             val lines = manifestEntries(outDir).entries
                 .sortedBy { it.key }
                 .joinToString("\n") { "${it.key}\t${it.value}" }
-            File(outDir, MANIFEST).writeText("# vachak $subdir manifest (name<TAB>bytes)\n$lines\n")
+            File(outDir, MANIFEST).writeText("# vachak $subdir manifest v${assetVersion(subdir)} (name<TAB>bytes)\n$lines\n")
             Log.d(TAG, "manifest written for $subdir (${lines.lines().size} files)")
         } catch (e: Exception) {
             Log.w(TAG, "manifest write failed for $subdir: ${e.message}")
@@ -108,6 +133,10 @@ object SherpaAssets {
                 Log.d(TAG, "no manifest for $subdir (pre-manifest install) — trusting markers once")
                 writeManifest(context, subdir, outDir)
                 return true
+            }
+            if (!manifestVersionOk(outDir, subdir)) {
+                Log.w(TAG, "asset generation STALE for $subdir (want v${assetVersion(subdir)}) — re-copying once")
+                return false
             }
             val expected = mf.readLines()
                 .filter { it.isNotBlank() && !it.startsWith("#") }

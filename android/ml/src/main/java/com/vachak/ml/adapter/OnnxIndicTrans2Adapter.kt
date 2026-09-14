@@ -101,8 +101,11 @@ class OnnxIndicTrans2Adapter(
             readMeta(File(dir, "tokenizer_meta.json"))
             readMaxPositions(File(dir, "config.json"))
             val env = OrtEnvironment.getEnvironment()
+            // Match the ASR adapter: threads share weights (no extra RAM) and
+            // the pipeline runs one model at a time. Big matmuls scale ~2x.
+            val mtThreads = minOf(4, Runtime.getRuntime().availableProcessors().coerceAtLeast(1))
             val opts = OrtSession.SessionOptions().apply {
-                setIntraOpNumThreads(1)
+                setIntraOpNumThreads(mtThreads)
                 setInterOpNumThreads(1)
             }
             encSession = env.createSession("$dir/encoder_model.onnx", opts)
@@ -182,18 +185,25 @@ class OnnxIndicTrans2Adapter(
             android.util.Log.d("Vachak-MT", "ONNX encode done shape=[1,$n,512]")
 
             // Greedy decode: step 0 full decoder, steps 1..N with past KV.
+            // Latency: encoder_attention_mask is constant per sentence — build
+            // once and reuse (was rebuilt + re-allocated every step, up to 128x).
+            // input_ids buffer is also reused; only non-shared tensors are closed
+            // per step so the shared mask survives the loop. maxTargetLen stays
+            // 128 per product decision (classroom quality over length cap).
             val outIds = ArrayList<Int>(64)
             var past: OrtSession.Result? = null
             var nextId = decoderStartId
             var steps = 0
+            val sharedEncMask = maskTensor(env, n)
+            val inIdBuf = LongBuffer.allocate(1)
             try {
                 while (steps < maxTargetLen) {
-                    val inIdBuf = LongBuffer.allocate(1)
+                    inIdBuf.clear()
                     inIdBuf.put(nextId.toLong())
                     inIdBuf.rewind()
                     val inputs = HashMap<String, OnnxTensor>()
                     inputs["input_ids"] = OnnxTensor.createTensor(env, inIdBuf, longArrayOf(1, 1))
-                    inputs["encoder_attention_mask"] = maskTensor(env, n)
+                    inputs["encoder_attention_mask"] = sharedEncMask
                     val res: OrtSession.Result
                     if (past == null) {
                         // Step 0: full decoder needs raw encoder states; it returns
@@ -206,9 +216,24 @@ class OnnxIndicTrans2Adapter(
                         feedPast(inputs, past!!)
                         res = decPastSession!!.run(inputs)
                     }
-                    inputs.values.forEach { try { it.close() } catch (_: Throwable) {} }
+                    // Close per-step tensors but NOT the shared mask (reused).
+                    // input_ids tensor wraps the reused buffer: close the tensor
+                    // (releases native handle) without touching the buffer.
+                    inputs.entries.forEach { (k, v) ->
+                        if (v !== sharedEncMask) {
+                            try { v.close() } catch (_: Throwable) {}
+                        } else if (k == "encoder_hidden_states") {
+                            try { v.close() } catch (_: Throwable) {}
+                        }
+                    }
                     @Suppress("UNCHECKED_CAST")
                     val logits = (res.get(0).value as Array<Array<FloatArray>>)[0][0]
+                    // Anti-loop guards (CT2 + host infer both use
+                    // repetition_penalty=1.2 / no_repeat_ngram_size=3; the ONNX
+                    // path was the only one without them and rode INT8
+                    // hallucinations to 128 tokens of repeated garbage).
+                    applyRepetitionPenalty(logits, outIds, 1.2f)
+                    banRepeatedNgrams(logits, outIds, 3)
                     nextId = argmax(logits)
                     past?.close()
                     past = res
@@ -218,6 +243,7 @@ class OnnxIndicTrans2Adapter(
                 }
             } finally {
                 try { past?.close() } catch (_: Throwable) {}
+                try { sharedEncMask.close() } catch (_: Throwable) {}
             }
             var decoded = decode(outIds)
             decoded = IndicProcessorPort.postprocessBatch(listOf(decoded), "sat_Olck")[0]
@@ -299,8 +325,40 @@ class OnnxIndicTrans2Adapter(
         return sb.toString().replace("▁", " ").trim()
     }
 
-    private fun argmax(logits: FloatArray): Int {
-        var best = 0
+    /**
+     * Repetition penalty (matches infer_it2.py / CT2: 1.2): depress logits of
+     * already-generated tokens so the greedy loop can't ride a hallucinated
+     * token to maxTargetLen.
+     */
+    private fun applyRepetitionPenalty(logits: FloatArray, generated: List<Int>, penalty: Float) {
+        if (penalty == 1f || generated.isEmpty()) return
+        for (id in generated.toSet()) {
+            if (id < 0 || id >= logits.size) continue
+            val v = logits[id]
+            logits[id] = if (v > 0) v / penalty else v * penalty
+        }
+    }
+
+    /**
+     * No-repeat-ngram ban (matches CT2 no_repeat_ngram_size=3): any token
+     * that would complete an already-seen n-gram gets -inf.
+     */
+    private fun banRepeatedNgrams(logits: FloatArray, generated: List<Int>, n: Int) {
+        if (generated.size < n - 1 || n < 2) return
+        val tail = generated.takeLast(n - 1)
+        for (i in 0..generated.size - n) {
+            var match = true
+            for (k in 0 until n - 1) {
+                if (generated[i + k] != tail[k]) { match = false; break }
+            }
+            if (match) {
+                val banned = generated[i + n - 1]
+                if (banned in logits.indices) logits[banned] = Float.NEGATIVE_INFINITY
+            }
+        }
+    }
+
+    private fun argmax(logits: FloatArray): Int {        var best = 0
         var bestV = logits[0]
         for (i in 1 until logits.size) {
             val v = logits[i]
@@ -323,42 +381,46 @@ class OnnxIndicTrans2Adapter(
         return OnnxTensor.createTensor(env, java.nio.FloatBuffer.wrap(flat), longArrayOf(1, n.toLong(), hiddenDim.toLong()))
     }
 
+    private val pastIoNames = listOf("decoder", "encoder")
+    private val pastKvNames = listOf("key", "value")
+
     private fun feedPast(inputs: MutableMap<String, OnnxTensor>, past: OrtSession.Result) {
         // present.{i}.{decoder,encoder}.{key,value} -> past_key_values.{i}.*
+        // Zero-boxing: collect FloatArray leaves and bulk-put them. The old
+        // code boxed every float through ArrayList<Float> (72 tensors × steps
+        // of GC churn on slow devices for identical bytes).
         for (i in 0 until decLayers) {
-            for (io in listOf("decoder", "encoder")) {
-                for (kv in listOf("key", "value")) {
+            for (io in pastIoNames) {
+                for (kv in pastKvNames) {
                     val outName = "present.$i.$io.$kv"
                     val inName = "past_key_values.$i.$io.$kv"
                     // ORT >= 1.17: Result.get(String) returns Optional<OnnxValue>.
                     // Unwrap to the nested float arrays via OnnxTensor.value.
                     val opt = past.get(outName) as java.util.Optional<ai.onnxruntime.OnnxValue>
                     val raw = (opt.orElse(null) as? OnnxTensor)?.value
-                    when (raw) {
-                        is Array<*> -> {
-                            // 4-D [1,8,S,64]: flatten generically.
-                            val flat = ArrayList<Float>()
-                            fun walk(o: Any?) {
-                                when (o) {
-                                    is FloatArray -> o.forEach { flat.add(it) }
-                                    is Array<*> -> o.forEach { walk(it) }
-                                    is Number -> flat.add(o.toFloat())
-                                }
-                            }
-                            walk(raw)
-                            // shapes are [1,8,S,64] where S=1 for decoder self-attn
-                            // and S=encLen for encoder cross-attn; recover S from count.
-                            val seq = flat.size / (8 * 64)
-                            val buf = java.nio.FloatBuffer.allocate(flat.size)
-                            flat.forEach { buf.put(it) }
-                            buf.rewind()
-                            inputs[inName] = OnnxTensor.createTensor(
-                                ortEnv!!, buf, longArrayOf(1, 8, seq.toLong(), 64)
-                            )
-                            if (io == "decoder" && seq != 1) android.util.Log.w("Vachak-MT", "past $inName seq=$seq (expected 1)")
+                    val leaves = ArrayList<FloatArray>(64)
+                    fun walk(o: Any?) {
+                        when (o) {
+                            is FloatArray -> leaves.add(o)
+                            is Array<*> -> o.forEach { walk(it) }
                         }
-                        else -> android.util.Log.w("Vachak-MT", "past $outName unexpected type")
                     }
+                    walk(raw)
+                    if (leaves.isEmpty()) {
+                        android.util.Log.w("Vachak-MT", "past $outName unexpected type")
+                        continue
+                    }
+                    // shapes are [1,8,S,64] where S grows for decoder self-attn
+                    // and S=encLen for encoder cross-attn; recover S from count.
+                    var total = 0
+                    for (l in leaves) total += l.size
+                    val seq = total / (8 * 64)
+                    val buf = java.nio.FloatBuffer.allocate(total)
+                    for (l in leaves) buf.put(l)
+                    buf.rewind()
+                    inputs[inName] = OnnxTensor.createTensor(
+                        ortEnv!!, buf, longArrayOf(1, 8, seq.toLong(), 64)
+                    )
                 }
             }
         }

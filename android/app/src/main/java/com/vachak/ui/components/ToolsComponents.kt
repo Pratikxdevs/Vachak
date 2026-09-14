@@ -28,7 +28,9 @@ fun PrimaryToolCard(
     glyph: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    badge: String? = "✨ AI Powered"
+    // Honest badge: worksheets/flashcards are template-based offline content,
+    // never AI-generated at runtime (see AGENTS.md hard rules).
+    badge: String? = "Offline templates"
 ) {
     Surface(
         modifier = modifier.clickable(onClick = onClick),

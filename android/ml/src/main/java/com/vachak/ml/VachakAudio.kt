@@ -32,11 +32,28 @@ object VachakAudio {
     /** Hard cap per utterance (2GB RAM bound); longer speech splits. */
     const val MAX_UTTERANCE_MS = 14000
 
-    /** Live-partial decode cadence while listening. */
-    const val PARTIAL_DECODE_MS = 700L
+    /** Live-partial decode cadence while listening. Phase 2: slower on
+     * low-core tablets — a 700ms tick on a 4-core device queues full-window
+     * forwards faster than the lane drains them, starving the 3s commit
+     * (the 20s full re-decode at Stop). 1000ms keeps the lane ahead of the
+     * commit rhythm with the same 3s window / 3s commit bounds. */
+    val PARTIAL_DECODE_MS: Long
+        get() = if (Runtime.getRuntime().availableProcessors() <= 4) 1000L else 700L
+
+    /** Partials may only start while uncommitted audio is under 1.5s: one
+     * early preview per 3s chunk, then the lane idles for the commit decode.
+     * Starting a partial later would still be decoding when the chunk becomes
+     * pending, starving the commit and forcing a full re-decode at Stop. */
+    const val PARTIAL_HEAD_START_SAMPLES = 24000
 
     /** Bounded streaming window (tail re-decode, never whole history). */
     const val STREAM_WINDOW_SEC = 3
+
+    /** Live commit rhythm: continuous speech force-commits every N seconds so
+     * words appear while speaking and no single decode exceeds ~3s of audio.
+     * Together with the 3s partial window this bounds every ASR unit of work
+     * (the <3s hard limit is per decode unit; stacked units stream). */
+    const val STREAM_COMMIT_SEC = 3
 
     /** Below this RMS a stream is digital silence (true zeros / muted route),
      * not quiet speech — room noise floor on a live mic never reads this low. */

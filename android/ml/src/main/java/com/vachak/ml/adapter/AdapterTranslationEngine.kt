@@ -28,13 +28,13 @@ class AdapterTranslationEngine(
 ) : TranslationEngine {
     // Santali (sat_Olck): PROVEN ONNX INT8 bundle (in-APK, verified on-device).
     private val onnxSat = OnnxIndicTrans2Adapter(context)
-    // Mundari (unr_Deva): deterministic 17k phrasebook until LoRA-merged CT2 ships.
-    private val mundariBook = MundariPhrasebookEngine(context)
+    // Mundari (unr_Deva): lazy — costs ZERO unless its UI chip is selected.
+    // Deterministic 17k phrasebook until LoRA-merged CT2 ships.
+    private val mundariBook by lazy { MundariPhrasebookEngine(context) }
     // CT2 base: future vehicle for the merged model (stripped_mt_merged). Kept
     // constructed-but-idle; it is NOT in the live path until the merged model
     // exists AND passes the migration benchmark (see benchmarks/ct2_migration_benchmark.py).
-    private val base = IndicTrans2Adapter(context) // CT2 (future merged path only)
-    private var currentAdapter: String? = null
+    private val base by lazy { IndicTrans2Adapter(context) } // CT2 (future merged path only)
 
     // Adapter paths (on-device: modelpacks/*, fallback to assets)
     // unr_Deva is Flores code for Mundari (Karya hi-unr), mun_Deva alias kept for compat
@@ -113,13 +113,17 @@ class AdapterTranslationEngine(
         if (activeLang != globalLang) activeLang = globalLang
         // Normalize pair target to adapter lang
         val tgt = ActiveLanguage.normalize(pair.target.ifBlank { activeLang })
-        val adapterPath = adapterMap[tgt] ?: adapterMap[activeLang] ?: "modelpacks/mundari_adapter"
+        val isSat = ActiveLanguage.normalize(tgt) == "sat_Olck"
+        // Extract ONLY the selected language's adapter: the old code ran the
+        // shared extraction helper on every translate, stat-ing/logging files
+        // for a language never used on this path.
+        val adapterPath = if (isSat) "modelpacks/santali_adapter"
+            else adapterMap[tgt] ?: adapterMap[activeLang] ?: "modelpacks/mundari_adapter"
         val extracted = ensureAdapterExtracted(adapterPath)
         val adapterPresent = extracted != null
         android.util.Log.d("Vachak-MT", "AdapterEngine translate [$tgt] active=$activeLang adapter=$adapterPath extracted=$extracted present=$adapterPresent text=\"${text.take(40)}\"")
         if (adapterPresent) {
             android.util.Log.d("Vachak-MT", "Adapter $adapterPath connected (${java.io.File(extracted, "adapter_model.safetensors").length()/1024/1024}M)")
-            currentAdapter = extracted
         } else {
             android.util.Log.w("Vachak-MT", "Adapter $adapterPath NOT connected - check modelpacks assets")
         }
@@ -128,7 +132,7 @@ class AdapterTranslationEngine(
         // - Mundari (unr_Deva): merged CT2 when built, else deterministic phrasebook.
         // The CT2 base below is the FUTURE merged path only — never the live path
         // until stripped_mt_merged/model.bin exists (see isMergedReady()).
-        val r: EngineResult<String> = if (ActiveLanguage.normalize(tgt) == "sat_Olck") {
+        val r: EngineResult<String> = if (isSat) {
             onnxSat.translate(text, LanguagePair(pair.source, "sat_Olck"))
         } else {
             translateMundari(text, pair)
@@ -165,17 +169,16 @@ class AdapterTranslationEngine(
     }
 
     override fun loadModel(path: String): EngineResult<Unit> {
-        // Ensure both adapters are extracted + warm the live paths (sat ONNX +
-        // Mundari phrasebook). CT2 base loads lazily only when merged model exists.
-        val adapterPath = adapterMap[activeLang] ?: "modelpacks/mundari_adapter"
-        ensureAdapterExtracted(adapterPath)
+        // Warm ONLY the Santali path + extract the Santali adapter. Mundari
+        // (phrasebook/CT2) stays cold until its chip is selected — it
+        // self-loads on first Mundari translate either way.
         ensureAdapterExtracted("modelpacks/santali_adapter")
         onnxSat.loadModel(path)
-        mundariBook.loadModel(path)
         if (isMergedReady()) return base.loadModel(path)
         return EngineResult.Ok(Unit)
     }
-    fun isReady(): Boolean = onnxSat.isReady() && mundariBook.isReady()
+    fun isReady(): Boolean = onnxSat.isReady() &&
+        (ActiveLanguage.normalize(activeLang) == "sat_Olck" || mundariBook.isReady())
     fun isAdapterConnected(lang: String): Boolean {
         val p = adapterMap[lang] ?: return false
         return ensureAdapterExtracted(p) != null

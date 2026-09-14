@@ -1,6 +1,5 @@
 package com.vachak.ui.theme
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
@@ -18,18 +17,18 @@ val VachakShape = Shapes(
 )
 
 private val LightScheme = lightColorScheme(
-    primary = primaryLight,
-    onPrimary = onPrimaryLight,
-    primaryContainer = primaryContainerLight,
-    onPrimaryContainer = onPrimaryContainerLight,
-    secondary = secondaryLight,
-    onSecondary = onSecondaryLight,
-    secondaryContainer = secondaryContainerLight,
-    onSecondaryContainer = onSecondaryContainerLight,
-    tertiary = tertiaryLight,
-    onTertiary = onTertiaryLight,
-    tertiaryContainer = tertiaryContainerLight,
-    onTertiaryContainer = onTertiaryContainerLight,
+    primary = VachakColors.DeepLavender,
+    onPrimary = Color.White,
+    primaryContainer = VachakColors.Lavender100,
+    onPrimaryContainer = VachakColors.ForestDark,
+    secondary = VachakColors.Lavender600,
+    onSecondary = Color.White,
+    secondaryContainer = VachakColors.SoftLavender,
+    onSecondaryContainer = VachakColors.Lavender700,
+    tertiary = VachakColors.AccentDeep,
+    onTertiary = Color.White,
+    tertiaryContainer = Color(0xFFFFE9C2),
+    onTertiaryContainer = Color(0xFF5C3D00),
     error = errorLight,
     onError = onErrorLight,
     errorContainer = errorContainerLight,
@@ -46,13 +45,13 @@ private val LightScheme = lightColorScheme(
     inverseSurface = inverseSurfaceLight,
     inverseOnSurface = inverseOnSurfaceLight,
     inversePrimary = inversePrimaryLight,
-    surfaceDim = surfaceDimLight,
-    surfaceBright = surfaceBrightLight,
-    surfaceContainerLowest = surfaceContainerLowestLight,
-    surfaceContainerLow = surfaceContainerLowLight,
-    surfaceContainer = surfaceContainerLight,
-    surfaceContainerHigh = surfaceContainerHighLight,
-    surfaceContainerHighest = surfaceContainerHighestLight,
+    surfaceDim = Color(0xFFDDD8CB),
+    surfaceBright = Color(0xFFFAF6EE),
+    surfaceContainerLowest = Color(0xFFFFFFFF),
+    surfaceContainerLow = Color(0xFFF4F0E6),
+    surfaceContainer = Color(0xFFEFEADF),
+    surfaceContainerHigh = Color(0xFFE9E3D5),
+    surfaceContainerHighest = Color(0xFFE3DCCC),
 )
 
 private val DarkScheme = darkColorScheme(
@@ -95,7 +94,9 @@ private val DarkScheme = darkColorScheme(
 
 @Composable
 fun VachakTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    // Light-only: dark scheme is half-wired (screens hardcode light surfaces),
+    // so never follow the system — always render the light classroom theme.
+    darkTheme: Boolean = false,
     content: @Composable () -> Unit
 ) {
     val scheme = if (darkTheme) DarkScheme else LightScheme

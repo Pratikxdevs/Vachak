@@ -89,7 +89,7 @@ class SherpaOnnxVadAnalyzer(
 /** DEV FIXTURE energy-gate VAD. Not a neural detector; local wiring only. */
 class MockVadAnalyzer(
     private val sampleRate: Int = 16000,
-    private val threshold: Float = 0.02f,
+    private val threshold: Float = 0.012f,
     private val minSpeechSamples: Int = 1600,
     private val padSamples: Int = 1600
 ) : VadAnalyzer {
@@ -126,7 +126,7 @@ class MockVadAnalyzer(
         return VadSegment(seg, sampleRate, start, end)
     }
 
-    override fun flush() { speaking = false }
+    override fun flush() { buf.clear(); speaking = false }
 }
 
 /**

@@ -21,6 +21,10 @@ data class LatencySample(
     var t2Translate: Long? = null,
     var t3TtsBegin: Long? = null,
     var t4AudioBegin: Long? = null,
+    /** Stop-tap nanos (benchmark T0 for stop→translate). */
+    var tStopTap: Long? = null,
+    /** Translated-text-visible nanos (benchmark T1: ASR+MT headline). */
+    var tTranslateShown: Long? = null,
     var asrText: String = "",
     var targetText: String = "",
     var backend: String = "",
@@ -31,12 +35,29 @@ data class LatencySample(
         return (t4AudioBegin!! - t0SpeechBegin!!) / 1_000_000f
     }
 
+    /** Headline benchmark: stop-tap → translated text on screen (ASR+MT only,
+     * voice excluded by product definition). The <3s budget applies HERE. */
+    fun stopToTranslateMs(): Float? {
+        if (tStopTap == null || tTranslateShown == null) return null
+        return (tTranslateShown!! - tStopTap!!) / 1_000_000f
+    }
+
     fun stageMs(): Map<String, Float?> = mapOf(
         "asr" to span(t0SpeechBegin, t1Asr),
         "translate" to span(t1Asr, t2Translate),
         "tts" to span(t2Translate, t3TtsBegin),
         "render" to span(t3TtsBegin, t4AudioBegin)
     )
+
+    /**
+     * Phase 4 honesty fix: the REAL TTS synthesis cost. Callers run
+     * markTtsBegin() -> tts.synthesize() (blocking generate) ->
+     * markAudioBegin(), so generate() lands in the "render" span while the
+     * "tts" span is just the MT-done -> synth-start queue gap (~0ms).
+     * Diagnostics showed TTS as ~0ms because it read stages["tts"].
+     * Every UI/budget consumer must use THIS for the TTS number.
+     */
+    fun ttsSynthMs(): Float? = span(t3TtsBegin, t4AudioBegin)
 
     private fun span(a: Long?, b: Long?): Float? =
         if (a == null || b == null) null else (b - a) / 1_000_000f
@@ -48,6 +69,8 @@ class LatencyTracker(private val sample: LatencySample) {
     fun markTranslate(targetText: String = "") { sample.t2Translate = now(); if (targetText.isNotEmpty()) sample.targetText = targetText }
     fun markTtsBegin() { sample.t3TtsBegin = now() }
     fun markAudioBegin() { sample.t4AudioBegin = now() }
+    fun markStopTap(ns: Long) { sample.tStopTap = ns }
+    fun markTranslateShown() { sample.tTranslateShown = now() }
     fun result(): LatencySample = sample
     private fun now(): Long = SystemClock.elapsedRealtimeNanos()
 }
@@ -68,7 +91,8 @@ object LastPipelineRun {
         android.util.Log.d(
             "Vachak-Latency",
             "RUN ${s.runId} stages=${s.stageMs()} totalMs=${s.endToEndMs()} " +
-                "withinBudget=${(s.endToEndMs() ?: Float.MAX_VALUE) < 3000}"
+                "stopToTranslateMs=${s.stopToTranslateMs()} " +
+                "withinBudget=${(s.stopToTranslateMs() ?: Float.MAX_VALUE) < 3000}"
         )
     }
 }

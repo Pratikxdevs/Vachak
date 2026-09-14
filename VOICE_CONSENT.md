@@ -122,3 +122,30 @@ signature is collected here.
 (STRIDE Tampering/Information Disclosure, ASVS L1 voice consent + CC BY 4.0).
 Never train on IN22 test sentences. Keep eval splits separate. §8 added per
 quarantine task — placeholders kept unsigned.*
+
+## 9. Native-corpus training data + interim voice (added 2026-09-11, additive only)
+
+* **Actual training audio in use:** `raw/santali_male_native_web/` — ~5,284
+  utterances / ~10 h, single male speaker, 48 kHz mono, transcribed in
+  Devanagari Santali (transliterated to Ol Chiki via
+  `ml/tts/dataset/transliterate.py`; 22.05 kHz resampled set
+  `ml/tts/dataset/wavs_22050/` + `metadata_{train,dev,eval}.csv`, splits
+  4557/304/203). Provenance is **web-collected and undocumented** — speaker
+  identity unknown, NO explicit synthesis consent on file. Training on this
+  data (`tmux satvits`, `ml/tts/finetune_sat.py`, Coqui VITS char-mode) is
+  **prototype/demo-only**. Release-grade native voice requires either a
+  signed consent filed here (§7 flow) or retraining on the §2 CC BY 4.0
+  corpora. Gate: do NOT ship the native modelpack as approved pedagogy until
+  this section records `consent: granted` with scope.
+* **Interim voice (audible now):** `modelpacks/piper-hi-base/hi-sat-interim.onnx`
+  — Piper `hi_IN-pratham-medium` (rhasspy/piper-voices, repo MIT; voice
+  dataset `pratham`, attribution in THIRD_PARTY_NOTICES.md), weights
+  unmodified, ONNX metadata patched for sherpa-onnx (`sample_rate`,
+  `n_speakers`, `language=hi`, `comment=piper`, `voice=hi`). Speaks Santali
+  via `normalize_mt` + `ol_to_dev` bridge (Hindi-accented, NOT the native
+  speaker — no Vachak speaker is cloned). Proof:
+  `ml/tts/runs/santali_vits/interim_proof.log`, re-check with
+  `python ml/tts/audible_check.py`. Dev-machine only (needs espeak-ng-data);
+  APK keeps the Ol Chiki char-token path.
+* Placeholders above remain unsigned; this section adds provenance without
+  signing. consent consent

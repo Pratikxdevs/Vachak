@@ -1,6 +1,7 @@
 package com.vachak.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -23,8 +24,11 @@ import com.vachak.engine.EngineResult
 import com.vachak.engine.Lesson
 import com.vachak.engine.LessonFilter
 import com.vachak.ui.components.*
+import com.vachak.ui.navigation.PackGrade
+import com.vachak.ui.navigation.loadPackSummary
 import com.vachak.ui.theme.VachakColors
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 private sealed interface CurriculumUiState {
@@ -39,50 +43,56 @@ private sealed interface CurriculumUiState {
 fun CurriculumScreen(
     engine: EngineProvider,
     onOpenLesson: (Lesson) -> Unit,
+    onOpenGrade: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var uiState by remember { mutableStateOf<CurriculumUiState>(CurriculumUiState.Loading) }
     var query by remember { mutableStateOf("") }
     var selectedFilter by remember { mutableStateOf("All") }
+    var gradeFilter by remember { mutableStateOf<Int?>(null) }
+    var showGradeSheet by remember { mutableStateOf(false) }
+    var expandedGrades by remember { mutableStateOf(false) }
+    var expandedRecents by remember { mutableStateOf(false) }
+    var expandedDecks by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
     var isSearchExpanded by remember { mutableStateOf(false) }
+    var reloadTick by remember { mutableStateOf(0) }
 
     suspend fun load() {
         withContext(Dispatchers.IO) {
             val ce = engine.curriculum as? com.vachak.content.ContentEngine
             val res = ce?.getLessons() ?: engine.curriculum.listLessons(0).let { r ->
                 when (r) {
-                    is EngineResult.Ok -> EngineResult.Ok(r.value.map { ref -> Lesson(ref.id, ref.title, ref.grade, "", "", true) })
+                    is EngineResult.Ok -> EngineResult.Ok(r.value.map { ref -> Lesson(ref.id, ref.title, ref.grade, "", "", true, ref.domain) })
                     is EngineResult.Err -> r as EngineResult<List<Lesson>>
                 }
             }
             withContext(Dispatchers.Main) {
                 uiState = when (res) {
                     is EngineResult.Ok -> {
-                        val list = if (res.value.isEmpty()) com.vachak.ui.mock.MockData.lessons else res.value
-                        CurriculumUiState.Ready(list)
+                        if (res.value.isEmpty()) CurriculumUiState.Empty
+                        else CurriculumUiState.Ready(res.value)
                     }
-                    is EngineResult.Err -> {
-                        val mock = com.vachak.ui.mock.MockData.lessons
-                        CurriculumUiState.Ready(mock)
-                    }
+                    is EngineResult.Err -> CurriculumUiState.Error(res.message)
                 }
             }
         }
     }
 
-    LaunchedEffect(Unit) { load() }
+    LaunchedEffect(reloadTick) { load() }
 
     val lessons = when (val s = uiState) {
         is CurriculumUiState.Ready -> s.lessons
         else -> emptyList()
     }
 
-    val filteredLessons by remember(lessons, query, selectedFilter) {
+    val filteredLessons by remember(lessons, query, selectedFilter, gradeFilter) {
         derivedStateOf {
             var lst = lessons
             if (selectedFilter != "All") {
                 lst = lst.filter { l -> LessonFilter.matches(l, selectedFilter) }
             }
+            gradeFilter?.let { g -> lst = lst.filter { it.grade == g } }
             if (query.isNotBlank()) lst = lst.filter { it.title.contains(query, true) || it.id.contains(query, true) }
             lst
         }
@@ -92,12 +102,39 @@ fun CurriculumScreen(
         derivedStateOf { (1..5).associateWith { g -> lessons.count { it.grade == g } } }
     }
 
-    val decks = remember {
-        com.vachak.ui.mock.MockData.flashcardDecks.map { Triple(it.title, it.subtitle, it.glyph) }
+    // Grade content packs — null until asset loads.
+    var packGrades by remember { mutableStateOf<List<PackGrade>?>(null) }
+    // Real recently-viewed order + completion set, refreshed on resume so the
+    // section never shows out-of-date data after opening a lesson.
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    var recentIds by remember { mutableStateOf<List<String>>(emptyList()) }
+    var doneIds by remember { mutableStateOf<Set<String>>(emptySet()) }
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val obs = androidx.lifecycle.LifecycleEventObserver { _, e ->
+            if (e == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                reloadTick++
+                recentIds = com.vachak.ui.prefs.VachakPrefs(ctx).recentlyViewed()
+                doneIds = com.vachak.ui.prefs.VachakPrefs(ctx).completedLessons()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(obs)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(obs) }
     }
 
     // Avoid nested BoxWithConstraints (double-measure cost at 90/120Hz)
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    // Seed once lessons arrive (remember(lessons) re-seeds on data load, while
+    // ON_RESUME keeps it fresh afterwards).
+    LaunchedEffect(lessons) {
+        if (lessons.isNotEmpty() && recentIds.isEmpty()) {
+            recentIds = com.vachak.ui.prefs.VachakPrefs(ctx).recentlyViewed()
+            doneIds = com.vachak.ui.prefs.VachakPrefs(ctx).completedLessons()
+        }
+    }
+    LaunchedEffect(Unit) {
+        withContext(Dispatchers.IO) { packGrades = loadPackSummary(ctx) }
+    }
     val isTablet = remember(configuration.screenWidthDp) { configuration.screenWidthDp >= 840 }
     val hPad = if (isTablet) 32.dp else 24.dp
     Box(modifier = modifier.fillMaxSize().background(VachakColors.Background)) {
@@ -154,9 +191,16 @@ fun CurriculumScreen(
 
             // Category Filters (cirriculum.md §5)
             item {
-                val filters = remember { listOf("All", "Language", "Mathematics", "EVS", "Stories", "Life Skills") }
+                val filters = remember { listOf("All", "Literacy", "Numeracy") }
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(end = 8.dp)) {
-                    item(key = "filter-icon") { FilterPill(label = "Filter", selected = false, onClick = {}, leadingIcon = Icons.Outlined.Tune) }
+                    item(key = "filter-icon") {
+                        FilterPill(
+                            label = gradeFilter?.let { "Grade $it" } ?: "Filter",
+                            selected = gradeFilter != null,
+                            onClick = { showGradeSheet = true },
+                            leadingIcon = Icons.Outlined.Tune
+                        )
+                    }
                     items(filters, key = { it }) { label ->
                         FilterPill(label = label, selected = selectedFilter == label, onClick = { selectedFilter = label })
                     }
@@ -181,7 +225,7 @@ fun CurriculumScreen(
                             Column(modifier = Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                                 Text("Couldn't load curriculum", style = MaterialTheme.typography.titleMedium, color = VachakColors.TextPrimary, fontWeight = FontWeight.SemiBold)
                                 Text(msg, style = MaterialTheme.typography.bodySmall, color = VachakColors.TextSecondary)
-                                OutlinedButton(onClick = { /* retry */ }, shape = RoundedCornerShape(50)) { Text("Try Again") }
+                                OutlinedButton(onClick = { scope.launch { load() } }, shape = RoundedCornerShape(50)) { Text("Try Again") }
                             }
                         }
                     }
@@ -192,21 +236,26 @@ fun CurriculumScreen(
                             Column(modifier = Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Text("Nothing here yet", style = MaterialTheme.typography.titleMedium, color = VachakColors.TextPrimary, fontWeight = FontWeight.SemiBold)
                                 Text("Try another subject or grade.", style = MaterialTheme.typography.bodyMedium, color = VachakColors.TextSecondary)
-                                OutlinedButton(onClick = { selectedFilter = "All"; query = "" }, shape = RoundedCornerShape(50)) { Text("Clear Filters") }
+                                OutlinedButton(onClick = { selectedFilter = "All"; gradeFilter = null; query = "" }, shape = RoundedCornerShape(50)) { Text("Clear Filters") }
                             }
                         }
                     }
                 }
                 is CurriculumUiState.Ready -> {
-                    val focus = filteredLessons.firstOrNull() ?: lessons.firstOrNull()
+                    // Continue = first incomplete lesson under current filters (honest resume).
+                    val candidates = filteredLessons.ifEmpty { lessons }
+                    val focus = candidates.firstOrNull { !doneIds.contains(it.id) }
+                        ?: candidates.firstOrNull()
+                        ?: lessons.firstOrNull()
                     if (focus != null) {
                         item {
+                            val doneCount = lessons.count { doneIds.contains(it.id) }
                             ContinueLearningCard(
                                 title = focus.title.ifBlank { "Letters & Sounds" },
-                                gradeLabel = "Grade ${focus.grade} • Language",
+                                gradeLabel = "Grade ${focus.grade} • " + LessonFilter.domainLabel(focus),
                                 description = focus.sourceTextHi.ifBlank { "Learn the first sounds and their corresponding Ol Chiki forms." }.take(90),
-                                progressLabel = "Progress  •  3 of ${lessons.size} lessons",
-                                progress = 3f / lessons.size.coerceAtLeast(1).toFloat(),
+                                progressLabel = "Progress  •  $doneCount of ${lessons.size} lessons",
+                                progress = doneCount.toFloat() / lessons.size.coerceAtLeast(1).toFloat(),
                                 onContinue = { onOpenLesson(focus) }
                             )
                         }
@@ -217,40 +266,85 @@ fun CurriculumScreen(
             // Browse by Grade (cirriculum.md §11)
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    HomeSectionHeader(title = "Browse by Grade", actionLabel = "View All", onAction = {})
+                    HomeSectionHeader(
+                        title = "Browse by Grade",
+                        actionLabel = if (expandedGrades) "Show Less" else "View All",
+                        onAction = { expandedGrades = !expandedGrades }
+                    )
+                    val grades = (1..5).toList()
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(end = 8.dp)) {
-                        items((1..5).toList(), key = { "grade-$it" }) { g ->
-                            GradeCard(grade = g, lessonCount = gradeCounts[g] ?: 0, onClick = { selectedFilter = when (g) { 1 -> "Language"; 2 -> "Mathematics"; else -> "All" } })
+                        items(grades, key = { "grade-$it" }) { g ->
+                            GradeCard(grade = g, lessonCount = gradeCounts[g] ?: 0, onClick = { onOpenGrade(g) })
+                        }
+                    }
+                    if (expandedGrades) {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            filteredLessons.forEach { lesson ->
+                                RecentLessonRow(
+                                    title = lesson.title,
+                                    subtitle = "Grade ${lesson.grade} • " + LessonFilter.domainLabel(lesson),
+                                    status = "${lesson.grade}",
+                                    statusIcon = null,
+                                    onClick = { onOpenLesson(lesson) }
+                                )
+                            }
                         }
                     }
                 }
             }
 
-            // Flashcards (cirriculum.md §15)
+            // Flashcards — real installed-pack decks per grade (never mock data).
             item {
+                val decks = packGrades?.filter { it.flashcards > 0 }
+                    ?.let { list -> gradeFilter?.let { g -> list.filter { it.grade == g } } ?: list }
+                    .orEmpty()
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text("Flashcards", style = MaterialTheme.typography.titleMedium, color = VachakColors.TextPrimary, fontWeight = FontWeight.SemiBold)
-                            Text("✨", style = MaterialTheme.typography.titleMedium)
-                        }
-                        TextButton(onClick = {}, contentPadding = PaddingValues(horizontal = 8.dp)) {
-                            Text("View All", style = MaterialTheme.typography.labelMedium, color = VachakColors.Lavender600)
+                        Text("Flashcards", style = MaterialTheme.typography.titleMedium, color = VachakColors.TextPrimary, fontWeight = FontWeight.SemiBold)
+                        TextButton(onClick = { expandedDecks = !expandedDecks }, contentPadding = PaddingValues(horizontal = 8.dp)) {
+                            Text(if (expandedDecks) "Show Less" else "View All", style = MaterialTheme.typography.labelMedium, color = VachakColors.Lavender600)
                             Spacer(Modifier.width(4.dp))
                             Icon(Icons.Outlined.ChevronRight, null, tint = VachakColors.Lavender600, modifier = Modifier.size(16.dp))
                         }
                     }
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(end = 8.dp)) {
-                        items(decks, key = { (title, _, _) -> title }) { (title, subtitle, glyph) ->
-                            val lessonForDeck = lessons.firstOrNull()
-                            val deckCount = remember(title, lessonForDeck?.id) { LessonFilter.stableDeckCount(title + (lessonForDeck?.id ?: "")) }
-                            FlashcardDeckCard(
-                                title = title,
-                                subtitle = subtitle,
-                                count = deckCount,
-                                glyph = glyph,
-                                onClick = { lessonForDeck?.let { onOpenLesson(it) } }
-                            )
+                    val olDigits = listOf("᱐", "᱑", "᱒", "᱓", "᱔", "᱕")
+                    when {
+                        packGrades == null -> {
+                            Surface(shape = RoundedCornerShape(20.dp), color = Color.White, border = androidx.compose.foundation.BorderStroke(1.dp, VachakColors.Border), modifier = Modifier.fillMaxWidth().height(120.dp)) {
+                                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) { CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp, color = VachakColors.Lavender600) }
+                            }
+                        }
+                        decks.isEmpty() -> {
+                            Surface(shape = RoundedCornerShape(20.dp), color = Color.White, border = androidx.compose.foundation.BorderStroke(1.dp, VachakColors.Border), modifier = Modifier.fillMaxWidth()) {
+                                Text("No flashcard decks yet — install a content pack.", style = MaterialTheme.typography.bodySmall, color = VachakColors.TextSecondary, modifier = Modifier.padding(16.dp))
+                            }
+                        }
+                        !expandedDecks -> {
+                            LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(end = 8.dp)) {
+                                items(decks, key = { it.grade }) { pg ->
+                                    FlashcardDeckCard(
+                                        title = "Grade ${pg.grade}",
+                                        subtitle = "${pg.chapters} decks",
+                                        count = "${pg.flashcards} cards",
+                                        glyph = olDigits.getOrElse(pg.grade) { "ᱚ" },
+                                        onClick = { onOpenGrade(pg.grade) }
+                                    )
+                                }
+                            }
+                        }
+                        else -> {
+                            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                decks.forEach { pg ->
+                                    FlashcardDeckCard(
+                                        title = "Grade ${pg.grade}",
+                                        subtitle = "${pg.chapters} decks",
+                                        count = "${pg.flashcards} cards",
+                                        glyph = olDigits.getOrElse(pg.grade) { "ᱚ" },
+                                        onClick = { onOpenGrade(pg.grade) },
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -259,25 +353,39 @@ fun CurriculumScreen(
             // Recently Viewed (cirriculum.md §20)
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    HomeSectionHeader(title = "Recently Viewed", actionLabel = "View All", onAction = {})
+                    HomeSectionHeader(
+                        title = "Recently Viewed",
+                        actionLabel = if (expandedRecents) "Show Less" else "View All",
+                        onAction = { expandedRecents = !expandedRecents }
+                    )
                     when (uiState) {
                         is CurriculumUiState.Ready -> {
-                            val recents = filteredLessons.take(3).ifEmpty { lessons.take(3) }
+                            // Real recents: tracked lesson opens, filtered like everything else.
+                            val tracked = recentIds.mapNotNull { id -> lessons.firstOrNull { it.id == id } }
+                            val scoped = if (selectedFilter != "All" || gradeFilter != null || query.isNotBlank()) {
+                                var lst = tracked
+                                if (selectedFilter != "All") lst = lst.filter { l -> LessonFilter.matches(l, selectedFilter) }
+                                gradeFilter?.let { g -> lst = lst.filter { it.grade == g } }
+                                if (query.isNotBlank()) lst = lst.filter { it.title.contains(query, true) || it.id.contains(query, true) }
+                                lst
+                            } else tracked
+                            val recents = (if (expandedRecents) scoped else scoped.take(3))
                             Surface(shape = RoundedCornerShape(20.dp), color = Color.White, border = androidx.compose.foundation.BorderStroke(1.dp, VachakColors.Border), modifier = Modifier.fillMaxWidth()) {
                                 Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
                                     if (recents.isEmpty()) {
-                                        Text("No recently viewed lessons.", style = MaterialTheme.typography.bodySmall, color = VachakColors.TextSecondary, modifier = Modifier.padding(vertical = 12.dp))
+                                        Text(
+                                            if (recentIds.isEmpty()) "Lessons you open will appear here."
+                                            else "No recently viewed lessons match these filters.",
+                                            style = MaterialTheme.typography.bodySmall, color = VachakColors.TextSecondary, modifier = Modifier.padding(vertical = 12.dp)
+                                        )
                                     } else {
                                         recents.forEachIndexed { idx, lesson ->
+                                            val completed = doneIds.contains(lesson.id)
                                             RecentLessonRow(
                                                 title = lesson.title,
-                                                subtitle = "Grade ${lesson.grade} • Language",
-                                                status = when (idx) {
-                                                    0 -> "3/8"
-                                                    1 -> "50%"
-                                                    else -> "Completed"
-                                                },
-                                                statusIcon = if (idx == 2) Icons.Outlined.CheckCircle else null,
+                                                subtitle = "Grade ${lesson.grade} • " + LessonFilter.domainLabel(lesson),
+                                                status = if (completed) "Completed" else "In Progress",
+                                                statusIcon = if (completed) Icons.Outlined.CheckCircle else null,
                                                 onClick = { onOpenLesson(lesson) }
                                             )
                                             if (idx < recents.lastIndex) HorizontalDivider(color = VachakColors.Border.copy(alpha = 0.6f), thickness = 0.8.dp)
@@ -307,11 +415,18 @@ fun CurriculumScreen(
                         Column(modifier = Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                             Text("No lessons found.", style = MaterialTheme.typography.titleSmall, color = VachakColors.TextPrimary)
                             Text("Try another subject or grade.", style = MaterialTheme.typography.bodySmall, color = VachakColors.TextSecondary)
-                            OutlinedButton(onClick = { selectedFilter = "All"; query = "" }, shape = RoundedCornerShape(50)) { Text("Clear Filters") }
+                            OutlinedButton(onClick = { selectedFilter = "All"; gradeFilter = null; query = "" }, shape = RoundedCornerShape(50)) { Text("Clear Filters") }
                         }
                     }
                 }
             }
+        }
+        if (showGradeSheet) {
+            GradeFilterSheet(
+                selected = gradeFilter,
+                onSelect = { gradeFilter = it; showGradeSheet = false },
+                onDismiss = { showGradeSheet = false }
+            )
         }
     }
 }

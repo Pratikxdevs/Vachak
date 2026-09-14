@@ -1,7 +1,5 @@
 package com.vachak.ui.navigation
 
-import androidx.compose.animation.*
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -36,7 +34,7 @@ fun AdaptiveScaffold(
         Row(modifier = Modifier.fillMaxSize()) {
             NavigationRail(
                 modifier = Modifier.fillMaxHeight(),
-                containerColor = Color.White,
+                containerColor = VachakColors.Surface,
                 header = { Spacer(Modifier.height(12.dp)) }
             ) {
                 NavDest.all.filterNotNull().filter { it.route != "diagnostics" && it.route != "packs" }.forEach { dest ->
@@ -56,7 +54,11 @@ fun AdaptiveScaffold(
             }
             VerticalDivider()
             Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
-                AnimatedNavContent(current) { content() }
+                // NavHost owns its own transitions: wrapping it in AnimatedContent
+                // keyed on the tab would mount TWO NavHosts during every tab switch
+                // (double lesson loads = the "spamming" bug) and drop backstack
+                // state on each highlight change. Render directly.
+                content()
             }
         }
     } else {
@@ -82,7 +84,7 @@ fun AdaptiveScaffold(
                         ) {
                             NavDest.all.filterNotNull().filter { it.route != "diagnostics" && it.route != "packs" }.forEach { dest ->
                                 val selected = dest == current
-                                val bg = if (selected) VachakColors.Lavender600 else Color.Transparent
+                                val bg = if (selected) VachakColors.DeepLavender else Color.Transparent
                                 val tint = if (selected) Color.White else VachakColors.TextSecondary
                                 val labelColor = if (selected) Color.White else VachakColors.TextSecondary
                                 Box(
@@ -103,7 +105,7 @@ fun AdaptiveScaffold(
                                         )
                                         Text(
                                             dest.label,
-                                            style = MaterialTheme.typography.labelSmall.copy(fontSize = androidx.compose.ui.unit.TextUnit(10.5f, androidx.compose.ui.unit.TextUnitType.Sp)),
+                                            style = MaterialTheme.typography.labelSmall,
                                             color = labelColor,
                                             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
                                             maxLines = 1,
@@ -119,24 +121,9 @@ fun AdaptiveScaffold(
             }
         ) { padding ->
             Box(modifier = Modifier.padding(padding).fillMaxSize()) {
-                AnimatedNavContent(current) { content() }
+                // See above: never wrap NavHost in AnimatedContent.
+                content()
             }
         }
-    }
-}
-
-@Composable
-private fun AnimatedNavContent(
-    current: NavDest,
-    content: @Composable () -> Unit
-) {
-    // Cheap fade only — slide is GPU-heavy on 2GB Mali and causes jank on first frame (2800ms).
-    // 150ms is spec-compliant (150–300ms) and skips layout thrash.
-    AnimatedContent(
-        targetState = current,
-        transitionSpec = { fadeIn(tween(150)) togetherWith fadeOut(tween(150)) },
-        label = "nav-transition"
-    ) {
-        content()
     }
 }

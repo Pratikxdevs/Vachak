@@ -70,3 +70,27 @@ interface FlashcardDao {
     @Query("SELECT COUNT(*) FROM flashcards")
     suspend fun count(): Int
 }
+
+@Dao
+interface ActivityDao {
+    @Query("SELECT * FROM activities WHERE lessonId = :lessonId ORDER BY sequence ASC")
+    suspend fun getForLesson(lessonId: String): List<ActivityEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(items: List<ActivityEntity>)
+
+    @Query("SELECT COUNT(*) FROM activities")
+    suspend fun count(): Int
+}
+
+@Dao
+interface AssessmentPromptDao {
+    @Query("SELECT * FROM assessment_prompts WHERE lessonId = :lessonId ORDER BY id ASC")
+    suspend fun getForLesson(lessonId: String): List<AssessmentPromptEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(items: List<AssessmentPromptEntity>)
+
+    @Query("SELECT COUNT(*) FROM assessment_prompts")
+    suspend fun count(): Int
+}

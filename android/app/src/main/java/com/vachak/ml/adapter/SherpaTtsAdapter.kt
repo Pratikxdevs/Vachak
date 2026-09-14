@@ -44,6 +44,12 @@ class SherpaTtsAdapter(
         )
     }
 
+    private fun isSantaliTarget(language: String): Boolean =
+        language.lowercase() in setOf("sat", "sat_olck", "sat-olck", "olck", "ol_ck", "sat_olchiki")
+
+    private fun hasOlChiki(text: String): Boolean =
+        text.any { it.code in 0x1C50..0x1C7F }
+
     override fun loadModel(packId: String): EngineResult<Unit> {
         if (context == null || !useReal) return EngineResult.Ok(Unit)
         synchronized(adapterLock) {
@@ -71,6 +77,17 @@ class SherpaTtsAdapter(
         // to the bundled VITS model as-is. No language is remapped away.
         val normalizedLang = language
         if (!supports(language)) return EngineResult.Err(EngineError.UNSUPPORTED_LANGUAGE, language)
+        // Proof gate: the Santali voice is an Ol Chiki char-token VITS. Feeding
+        // it Devanagari/Latin (e.g. MT output that missed the script) produces
+        // garbage-or-silence in the native layer — refuse LOUDLY with the cause
+        // instead of playing nothing. Mundari (Devanagari) + Hindi pass through.
+        if (isSantaliTarget(language) && !hasOlChiki(text)) {
+            Log.w(tag, "refusing synth: Santali target but no Ol Chiki in \"${text.take(40)}\" (MT script miss?)")
+            return EngineResult.Err(
+                EngineError.MODEL_DECODE_FAILED,
+                "Voice needs Ol Chiki text — got non-Ol-Chiki (translation shows above; voice can't speak it)"
+            )
+        }
         if (context == null || !useReal) {
             // Mock path: fabricate audible-length PCM (>200ms) for offline tests
             val sr = com.vachak.ml.VachakAudio.TTS_OUTPUT_HZ
@@ -84,28 +101,26 @@ class SherpaTtsAdapter(
             val adapter = synchronized(adapterLock) {
                 cachedAdapter ?: SherpaOnnxTtsAdapter(context!!, packDir = packDir).also { cachedAdapter = it }
             }
-            // Shim gate (permanent, crash-critical): the 55-token placeholder
-            // graph is structurally incompatible with sherpa-onnx VITS and the
-            // native layer HARD-ABORTS the process (exit 255, uncatchable) on
-            // load. Never hand it over — fail honest BEFORE any native call.
-            // The gate lifts itself the moment a real model ships (isShim false).
+            // Shim gate: 55-token placeholder is incompatible with sherpa-onnx VITS
+            // and the native layer HARD-ABORTS on load. Fine-tuned 38-token
+            // model passes through (isShim=false) for live synthesis.
             val shim = try { adapter.isShim() } catch (_: Exception) { false }
             if (shim) {
                 Log.w(tag, "shim voice model detected — refusing native load (would abort process); text stays source of truth")
                 val lang = ActiveLanguage.label(language)
-                return EngineResult.Err(EngineError.MODEL_NOT_LOADED, "Voice model pending training — $lang text shown (Coqui VITS not yet trained)")
+                return EngineResult.Err(EngineError.MODEL_NOT_LOADED, "Voice files outdated or missing — $lang text shown (update the app or reinstall the language pack)")
             }
             val audio = adapter.synthesize(text, normalizedLang)
+            if (audio.sampleRate != com.vachak.ml.VachakAudio.TTS_OUTPUT_HZ) {
+                Log.w(tag, "model emitted ${audio.sampleRate}Hz but playback assumes ${com.vachak.ml.VachakAudio.TTS_OUTPUT_HZ}Hz — pitch/speed will be wrong; refusing silent corruption")
+                return EngineResult.Err(EngineError.MODEL_LOAD_FAILED, "Voice sample-rate mismatch (${audio.sampleRate}Hz) — $text shown as text")
+            }
             Log.d(tag, "synthesize \"$text\" ($language -> $normalizedLang) -> ${audio.samples.size} samples @ ${audio.sampleRate} Hz via sherpa-onnx (packDir=${packDir ?: "bundled"})")
-            // Anti-blip guard (permanent): sub-200ms output is NOT speech — it is a
-            // fixture/shim artifact. Never play it as if the translation was spoken;
-            // surface an honest message so the text path stays the source of truth.
+            // Anti-blip guard: sub-200ms output is NOT speech.
             val minAudible = (0.2 * audio.sampleRate).toInt()
             if (audio.samples.size < minAudible) {
-                val shim = try { adapter.isShim() } catch (_: Exception) { false }
-                val why = if (shim) "voice model is the 55-token training placeholder (real Coqui VITS pending)"
-                          else (audio.warning ?: "model returned ${audio.samples.size} samples (<200ms)")
-                Log.w(tag, "synthesize inaudible ${audio.samples.size} samples @ ${audio.sampleRate}Hz shim=$shim — $why")
+                val why = audio.warning ?: "model returned ${audio.samples.size} samples (<200ms)"
+                Log.w(tag, "synthesize inaudible ${audio.samples.size} samples @ ${audio.sampleRate}Hz — $why")
                 throw IllegalStateException("TTS inaudible: $why")
             }
             ShortArray(audio.samples.size) {
@@ -114,14 +129,13 @@ class SherpaTtsAdapter(
         }.fold(
             onSuccess = { EngineResult.Ok(it) },
             onFailure = { e ->
-                val shimHint = try {
-                    synchronized(adapterLock) { cachedAdapter }?.let { a ->
-                        try { a.isShim() } catch (_: Exception) { false }
-                    } ?: false
-                } catch (_: Exception) { false }
-                val msg = if (shimHint || (e.message ?: "").contains("placeholder")) {
+                // Latency: shim already resolved pre-synth — reuse it instead of
+                // re-statting tokens.txt on the failure path.
+                val msg = if ((e.message ?: "").contains("placeholder")) {
                     val lang = ActiveLanguage.label(language)
-                    "Voice model pending training — $lang text shown (Coqui VITS not yet trained)"
+                    "Voice files outdated or missing — $lang text shown (update the app or reinstall the language pack)"
+                } else if ((e.message ?: "").contains("inaudible")) {
+                    e.message ?: "TTS run failed"
                 } else "TTS run failed: ${e.message}"
                 EngineResult.Err(EngineError.MODEL_LOAD_FAILED, msg)
             }

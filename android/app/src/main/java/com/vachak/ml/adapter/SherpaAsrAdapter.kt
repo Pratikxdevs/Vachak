@@ -50,8 +50,11 @@ class SherpaAsrAdapter(
         Log.d("Vachak-VAD", "VAD segments=${segments.size} for ${pcm16.size} samples @ $sampleRateHz Hz: $segments")
         Log.d("Vachak-ASR", "VAD gated ${segments.size} segments from ${pcm16.size} samples")
         if (segments.isEmpty()) {
-            Log.d("Vachak-ASR", "transcribed 0 segments (silence) -> \"\"")
-            return EngineResult.Ok("")
+            Log.d("Vachak-ASR", "transcribed 0 segments (silence) -> Err INVALID_INPUT")
+            return EngineResult.Err(
+                EngineError.INVALID_INPUT,
+                "VAD heard no speech (${pcm16.size} samples) — speak closer/louder and retry"
+            )
         }
 
         val texts = segments.mapNotNull { seg ->
@@ -73,6 +76,13 @@ class SherpaAsrAdapter(
         }.filter { it.isNotBlank() }
 
         val result = texts.joinToString(" ").trim()
+        if (result.isBlank()) {
+            Log.w("Vachak-ASR", "decoded ${segments.size} segments but all blank -> Err INVALID_INPUT")
+            return EngineResult.Err(
+                EngineError.INVALID_INPUT,
+                "ASR decoded no words (${segments.size} segments, ${pcm16.size} samples) — speak closer/louder and retry"
+            )
+        }
         val latencyMs = (android.os.SystemClock.elapsedRealtimeNanos() - t0) / 1_000_000f
         Log.d("Vachak-ASR", "transcribed ${pcm16.size} samples @ $sampleRateHz Hz -> \"$result\" (${latencyMs}ms, ${segments.size} segments)")
         Log.d("Vachak-Latency", "ASR total ${latencyMs}ms for ${pcm16.size} samples, withinBudget=${latencyMs <= 1000}")

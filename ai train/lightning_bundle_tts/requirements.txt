@@ -1,0 +1,12 @@
+# Lightning Studio deps (GPU image already has CUDA torch; keep torch unpinned)
+torch
+transformers==4.53.3
+coqui-tts==0.27.5
+snac
+soundfile
+librosa
+huggingface_hub
+tensorboard
+sherpa-onnx
+onnx
+numpy

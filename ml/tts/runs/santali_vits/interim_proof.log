@@ -1,0 +1,7 @@
+Vachak-TTS interim voice proof (sherpa-onnx OfflineTts, Piper path)
+model=modelpacks/piper-hi-base/hi-sat-interim.onnx (hi_IN-pratham-medium base, 22050 Hz, interim)
+Vachak-TTS synthesized "ᱡᱚᱦᱟᱨ" -> 16384 samples @ 22050 Hz (wall 0.09s, rms 0.1721, sha bd19d1f53244e3f8) -> ml/tts/runs/santali_vits/interim_johaar.wav
+Vachak-TTS OfflineTts ready (interim hi-base, audible >200ms: 16384 samples)
+Vachak-TTS synthesized "ᱪᱮᱫ ᱱᱚᱣᱟ ᱫᱤᱱ ᱱᱟᱯᱟᱭ ᱠᱟᱱᱟ?" -> 30800 samples @ 22050 Hz (wall 0.18s, rms 0.1478, sha 48e188a8ce55feaf) -> ml/tts/runs/santali_vits/interim_mt-question.wav
+Vachak-TTS synthesized "ᱥᱟᱱᱛᱟᱲ ᱦᱚᱲ ᱫᱚ, ᱵᱷᱟᱨᱚᱛ ᱫᱤᱥᱚᱢ ᱨᱮᱱ ᱟᱹᱫ ᱵᱩᱱᱤ" -> 95111 samples @ 22050 Hz (wall 0.50s, rms 0.1379, sha 53c414006a88e5a6) -> ml/tts/runs/santali_vits/interim_train-line1.wav
+assets: interim pack is dev-machine only (needs espeak-ng-data); APK keeps char-token path

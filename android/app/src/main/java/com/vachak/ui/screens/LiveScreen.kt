@@ -11,6 +11,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -29,6 +31,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -54,6 +57,32 @@ private const val TAG_MT = "Vachak-MT"
 private const val TAG_TTS = "Vachak-TTS"
 private const val TAG_LAT = "Vachak-Latency"
 
+/** Pure mm:ss formatter for the listen timer (unit-tested). */
+fun formatListenTimer(elapsedMs: Long): String {
+    val s = (elapsedMs.coerceAtLeast(0L) / 1000).toInt()
+    return "%d:%02d".format(s / 60, s % 60)
+}
+
+/** Ticking mm:ss pill while listening (1s cadence — cheap, no meter churn). */
+@Composable
+private fun ListenTimer(sinceMs: Long?) {
+    var now by remember(sinceMs) { mutableStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(sinceMs) {
+        while (sinceMs != null) {
+            kotlinx.coroutines.delay(1000)
+            now = System.currentTimeMillis()
+        }
+    }
+    if (sinceMs != null) {
+        Text(
+            formatListenTimer(now - sinceMs),
+            style = MaterialTheme.typography.labelMedium,
+            color = VachakColors.Lavender600,
+            fontWeight = FontWeight.SemiBold
+        )
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LiveScreen(
@@ -67,8 +96,11 @@ fun LiveScreen(
     // (The old screen-owned pipeline is retired — see LiveViewModel.)
     val vmState by viewModel.uiStateDirect.collectAsState()
     val vmMeterRms by viewModel.meterRms.collectAsState()
+    // "Model live" signal: ASR dot + mic button read this. IDLE/LOADING =
+    // still building (mic still works — decode starts when ready).
+    val asrStatus by com.vachak.ml.ModelStatus.asr.collectAsState()
+    val asrReady = asrStatus.state == com.vachak.ml.ModelState.READY
     var manualHindi by remember { mutableStateOf("") }
-    var showDebugDialog by remember { mutableStateOf(false) }
     var showClearConfirm by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -78,6 +110,7 @@ fun LiveScreen(
     }
     val listState = rememberLazyListState()
     val conversation = LiveConversationStore.items
+    val inputFocus = remember { androidx.compose.ui.focus.FocusRequester() }
 
     // Live typed translation — SINGLE path: debounced hi→activeLang lives in
     // LiveViewModel (600ms + pipelineDispatcher + Mutex, sequential ASR->MT->TTS).
@@ -127,8 +160,11 @@ fun LiveScreen(
         onDispose { lifecycle?.removeObserver(observer) }
     }
 
-    // auto-scroll only on new message — no animation on mic open (was janky), instant scroll
-    LaunchedEffect(conversation.size) {
+    // auto-scroll on new messages AND on in-place updates (translating →
+    // translated swaps content without changing size — the old size-only key
+    // left fresh results below the fold looking like "not updating").
+    val lastItemSig = conversation.lastOrNull()?.let { it.id + (it.santaliText ?: "") + (it.error ?: "") + it.isTranslating }
+    LaunchedEffect(conversation.size, lastItemSig) {
         if (conversation.isNotEmpty()) {
             // Use scrollToItem (no animation) for 60fps; animateScroll is heavy on 2GB
             listState.scrollToItem(conversation.size - 1)
@@ -140,8 +176,9 @@ fun LiveScreen(
 
     Box(modifier = modifier.fillMaxSize().background(VachakColors.Background).imePadding()) {
         Column(modifier = Modifier.fillMaxSize()) {
-            // Header (live.md §5)
-            Surface(color = Color.White, shadowElevation = 0.dp, tonalElevation = 0.dp) {
+            // Header — deep pine identity band: title + direction + offline
+            // badge in one row; target toggle as a segmented control below.
+            Surface(color = VachakColors.DeepLavender, shadowElevation = 0.dp, tonalElevation = 0.dp) {
                 Column {
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
@@ -149,69 +186,36 @@ fun LiveScreen(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("Live Translation", style = MaterialTheme.typography.titleMedium, color = VachakColors.TextPrimary, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-                            Text("Hindi → ${ActiveLanguage.label(activeLang)}", style = MaterialTheme.typography.bodySmall, color = VachakColors.TextSecondary, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                            Text("Live Translation", style = MaterialTheme.typography.titleMedium, color = Color.White, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                            // P4: direction follows the toggle below (was hardcoded Santali).
+                            Text("Hindi → ${ActiveLanguage.label(activeLang)}", style = MaterialTheme.typography.bodySmall, color = VachakColors.Lavender200, fontWeight = FontWeight.Medium, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                         }
+                        // Offline badge only — history (scroll-to-top), debug
+                        // and overflow buttons removed; Clear lives on the
+                        // Conversation header row below.
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Surface(shape = RoundedCornerShape(50), color = VachakColors.SuccessLight) {
+                            Surface(shape = RoundedCornerShape(50), color = VachakColors.AccentLight) {
                                 Row(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                     Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(VachakColors.Success))
-                                    Text("Offline", style = MaterialTheme.typography.labelSmall, color = VachakColors.Success, fontWeight = FontWeight.SemiBold)
+                                    Text("Offline", style = MaterialTheme.typography.labelSmall, color = VachakColors.ForestDark, fontWeight = FontWeight.SemiBold)
                                 }
                             }
-                            IconButton(onClick = { /* History placeholder */ }, modifier = Modifier.size(44.dp)) {
-                                Icon(Icons.Outlined.History, null, tint = VachakColors.TextPrimary)
-                            }
-                            IconButton(onClick = { showDebugDialog = true }, modifier = Modifier.size(44.dp)) {
-                                Icon(Icons.Outlined.BugReport, null, tint = if (vmState.asrError != null || vmState.livePreviewError != null) MaterialTheme.colorScheme.error else VachakColors.TextPrimary)
-                            }
-                            IconButton(onClick = { showClearConfirm = true }, modifier = Modifier.size(44.dp)) {
-                                Icon(Icons.Outlined.MoreVert, null, tint = VachakColors.TextPrimary)
-                            }
                         }
                     }
-                    // Target-language toggle: Santali (Ol Chiki) <-> Mundari.
-                    // The ONLY place Live translation target is chosen — every
-                    // translate/playPcm/retry call below uses activeLang, no hard-coded lang.
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            "Translate to:",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = VachakColors.TextSecondary,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        ActiveLanguage.all().forEach { (code, name) ->
-                            val selected = ActiveLanguage.normalize(activeLang) == code
-                            FilterChip(
-                                selected = selected,
-                                onClick = {
-                                    if (!selected && !vmState.isListening && !vmState.isStopping) {
-                                        Log.d(TAG_MT, "Live toggle -> $code ($name)")
-                                        ActiveLanguage.set(code)
-                                        (engine.translation as? com.vachak.ml.adapter.AdapterTranslationEngine)?.setActiveLanguage(code)
-                                    } else {
-                                        Log.d(TAG_MT, "toggle ignored selected=$selected listening=${vmState.isListening} stopping=${vmState.isStopping}")
-                                    }
-                                },
-                                enabled = !vmState.isListening && !vmState.isStopping,
-                                label = {
-                                    Text(
-                                        name,
-                                        style = MaterialTheme.typography.labelMedium,
-                                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                                        maxLines = 1
-                                    )
-                                },
-                                leadingIcon = if (selected) {
-                                    { Icon(Icons.Outlined.Check, null, modifier = Modifier.size(16.dp)) }
-                                } else null
-                            )
-                        }
-                    }
+                    // P4: target toggle on the mic page — Hi→Santali vs
+                    // Hi→Mundari. Mic stays Hindi-only (ASR is Hindi-only);
+                    // this flips the MT target + TTS voice. History keeps each
+                    // item's own language (item.targetLang), so toggling never
+                    // rewrites past messages.
+                    TargetSegmentedToggle(
+                        activeLang = activeLang,
+                        onSelect = { code ->
+                            ActiveLanguage.set(code)
+                            (engine.translation as? com.vachak.ml.adapter.AdapterTranslationEngine)?.setActiveLanguage(code)
+                            android.util.Log.d(TAG_MT, "Live target toggled to $code")
+                        },
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 10.dp)
+                    )
                     if (!hasMicPermission) {
                         // Permanent denial ("Don't ask again") makes the system
                         // silently swallow requests — an "Allow" button that does
@@ -246,46 +250,57 @@ fun LiveScreen(
                 }
             }
 
-            ModelStatusRow()
-            // Live mic meter — proves the mic hears the user while listening.
-            if (vmState.isListening) {
-                MicMeter(rms = vmMeterRms)
-            }
-            VoiceArea(
-                hasConversation = hasConversation,
-                isListening = vmState.isListening,
-                isTranslating = vmState.isTranslating,
-                isStopping = vmState.isStopping,
-                partialText = vmState.partialText,
-                hasMicPermission = hasMicPermission,
-                activeLang = activeLang,
-                onStop = { viewModel.onStop() },
-                onRequestPermission = { permissionLauncher.launch(Manifest.permission.RECORD_AUDIO) }
-            )
-            // Mic action button: sibling of VoiceArea (NOT nested in its capped
-            // column). Stop path stays enabled while draining so the mic can
-            // never look stuck; isStopping taps are ignored inside onStop.
+            ModelStatusRow(onTtsTest = viewModel::testVoice)
+    // Hoisted callbacks: inline lambdas here re-created per recomposition and
+    // forced VoiceArea/MicCluster to recompose on every 150ms meter tick.
+    val onVmStop = remember(viewModel) { { viewModel.onStop() } }
+    val onPermission = remember(permissionLauncher) { { permissionLauncher.launch(Manifest.permission.RECORD_AUDIO) } }
+    // Combined live capture for the voice area (committed chunks + partial).
+    val voiceLiveText = listOf(vmState.liveHindi, vmState.partialText)
+        .filter { it.isNotBlank() }.joinToString(" ")
+    // P5: single-column layout — voice cluster always visible (the old
+    // focus-mode collapse left with the duplicate hints).
+    VoiceArea(
+        hasConversation = hasConversation,
+        isListening = vmState.isListening,
+        isTranslating = vmState.isTranslating,
+        isStopping = vmState.isStopping,
+        isSynthesizing = vmState.isSynthesizing,
+        partialText = voiceLiveText,
+        hasMicPermission = hasMicPermission,
+        activeLang = activeLang,
+        asrReady = asrReady,
+        asrDetail = asrStatus.detail
+    )
+            // Bottom mic cluster (reference design): cancel | big mic | lang.
+            // P2: Cancel/mic taps while draining are ignored (VM guard +
+            // disabled Cancel) so the mic can never queue a wedged second stop.
             // Sequential-RAM rule: never capture while translating — narrate
             // the tap instead of swallowing it.
-            val guardedStart: () -> Unit = {
-                if (vmState.isTranslating) {
-                    scope.launch(Dispatchers.Main) {
-                        snackbarHostState.showSnackbar("Finishing translation — tap mic again in a moment")
+            val guardedStart: () -> Unit = remember(viewModel, vmState.isTranslating) {
+                {
+                    if (vmState.isTranslating) {
+                        scope.launch(Dispatchers.Main) {
+                            snackbarHostState.showSnackbar("Finishing translation — tap mic again in a moment")
+                        }
+                    } else {
+                        viewModel.onStart()
                     }
-                } else {
-                    viewModel.onStart()
                 }
             }
-            MicActionButton(
-                isListening = vmState.isListening,
-                isStopping = vmState.isStopping,
-                isTranslating = vmState.isTranslating,
-                hasMicPermission = hasMicPermission,
-                activeLang = activeLang,
-                onStart = guardedStart,
-                onStop = { viewModel.onStop() },
-                onRequestPermission = { permissionLauncher.launch(Manifest.permission.RECORD_AUDIO) }
-            )
+    MicCluster(
+        isListening = vmState.isListening,
+        isStopping = vmState.isStopping,
+        isTranslating = vmState.isTranslating,
+        isSynthesizing = vmState.isSynthesizing,
+        hasMicPermission = hasMicPermission,
+        asrReady = asrReady,
+        meterRms = vmMeterRms,
+        listeningSinceMs = vmState.listeningSinceMs,
+        onStart = guardedStart,
+        onStop = onVmStop,
+        onRequestPermission = onPermission
+    )
             if (vmState.asrError != null) {
                 Surface(color = MaterialTheme.colorScheme.errorContainer, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp), shape = RoundedCornerShape(12.dp)) {
                     Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -295,22 +310,49 @@ fun LiveScreen(
                     }
                 }
             }
+            // MT failure kept the Hindi (see LiveViewModel): surface it here too
+            // so ASR-OK + MT-fail is never a silent empty screen.
+            if (vmState.asrError == null && vmState.error != null) {
+                Surface(color = MaterialTheme.colorScheme.errorContainer, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp), shape = RoundedCornerShape(12.dp)) {
+                    Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Icon(Icons.Outlined.ErrorOutline, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
+                        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            if (vmState.committedText.isNotBlank()) {
+                                Text("Heard: “${vmState.committedText}”", style = MaterialTheme.typography.bodySmall, color = VachakColors.TextPrimary)
+                            }
+                            Text("Translation failed: ${vmState.error}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                        }
+                        TextButton(onClick = { viewModel.dismissErrors() }, contentPadding = PaddingValues(horizontal = 8.dp)) { Text("Dismiss", style = MaterialTheme.typography.labelMedium) }
+                    }
+                }
+            }
             HorizontalDivider(color = VachakColors.Border, thickness = 0.8.dp)
 
             // Conversation (live.md §4 — primary content, LazyColumn)
-            if (!hasConversation && !vmState.isListening) {
+            // Keep the list (and InlineTranscription) mounted while draining /
+            // translating or while a transcript/error is on screen — the old
+            // !hasConversation && !isListening gate swapped to a placeholder
+            // the moment Stop was tapped, hiding a good transcript.
+            val showPlaceholder = !hasConversation && !vmState.isListening &&
+                !vmState.isStopping && !vmState.isTranslating && !vmState.isSynthesizing &&
+                vmState.partialText.isBlank() && vmState.committedText.isBlank() &&
+                vmState.asrError == null && vmState.error == null
+            if (showPlaceholder) {
+                // P5: single hint — the duplicate "Type in Hindi" button and
+                // idle lines are gone; the input row below is the type entry.
                 Box(modifier = Modifier.weight(1f).fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Text("Your translations will appear here.", style = MaterialTheme.typography.bodyLarge, color = VachakColors.TextSecondary)
-                        OutlinedButton(onClick = {}, shape = RoundedCornerShape(50), enabled = false) { Text("Type in Hindi") }
-                    }
+                    Text(
+                        "Your translations will appear here — tap the mic or type below.",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = VachakColors.TextSecondary
+                    )
                 }
             } else {
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.weight(1f).fillMaxWidth(),
-                    contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     if (hasConversation) {
                         item {
@@ -326,25 +368,44 @@ fun LiveScreen(
                         ConversationMessagePair(
                             item = item,
                             onPlayHindi = { viewModel.playText(item.hindiText, "hi") },
-                            onPlaySantali = { item.santaliText?.let { viewModel.playText(it, activeLang) } },
-                            targetLabel = ActiveLanguage.label(activeLang),
+                            // Item's own language: history keeps its label +
+                            // voice across toggles instead of inheriting current.
+                            onPlaySantali = { item.santaliText?.let { viewModel.playText(it, item.targetLang) } },
+                            targetLabel = ActiveLanguage.label(item.targetLang),
                             onRetry = { viewModel.retryItem(item.id, item.hindiText) }
                         )
                     }
                     item {
-                        InlineTranscription(vmState.partialText, vmState.isListening)
+                        // Live capture: committed 3s chunks + in-progress
+                        // partial, so Hindi appears while speaking.
+                        val liveText = listOf(vmState.liveHindi, vmState.partialText)
+                            .filter { it.isNotBlank() }.joinToString(" ")
+                            .ifBlank { vmState.committedText }
+                        InlineTranscription(
+                            liveText,
+                            vmState.isListening,
+                            vmState.isStopping,
+                            vmState.isTranslating,
+                            vmState.isSynthesizing
+                        )
                     }
-                    if (vmState.latencyMs != null || vmState.ttsMessage != null) {
+                    // Benchmark: ASR+MT headline (stop-tap → translated text,
+                    // the <3s budget) with voice/full-run as verdict-free
+                    // secondary. TTS starts AFTER the headline by definition.
+                    if (vmState.translateMs != null || vmState.latencyMs != null || vmState.ttsMessage != null) {
                         item {
-                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                vmState.latencyMs?.let { ms ->
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                vmState.translateMs?.let { ms ->
                                     val within = ms < 3000
                                     Surface(shape = RoundedCornerShape(50), color = if (within) VachakColors.SuccessLight else MaterialTheme.colorScheme.errorContainer) {
                                         Row(modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                                             Text(if (within) "✓" else "⚠", style = MaterialTheme.typography.labelSmall, color = if (within) VachakColors.Success else MaterialTheme.colorScheme.error)
-                                            Text("${ms}ms ${if (within) "< 3s" else "≥ 3s"}", style = MaterialTheme.typography.labelSmall, color = if (within) VachakColors.Success else MaterialTheme.colorScheme.error)
+                                            Text("Translated in ${ms}ms ${if (within) "< 3s" else "≥ 3s"}", style = MaterialTheme.typography.labelSmall, color = if (within) VachakColors.Success else MaterialTheme.colorScheme.error)
                                         }
                                     }
+                                }
+                                vmState.latencyMs?.let { total ->
+                                    Text("Full run ${total}ms (listening + voice)", style = MaterialTheme.typography.labelSmall, color = VachakColors.TextSecondary)
                                 }
                                 vmState.ttsMessage?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = VachakColors.TextSecondary) }
                             }
@@ -359,9 +420,9 @@ fun LiveScreen(
                     shape = RoundedCornerShape(16.dp),
                     color = Color.White,
                     border = androidx.compose.foundation.BorderStroke(1.dp, VachakColors.Border),
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)
                 ) {
-                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text("${ActiveLanguage.label(activeLang)} · Live", style = MaterialTheme.typography.labelSmall, color = VachakColors.Lavender600, fontWeight = FontWeight.SemiBold, letterSpacing = 0.8.sp)
                             if (vmState.livePreviewLoading) CircularProgressIndicator(modifier = Modifier.size(12.dp), strokeWidth = 1.5.dp, color = VachakColors.Lavender600)
@@ -387,6 +448,8 @@ fun LiveScreen(
                 }
             }
 
+            // Input zone — single type row (P5: divider + duplicate hints
+            // removed; the space went to the conversation + mic above).
             // Input bar — typed Hindi goes through the same VM pipeline (commitTyped).
             LiveInputBar(
                 text = manualHindi,
@@ -396,7 +459,9 @@ fun LiveScreen(
                     if (t.isNotBlank()) { viewModel.commitTyped(t); manualHindi = "" }
                 },
                 enabled = !vmState.isListening,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp).navigationBarsPadding()
+                focusRequester = inputFocus,
+                onFocusChange = {},
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp).navigationBarsPadding()
             )
         }
 
@@ -416,26 +481,39 @@ fun LiveScreen(
             }
         )
     }
-    if (showDebugDialog) {
-        AlertDialog(
-            onDismissRequest = { showDebugDialog = false },
-            title = { Text("Pipeline Debug") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("ASR: ${vmState.asrError ?: "OK — no error (VAD active)"}", style = MaterialTheme.typography.bodySmall, color = if (vmState.asrError != null) MaterialTheme.colorScheme.error else VachakColors.TextSecondary)
-                    Text("MT live: ${vmState.livePreviewError ?: vmState.livePreview ?: "idle — type Hindi or speak"}", style = MaterialTheme.typography.bodySmall, color = if (vmState.livePreviewError != null) MaterialTheme.colorScheme.error else VachakColors.TextSecondary)
-                    Text("MT conv: ${conversation.lastOrNull()?.error ?: conversation.lastOrNull()?.santaliText?.take(30) ?: "no conv"}", style = MaterialTheme.typography.bodySmall)
-                    Text("TTS: ${vmState.ttsMessage ?: "idle"}", style = MaterialTheme.typography.bodySmall, color = VachakColors.TextSecondary)
-                    Text("States: listening=${vmState.isListening} stopping=${vmState.isStopping} translating=${vmState.isTranslating} conv=${conversation.size}", style = MaterialTheme.typography.bodySmall, color = VachakColors.TextSecondary)
-                    Text("Latency: ${vmState.latencyMs?.let { "$it ms ${if (it < 3000) "< 3s ✓" else "≥ 3s ⚠"}" } ?: "not measured"}", style = MaterialTheme.typography.bodySmall, color = if (vmState.latencyMs != null && vmState.latencyMs!! < 3000) VachakColors.Success else MaterialTheme.colorScheme.error)
-                    Text("ABI: ${android.os.Build.SUPPORTED_ABIS.joinToString()}", style = MaterialTheme.typography.labelSmall, color = VachakColors.TextSecondary)
-                    Text("Logcat: adb logcat -s Vachak-MT:V Vachak-ASR:V Vachak-VAD:V Vachak-TTS:V Vachak-Latency:V", style = MaterialTheme.typography.labelSmall, color = VachakColors.TextSecondary)
-                    Text("Pipeline: App input → preprocess→BPE(245k)→encoder[1,seq,512]→decoder past KV→postprocess→OlChiki U+1C50", style = MaterialTheme.typography.labelSmall, color = VachakColors.TextSecondary)
-                }
-            },
-            confirmButton = { TextButton(onClick = { showDebugDialog = false }) { Text("Close") } },
-            dismissButton = { TextButton(onClick = { viewModel.dismissErrors(); showDebugDialog = false }) { Text("Clear errors") } }
-        )
+}
+
+/**
+ * Target-language segmented control for the pine header. Single M3
+ * component instead of mismatched Button/OutlinedButton pair — the
+ * selected segment reads instantly, and unselected stays legible on pine.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TargetSegmentedToggle(
+    activeLang: String,
+    onSelect: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val options = ActiveLanguage.all()
+    SingleChoiceSegmentedButtonRow(modifier = modifier) {
+        options.forEachIndexed { index, (code, name) ->
+            val selected = ActiveLanguage.normalize(activeLang) == ActiveLanguage.normalize(code)
+            SegmentedButton(
+                selected = selected,
+                onClick = { if (!selected) onSelect(code) },
+                shape = SegmentedButtonDefaults.itemShape(index, options.size),
+                colors = SegmentedButtonDefaults.colors(
+                    activeContainerColor = VachakColors.Accent,
+                    activeContentColor = VachakColors.ForestDark,
+                    inactiveContainerColor = Color.Transparent,
+                    inactiveContentColor = Color.White
+                ),
+                border = SegmentedButtonDefaults.borderStroke(Color.White.copy(alpha = 0.4f))
+            ) {
+                Text(name, style = MaterialTheme.typography.labelLarge, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium, maxLines = 1)
+            }
+        }
     }
 }
 
@@ -446,7 +524,7 @@ fun LiveScreen(
  * exactly what the next pipeline failure will blame — no more guessing.
  */
 @Composable
-private fun ModelStatusRow() {
+private fun ModelStatusRow(onTtsTest: () -> Unit = {}) {
     val asr by com.vachak.ml.ModelStatus.asr.collectAsState()
     val mt by com.vachak.ml.ModelStatus.mt.collectAsState()
     val tts by com.vachak.ml.ModelStatus.tts.collectAsState()
@@ -458,6 +536,10 @@ private fun ModelStatusRow() {
         ModelDot(asr, "ASR")
         ModelDot(mt, "MT")
         ModelDot(tts, "TTS")
+        // One-tap voice proof (known-good string → synth → speaker).
+        TextButton(onClick = onTtsTest, contentPadding = PaddingValues(horizontal = 4.dp)) {
+            Text("Test voice", style = MaterialTheme.typography.labelSmall, color = VachakColors.DeepLavender)
+        }
         val worst = listOf(asr, mt, tts).firstOrNull { it.state == com.vachak.ml.ModelState.ERROR }
         if (worst != null) {
             Text(
@@ -501,53 +583,152 @@ private fun ModelDot(info: com.vachak.ml.ModelInfo, label: String) {
 }
 
 @Composable
-private fun MicActionButton(
+private fun MicCluster(
     isListening: Boolean,
     isStopping: Boolean,
     isTranslating: Boolean,
+    isSynthesizing: Boolean = false,
     hasMicPermission: Boolean,
-    activeLang: String,
+    asrReady: Boolean,
+    meterRms: Float,
+    listeningSinceMs: Long?,
     onStart: () -> Unit,
     onStop: () -> Unit,
     onRequestPermission: () -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
-    val isButtonEnabled = if (isListening || isStopping) true else !isTranslating
-    Button(
-        onClick = {
-            if (!isButtonEnabled) return@Button
-            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-            if (!hasMicPermission) {
-                Log.d(TAG_ASR, "mic permission missing, requesting")
-                onRequestPermission()
-            } else if (isListening || isStopping) {
-                Log.d(TAG_ASR, "Stop tapped isListening=$isListening isStopping=$isStopping")
-                onStop()
-            } else {
-                Log.d(TAG_ASR, "Start tapped hasPermission=$hasMicPermission lang=$activeLang")
-                onStart()
-            }
-        },
-        enabled = isButtonEnabled,
-        shape = RoundedCornerShape(50),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = if (isListening || isStopping) MaterialTheme.colorScheme.error else VachakColors.PrimaryDark,
-            contentColor = Color.White,
-            disabledContainerColor = Color.Gray.copy(alpha = 0.2f)
-        ),
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).height(44.dp),
-        contentPadding = PaddingValues(horizontal = 16.dp)
-    ) {
-        if (isStopping && !isListening) {
-            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = Color.White)
+    val active = isListening || isStopping
+    val isButtonEnabled = if (active) true else !isTranslating
+    fun tapMic() {
+        if (!isButtonEnabled) return
+        // P2: draining taps are ignored in the VM guard too — belt and braces
+        // so a second tap can never queue another pipeline run.
+        if (isStopping) return
+        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+        if (!hasMicPermission) {
+            Log.d(TAG_ASR, "mic permission missing, requesting")
+            onRequestPermission()
+        } else if (active) {
+            Log.d(TAG_ASR, "Stop tapped isListening=$isListening isStopping=$isStopping")
+            onStop()
         } else {
-            Icon(if (isListening) Icons.Filled.Stop else Icons.Filled.Mic, null, modifier = Modifier.size(16.dp))
+            Log.d(TAG_ASR, "Start tapped hasPermission=$hasMicPermission")
+            onStart()
         }
-        Spacer(Modifier.width(6.dp))
-        Text(
-            if (isListening) "Stop" else if (isStopping) "Stopping…" else "Tap to speak",
-            style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, maxLines = 1
-        )
+    }
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        // Status line: Listening… + ticking timer, or the honest pipeline stage.
+        // P2/P3: each stage names itself so Stop never looks wedged; warming
+        // tells the truth (tap records, decode starts when ready).
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                if (isListening) "Listening…"
+                else if (isStopping) "Transcribing…"
+                else if (isSynthesizing) "Synthesizing voice…"
+                else if (isTranslating) "Translating…"
+                else if (!asrReady) "Warming models… tap mic — speech is recorded"
+                else "Tap the mic and speak in Hindi",
+                style = MaterialTheme.typography.labelLarge,
+                color = if (active) VachakColors.Lavender600 else VachakColors.TextSecondary,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+            )
+            if (active) ListenTimer(listeningSinceMs)
+        }
+        // Waveform while listening (reference: bars under Listening…).
+        if (isListening) {
+            MicMeter(rms = meterRms)
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            // Cancel (left): stops the session while listening; hidden when
+            // idle to keep symmetry. Disabled while draining (isStopping) so
+            // Cancel taps can't queue a second stop behind the first.
+            if (active || isTranslating) {
+                Surface(
+                    shape = CircleShape,
+                    color = Color.White,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, VachakColors.Border),
+                    modifier = Modifier.size(56.dp).clip(CircleShape).clickable(
+                        enabled = isListening,
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            if (isListening) onStop()
+                        }
+                    )
+                ) {
+                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                        Icon(Icons.Outlined.Close, null, tint = VachakColors.TextPrimary, modifier = Modifier.size(24.dp))
+                    }
+                }
+            } else {
+                Spacer(Modifier.size(56.dp))
+            }
+            // Big mic: idle = deep pine w/ white icon; active = white w/
+            // pine icon + radiating waves (reference design, tap-toggle).
+            // Press scale (0.94, 140ms ease-out): the button answers the
+            // finger instantly, so taps feel heard even before ASR starts.
+            val micInteraction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+            val micPressed by micInteraction.collectIsPressedAsState()
+            val micScale by animateFloatAsState(
+                targetValue = if (micPressed) 0.94f else 1f,
+                animationSpec = tween(durationMillis = 140, easing = FastOutSlowInEasing),
+                label = "micPress"
+            )
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier.size(112.dp)
+                    .graphicsLayer(scaleX = micScale, scaleY = micScale)
+                    .clip(CircleShape)
+                    .clickable(
+                        interactionSource = micInteraction,
+                        indication = null,
+                        enabled = isButtonEnabled
+                    ) { tapMic() }
+            ) {
+                if (active) {
+                    BreathVisualizer(isListening = true, modifier = Modifier.size(112.dp))
+                } else {
+                    BreathVisualizer(isListening = false, modifier = Modifier.size(112.dp))
+                }
+                Surface(
+                    shape = CircleShape,
+                    color = if (active) Color.White else VachakColors.DeepLavender,
+                    border = if (active) androidx.compose.foundation.BorderStroke(1.dp, VachakColors.Lavender200) else null,
+                    modifier = Modifier.size(76.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                        if (isStopping && !isListening) {
+                            CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.5.dp, color = VachakColors.DeepLavender)
+                        } else {
+                            Icon(
+                                if (active) Icons.Filled.Stop else Icons.Filled.Mic,
+                                contentDescription = if (active) "Stop" else "Tap to speak",
+                                tint = if (active) VachakColors.DeepLavender else Color.White,
+                                modifier = Modifier.size(30.dp)
+                            )
+                        }
+                    }
+                }
+            }
+            // Direction badge (right): display-only mirror of the toggle above.
+            Surface(shape = CircleShape, color = Color.White, border = androidx.compose.foundation.BorderStroke(1.dp, VachakColors.Border), modifier = Modifier.size(56.dp)) {
+                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("हिं", style = MaterialTheme.typography.labelLarge, color = VachakColors.TextPrimary, fontWeight = FontWeight.Bold)
+                        Text("अ.", style = MaterialTheme.typography.labelSmall, color = VachakColors.DeepLavender, fontWeight = FontWeight.SemiBold)
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -558,7 +739,7 @@ private fun MicMeter(rms: Float) {
     val fraction = ((db + 50f) / 50f).coerceIn(0f, 1f)
     val hearing = rms > VachakAudio.VAD_RMS_THRESHOLD
     Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 2.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -580,10 +761,24 @@ private fun MicMeter(rms: Float) {
 @Composable
 private fun InlineTranscription(
     text: String,
-    isListening: Boolean
+    isListening: Boolean,
+    isStopping: Boolean = false,
+    isTranslating: Boolean = false,
+    // Phase 4: MT done, TTS generate() running — blank text here means the
+    // synth wait, not a hang.
+    isSynthesizing: Boolean = false
 ) {
-    if (isListening && text.isNotBlank()) {
-        LiveTranscriptionStrip(text = text, isListening = true)
+    // Show live text while listening AND while draining/translating: the old
+    // isListening-only gate blanked the screen the moment Stop was tapped,
+    // even when ASR had succeeded.
+    if (text.isNotBlank()) {
+        LiveTranscriptionStrip(text = text, isListening = isListening)
+    } else if (isSynthesizing) {
+        LiveTranscriptionStrip(text = "Synthesizing voice…", isListening = false)
+    } else if (isStopping || isTranslating) {
+        LiveTranscriptionStrip(text = "Transcribing…", isListening = false)
+    } else if (isListening) {
+        LiveTranscriptionStrip(text = "Listening… speak now", isListening = true)
     }
 }
 
@@ -593,71 +788,75 @@ private fun VoiceArea(
     isListening: Boolean,
     isTranslating: Boolean,
     isStopping: Boolean,
+    isSynthesizing: Boolean = false,
     partialText: String,
     hasMicPermission: Boolean,
     activeLang: String,
-    onStop: () -> Unit,
-    onRequestPermission: () -> Unit
+    asrReady: Boolean,
+    asrDetail: String?
 ) {
-    val haptic = LocalHapticFeedback.current
-    Log.d(TAG_ASR, "VoiceArea recompose isListening=$isListening isStopping=$isStopping isTranslating=$isTranslating hasMic=$hasMicPermission")
-    BoxWithConstraints(
-        modifier = Modifier.fillMaxWidth().background(Color.White).padding(horizontal = 20.dp, vertical = 12.dp),
-        contentAlignment = Alignment.Center
+    // Slim status zone: the bottom MicCluster owns all mic visuals now.
+    // This area only shows live transcription / heard-Hindi / warming state,
+    // with flexible height so the chat list always keeps room to breathe.
+    // Sand tint (not white) so it reads as a zone distinct from the
+    // conversation cards below it.
+    Column(
+        modifier = Modifier.fillMaxWidth().background(VachakColors.SoftLavender)
+            .padding(horizontal = 16.dp, vertical = 6.dp)
+            .heightIn(min = 0.dp, max = 300.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        // Max fits visual + strip + action button: below ~300dp in listening
-        // state the Stop button measured 0x0 (invisible Stop) on dense screens.
-        // Idle keeps the compact cap; listening gets room for strip + button.
-        val cap = if (isListening) 340.dp else 220.dp
-        val voiceHeight = (maxHeight * if (!hasConversation && !isListening) 0.40f else 0.28f).coerceIn(120.dp, cap)
-        val micVisual = if (maxWidth < 360.dp) 72.dp else 96.dp
-        val micInner = if (maxWidth < 360.dp) 48.dp else 56.dp
-        val iconSize = if (maxWidth < 360.dp) 20.dp else 24.dp
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth().heightIn(min = 100.dp, max = voiceHeight)) {
-            if (!hasConversation && !isListening) {
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.size(micVisual)) {
-                    BreathVisualizer(isListening = false, modifier = Modifier.size(micVisual))
-                    Surface(shape = CircleShape, color = VachakColors.DeepLavender, modifier = Modifier.size(micInner)) {
-                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                            Icon(Icons.Filled.Mic, null, tint = Color.White, modifier = Modifier.size(iconSize))
-                        }
-                    }
-                }
-                Text("Tap to speak", style = MaterialTheme.typography.titleSmall, color = VachakColors.TextPrimary, fontWeight = FontWeight.SemiBold, maxLines = 1)
-                Text("Speak in Hindi", style = MaterialTheme.typography.bodySmall, color = VachakColors.TextSecondary, maxLines = 1)
-            } else if (isListening) {
-                // Whole visual is tappable to stop — users tap the mic, not just the button.
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.size(micVisual * 0.85f).clip(CircleShape).clickable {
-                    Log.d(TAG_ASR, "Visual Stop tapped isListening=$isListening")
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    if (hasMicPermission) onStop() else onRequestPermission()
-                }) {
-                    BreathVisualizer(isListening = true, modifier = Modifier.size(micVisual * 0.85f))
-                    Surface(shape = CircleShape, color = VachakColors.PrimaryDark, modifier = Modifier.size(micInner * 0.9f)) {
-                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                            Icon(Icons.Filled.Stop, null, tint = Color.White, modifier = Modifier.size(iconSize * 0.9f))
-                        }
-                    }
-                }
-                LiveTranscriptionStrip(text = partialText.ifBlank { "Listening… speak now" }, isListening = true)
-                // (No helper text here: the Stop button below + tappable visual
-                // say it. A third line squeezed the action button to 0px.)
-            } else {
-                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Surface(shape = CircleShape, color = VachakColors.SoftLavender, border = androidx.compose.foundation.BorderStroke(1.dp, VachakColors.Lavender200), modifier = Modifier.size(40.dp)) {
-                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                            Icon(Icons.Filled.Mic, null, tint = VachakColors.DeepLavender, modifier = Modifier.size(18.dp))
-                        }
-                    }
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(if (isTranslating) "Translating… Hindi → ${ActiveLanguage.label(activeLang)}" else "Tap mic and speak", style = MaterialTheme.typography.bodySmall, color = VachakColors.TextPrimary, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-                        Text("Hindi → ${ActiveLanguage.label(activeLang)} • Offline", style = MaterialTheme.typography.labelSmall, color = VachakColors.TextSecondary, maxLines = 1)
-                    }
-                    if (isTranslating) CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = VachakColors.Lavender600)
-                }
+        if (isListening) {
+            LiveTranscriptionStrip(text = partialText.ifBlank { "Listening… speak now" }, isListening = true)
+        } else if (!hasConversation && !isTranslating && !isStopping && !isSynthesizing) {
+            // P5: no idle hint line (mic cluster owns idle). Only
+            // permission/warming problems speak here; ready-idle collapses
+            // so the conversation + mic keep the room.
+            if (!hasMicPermission) {
+                Text(
+                    "Microphone permission needed — see above",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = VachakColors.TextSecondary,
+                    maxLines = 2,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                )
+            } else if (!asrReady) {
+                Text(
+                    (asrDetail?.take(80) ?: "Building ASR… transcription starts when ready") + " • your speech will still be recorded • Offline",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = VachakColors.TextSecondary,
+                    maxLines = 2,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                )
             }
-            // (Action button lives in the screen body below, outside the capped
-            // VoiceArea column — see MicActionButton.)
+        } else if (isTranslating || isStopping || isSynthesizing) {
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Surface(shape = CircleShape, color = VachakColors.SoftLavender, border = androidx.compose.foundation.BorderStroke(1.dp, VachakColors.Lavender200), modifier = Modifier.size(40.dp)) {
+                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                        Icon(Icons.Filled.Mic, null, tint = VachakColors.DeepLavender, modifier = Modifier.size(18.dp))
+                    }
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    // Keep the heard Hindi on screen while translating /
+                    // draining — a static "Translating…" line would hide a
+                    // good transcript for the whole MT window.
+                    val heard = partialText.ifBlank { "" }
+                    // Phase 4: name the MT→TTS wait honestly.
+                    val busyLabel = if (isSynthesizing) "Synthesizing voice…" else "Translating… Hindi → ${ActiveLanguage.label(activeLang)}"
+                    Text(
+                        if (heard.isNotBlank()) "“$heard”" else busyLabel,
+                        style = MaterialTheme.typography.bodySmall, color = VachakColors.TextPrimary, maxLines = 2,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                    )
+                    Text(
+                        "Hindi → ${ActiveLanguage.label(activeLang)} • Offline",
+                        style = MaterialTheme.typography.labelSmall, color = VachakColors.TextSecondary, maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                    )
+                }
+                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = VachakColors.Lavender600)
+            }
         }
     }
 }

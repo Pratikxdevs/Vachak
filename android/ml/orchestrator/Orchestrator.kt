@@ -70,7 +70,18 @@ class Orchestrator(
         var lastErr: String? = null
         for (attempt in 0..policy.asrRetries) {
             when (val r = asr.transcribe(pcm16, sampleRateHz)) {
-                is EngineResult.Ok -> { transcript = r.value; asrOk = true
+                is EngineResult.Ok -> {
+                    // Blank Ok("") is VAD-silence, never a transcript: do NOT
+                    // accept it as success or MT will "translate" empty and the
+                    // UI shows nothing. Retry/fail with a clear cause instead.
+                    if (r.value.isBlank()) {
+                        lastErr = "ASR returned empty (VAD silence / no words decoded)"
+                        stages += StageResult(PipelineStage.ASR.name, false, 0, lastErr)
+                        val (deg, msg) = policy.decide("asr", attempt, false)
+                        if (deg != Degradation.RETRY) return finish(RequestStatus.FAILED, stages, t0, error = msg)
+                        continue
+                    }
+                    transcript = r.value; asrOk = true
                     stages += StageResult(PipelineStage.ASR.name, true, 0); break }
                 is EngineResult.Err -> {
                     lastErr = r.message

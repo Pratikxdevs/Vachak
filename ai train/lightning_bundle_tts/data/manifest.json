@@ -1,0 +1,23 @@
+{
+ "bundle": "lightning_bundle_tts",
+ "purpose": "Santali TTS on Lightning Studio WITHOUT from-scratch local training: Quipus Sido teacher synthesis in-cloud, then small VITS distillation.",
+ "transcripts": {
+  "rows": 5284,
+  "script": "Ol Chiki U+1C50-U+1C7F",
+  "source": "ml/tts/dataset/santali_olchiki.tsv (Devanagari web corpus transliterated)"
+ },
+ "splits": {
+  "train": 4556,
+  "dev": 303,
+  "eval": 202
+ },
+ "teacher": {
+  "model": "hyperneuronAILabs/quipus-0.6-speechv2",
+  "license": "MIT",
+  "voice": "Sido (male Santali)",
+  "sr": 24000,
+  "note": "synthetic teacher audio; no human speaker cloned"
+ },
+ "train_audio_plan": "teacher 24kHz -> resample 22050 mono (in train script)",
+ "license_note": "Quipus weights MIT; transcripts derived from unverified web corpus (prototype-only) BUT teacher audio is synthetic Sido voice — release gate in VOICE_CONSENT.md"
+}

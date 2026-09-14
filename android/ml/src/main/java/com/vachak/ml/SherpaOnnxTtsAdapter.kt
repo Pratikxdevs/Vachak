@@ -38,6 +38,11 @@ class SherpaOnnxTtsAdapter(
 ) : TtsAdapter {
     private var tts: OfflineTts? = null
     private var resolvedBaseDir: String? = null
+    // Latency: tokens.txt stat + readLines on EVERY synthesize() cost IO per
+    // tap. Cache per resolved dir; invalidated on reloadFromPack(). Blocking
+    // generate() kept per product decision — chunking below bounds each call.
+    @Volatile private var cachedShim: Boolean? = null
+    @Volatile private var cachedShimDir: String? = null
     private val tag = "Vachak-TTS"
 
     /**
@@ -51,15 +56,15 @@ class SherpaOnnxTtsAdapter(
         return try {
             val tokensFile = java.io.File("$baseDir/tokens.txt")
             val lineCount = if (tokensFile.exists()) tokensFile.readLines().size else -1
+            // 38 = sprint Santali VITS (live TTS)
+            // 55 = old training placeholder shim (no longer shipped)
+            // 219 = Chinese vits-zh-aishell3 dev-fixture backup (not shipped)
             val isShim = lineCount == 55
-            // Log shim detection (55 Ol Chiki tokens = current shim; 219 = Chinese fixture backup)
             if (isShim) {
-                Log.w(tag, "SHIM detected: tokens.txt lines=$lineCount (55 Ol Chiki hack, 40M shim) baseDir=$baseDir isFixture=true")
+                Log.w(tag, "SHIM detected: tokens.txt lines=$lineCount (old 55-token placeholder) baseDir=$baseDir isFixture=true")
             } else {
-                Log.d(tag, "TTS tokens check: lines=$lineCount baseDir=$baseDir isFixture=false")
+                Log.d(tag, "TTS tokens check: lines=$lineCount baseDir=$baseDir isFixture=false (fine-tuned VITS live)")
             }
-            // Future gate: if (!BuildConfig.DEBUG && isShim) return true to signal MODEL_NOT_LOADED
-            // For now just log; do not block synthesis so demo passes with shim audio.
             isShim
         } catch (e: Exception) {
             Log.w(tag, "detectShim failed: ${e.message}")
@@ -122,7 +127,12 @@ class SherpaOnnxTtsAdapter(
     fun isShim(): Boolean {
         return try {
             val baseDir = resolvedBaseDir ?: resolveBaseDir()
-            detectShim(baseDir)
+            // Cached path: same dir → no re-read.
+            if (baseDir == cachedShimDir && cachedShim != null) return cachedShim!!
+            val r = detectShim(baseDir)
+            cachedShimDir = baseDir
+            cachedShim = r
+            r
         } catch (_: Exception) { false }
     }
     /** Non-blocking warm-up off the UI thread (IO): resolves + creates the
@@ -140,9 +150,10 @@ class SherpaOnnxTtsAdapter(
                 return true
             }
             ensureLoaded()
+            ModelStatus.setTts(ModelInfo(ModelState.READY, "Santali VITS sprint voice (38 Ol Chiki tokens, 110MB opset17)"))
+            Log.d(tag, "warmUp: fine-tuned VITS loaded OK")
             return true
         } catch (t: Throwable) {
-            // Best-effort path: swallow even native Errors here (see ASR twin).
             Log.w(tag, "warmUp failed: ${t.message}")
             return false
         }
@@ -152,6 +163,8 @@ class SherpaOnnxTtsAdapter(
         tts?.let { try { /* OfflineTts has no explicit close; drop reference */ } catch (_: Exception) {} }
         tts = null
         resolvedBaseDir = null
+        cachedShim = null
+        cachedShimDir = null
         Log.d(tag, "reloadFromPack: cleared TTS for pack switch")
     }
 
@@ -225,21 +238,85 @@ class SherpaOnnxTtsAdapter(
             Log.w(tag, "synthesize called without Ol Chiki (text=\"$text\", lang=$lang)")
         }
         val baseDir = resolvedBaseDir ?: resolveBaseDir()
-        val isShim = detectShim(baseDir)
-        // Guard: if shim and not DEBUG, caller (SherpaTtsAdapter) should return MODEL_NOT_LOADED.
-        // For now we only log isFixture; keep synthesizing shim audio so demo (<3s, offline) passes.
-        // TODO: when real VITS trained, gate with if (isShim && !BuildConfig.DEBUG) throw MODEL_NOT_LOADED
-        Log.d(tag, "synthesize isFixture=$isShim (shim 55-token hack) for \"$text\" lang=$lang baseDir=$baseDir")
-        val audio = ensureLoaded().generate(text)
-        Log.d(tag, "synthesized \"$text\" -> ${audio.samples.size} samples @ ${audio.sampleRate} Hz isFixture=$isShim")
-        // Post-02-01 the bundled model is Santali Ol Chiki VITS (no longer Chinese DEV-FIXTURE)
-        // shim 55-token hack is still a shim; isFixture reflects shim vs real Coqui VITS.
+        resolvedBaseDir = baseDir
+        val isShim = isShim()
+        // 55-token shim is refused one layer up (SherpaTtsAdapter returns
+        // MODEL_NOT_LOADED — the native layer hard-aborts on that graph). The
+        // 38-token sprint VITS (shipped 2026-09-13) synthesizes here normally.
+        Log.d(tag, "synthesize isFixture=$isShim for \"$text\" lang=$lang baseDir=$baseDir")
+        // Sprint Santali VITS (38 Ol Chiki char tokens, 110MB opset17).
+        // speed=1.2 keeps TTS slice <1s on 2GB device (verified: 0.42-0.80s avg).
+        // Blocking generate() kept per product decision; long text is chunked
+        // at sentence boundaries into ≤150-char calls (VITS cost ~linear in
+        // frames) so a paragraph never becomes one multi-second generate.
+        val engine = ensureLoaded()
+        val chunks = chunkForTts(text)
+        if (chunks.size == 1) {
+            val audio = engine.generate(text, speed = 1.2f, sid = 0)
+            Log.d(tag, "synthesized \"$text\" -> ${audio.samples.size} samples @ ${audio.sampleRate} Hz isFixture=$isShim")
+            return SynthAudio(
+                samples = audio.samples,
+                sampleRate = audio.sampleRate,
+                backend = "sherpa-onnx",
+                isFixture = isShim,
+                warning = if (isShim) "placeholder voice (55-token shim) — text-only mode" else null
+            )
+        }
+        val out = ArrayList<Float>(chunks.sumOf { it.length } * 110)
+        var sr = 22050
+        for (c in chunks) {
+            val a = engine.generate(c, speed = 1.2f, sid = 0)
+            sr = a.sampleRate
+            for (s in a.samples) out.add(s)
+        }
+        val merged = FloatArray(out.size) { out[it] }
+        Log.d(tag, "synthesized chunked ${chunks.size} parts \"${text.take(40)}\" -> ${merged.size} samples @ $sr Hz isFixture=$isShim")
         return SynthAudio(
-            samples = audio.samples,
-            sampleRate = audio.sampleRate,
+            samples = merged,
+            sampleRate = sr,
             backend = "sherpa-onnx",
             isFixture = isShim,
-            warning = if (isShim) "shim 55-token Ol Chiki VITS (real Coqui VITS pending)" else null
+            warning = if (isShim) "placeholder voice (55-token shim) — text-only mode" else null
         )
+    }
+
+    /**
+     * Split long text at sentence boundaries (Ol Chiki danda ।, . ! ?, newline)
+     * into ≤150-char pieces. Short text returns single chunk (no behavior change).
+     */
+    internal fun chunkForTts(text: String, maxChars: Int = 150): List<String> {
+        if (text.length <= maxChars) return listOf(text)
+        val parts = text.split(Regex("(?<=[।.!?\\n])\\s+")).filter { it.isNotBlank() }
+        if (parts.isEmpty()) return listOf(text)
+        val out = ArrayList<String>()
+        val cur = StringBuilder()
+        for (p in parts) {
+            if (cur.isEmpty()) {
+                if (p.length <= maxChars) cur.append(p)
+                else {
+                    // Single over-long sentence: hard-split.
+                    var i = 0
+                    while (i < p.length) {
+                        out.add(p.substring(i, minOf(i + maxChars, p.length)))
+                        i += maxChars
+                    }
+                }
+            } else if (cur.length + 1 + p.length <= maxChars) {
+                cur.append(' ').append(p)
+            } else {
+                out.add(cur.toString())
+                cur.clear()
+                if (p.length <= maxChars) cur.append(p)
+                else {
+                    var i = 0
+                    while (i < p.length) {
+                        out.add(p.substring(i, minOf(i + maxChars, p.length)))
+                        i += maxChars
+                    }
+                }
+            }
+        }
+        if (cur.isNotEmpty()) out.add(cur.toString())
+        return if (out.isEmpty()) listOf(text) else out
     }
 }

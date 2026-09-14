@@ -133,6 +133,43 @@ class ContentEngine(private val context: Context) : CurriculumEngine, WorksheetE
         db.outcomeDao().getById(lesson.outcomeId)
     }
 
+    override fun getActivities(lessonId: String): EngineResult<List<com.vachak.engine.Activity>> {
+        ensurePrepopulated()
+        return runBlocking {
+            try {
+                EngineResult.Ok(
+                    db.activityDao().getForLesson(lessonId).map {
+                        com.vachak.engine.Activity(
+                            id = it.id, lessonId = it.lessonId, titleHi = it.titleHi,
+                            instructionHi = it.instructionHi, instructionSat = it.instructionSatOlChiki,
+                            materials = it.materials
+                        )
+                    }
+                )
+            } catch (e: Exception) {
+                EngineResult.Err(EngineError.IO_ERROR, e.message ?: "getActivities failed")
+            }
+        }
+    }
+
+    override fun getAssessments(lessonId: String): EngineResult<List<com.vachak.engine.AssessmentPrompt>> {
+        ensurePrepopulated()
+        return runBlocking {
+            try {
+                EngineResult.Ok(
+                    db.assessmentPromptDao().getForLesson(lessonId).map {
+                        com.vachak.engine.AssessmentPrompt(
+                            id = it.id, lessonId = it.lessonId, promptHi = it.promptHi,
+                            promptSat = it.promptSatOlChiki, expectedResponse = it.expectedResponse
+                        )
+                    }
+                )
+            } catch (e: Exception) {
+                EngineResult.Err(EngineError.IO_ERROR, e.message ?: "getAssessments failed")
+            }
+        }
+    }
+
     // --- WorksheetEngine ---
 
     override fun generate(lessonId: String, template: String): EngineResult<Worksheet> {

@@ -33,6 +33,20 @@ android {
     }
     kotlinOptions { jvmTarget = "17" }
     packaging {
+        resources {
+            // Mundari APK trim (Phase 11): keep files+UI in repo, drop these
+            // weighty asset trees from the packaged APK. Santali path
+            // (vachak_models/*, santali_adapter) untouched. Verified safe:
+            // missing assets surface as EngineResult.Err, never a crash.
+            excludes += listOf(
+                "modelpacks/stripped_mt_merged/*",
+                "modelpacks/stripped_mt_merged/config.json",
+                "modelpacks/mundari_adapter/*",
+                "modelpacks/mundari_adapter/adapter_config.json",
+                "modelpacks/mundari_phrasebook/*",
+                "modelpacks/mundari_phrasebook/README.md",
+            )
+        }
         jniLibs {
             pickFirsts += listOf("**/libonnxruntime.so", "**/libc++_shared.so")
         }

@@ -1,5 +1,6 @@
 Santali VITS replaced the Chinese vits-zh-aishell3 DEV-FIXTURE.
 Previous: vits-zh-aishell3 (Chinese pinyin/hanzi) model.onnx ~39 MB, tokens pinyin (sil eos sp #0...), lexicon hanzi (一 ^ i1 #0), espeak-ng-data/ 632K.
-Now: vits-sat (Santali Ol Chiki) model.onnx opset17 ~40 MB shim (real VITS Coqui/MunTTS pattern when trained), tokens Ol Chiki U+1C50–U+1C7F + specials, lexicon Ol Chiki word->char-split, NO espeak-ng-data (dataDir='').
+Now: vits-sat sprint voice (Coqui VITS trained from scratch, Colab T4, ~300 epochs/~8.5k steps) model.onnx opset17 110 MB, tokens 38 Ol Chiki single-char symbols (ids 4-41), lexicon 231 Ol Chiki words + char fallback, NO espeak-ng-data (dataDir='').
 Backup of previous Chinese fixture was intentionally NOT retained as binary to keep repo under 500 MB budget; rebuild via scripts/fetch_android_models.sh if needed.
 See VOICE_CONSENT.md, ml/tts/dataset/santali_manifest.json, ml/tts/runs/santali_vits/train_config.json, THIRD_PARTY_NOTICES.md, docs/MODEL_AND_DATA_PROVENANCE.md.
+Wired 2026-09-13 from export (1)/export/: vits-sat.onnx (opset17) -> model.onnx, tokens.txt (38), lexicon.txt (231). Host verify PASS/PASS rms ~0.18 (>=0.05 bar); cross-check sherpa 1.13.8 3/3 PASS. Previous 55-token 41MB shim superseded.

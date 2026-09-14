@@ -64,3 +64,30 @@ android/.cxx/
 app/build/
 *.vachakpack
 packages/packs/
+
+# Santali TTS training (heavy, reproducible, never committed)
+ml/tts/.venv-tts/
+ml/tts/runs/santali_vits_native/
+ml/tts/dataset/wavs_22050/
+modelpacks/piper-hi-base/*.onnx
+modelpacks/quipus/
+modelpacks/quipus-sat-sido/
+modelpacks/quipus-sample/
+
+# Machine-local SDK path (android/local.properties already covered above)
+local.properties
+
+# Heavy generated blobs (reproducible via scripts/, never committed)
+samples/
+santali_organized/
+santali_organized.zip
+sprint4h/
+sprint4h_upload.zip
+export (1)/
+ct2_sat_bidi_int8/
+.tmp_mt_merged/
+curriculum/class/
+modelpacks/piper-hi-base/
+docs/Archive.zip
+final_curriculum.zip
+lightning_bundle_tts.zip

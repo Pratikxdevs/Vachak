@@ -16,7 +16,10 @@ from pathlib import Path
 
 import onnx
 from onnxruntime.quantization import QuantType, quantize_dynamic
-from onnxruntime.quantization.matmul_4bits_quantizer import MatMul4BitsQuantizer
+try:
+    from onnxruntime.quantization.matmul_4bits_quantizer import MatMul4BitsQuantizer
+except ImportError:  # old onnxruntime without 4-bit support; bits=8 path unaffected
+    MatMul4BitsQuantizer = None
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -36,6 +39,8 @@ def _save_ext(model: onnx.ModelProto, path: Path):
 def _quantize_file(src: Path, dst: Path, bits: int) -> None:
     use_ext = src.with_suffix(src.suffix + ".data").exists()
     if bits == 4:
+        if MatMul4BitsQuantizer is None:
+            raise RuntimeError("INT4 needs onnxruntime with matmul_4bits_quantizer; pip install -U onnxruntime")
         model = onnx.load(str(src))
         q = MatMul4BitsQuantizer(model, block_size=32, is_symmetric=True,
                                  op_types_to_quantize=("MatMul",))
@@ -43,7 +48,7 @@ def _quantize_file(src: Path, dst: Path, bits: int) -> None:
         _save_ext(q.model.model, dst)
     else:
         quantize_dynamic(str(src), str(dst), weight_type=QuantType.QInt8,
-                         op_types_to_quantize=["MatMul", "Gemm"], per_channel=True,
+                         op_types_to_quantize=["MatMul", "Gemm", "Gather"], per_channel=True,
                          use_external_data_format=use_ext)
 
 

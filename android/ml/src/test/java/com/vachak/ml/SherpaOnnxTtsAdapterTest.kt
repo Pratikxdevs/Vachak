@@ -53,6 +53,32 @@ class SherpaOnnxTtsAdapterTest {
     }
 
     @Test
+    fun testStaleShimCacheDetected() {
+        // Upgrade-over-old-install contract: a filesDir copy left behind by the
+        // 55-token shim era carries a legacy (unversioned) manifest. prepare()
+        // gates on the generation stamp, so that copy must be judged stale and
+        // re-copied instead of served. (The Robolectric sandbox has no bundled
+        // assets to copy from, so we assert the staleness decision directly —
+        // the re-copy itself is the straight-line copyTree/writeManifest path.)
+        val dir = File(context.filesDir, "manifest_probe_${System.currentTimeMillis()}").also { it.mkdirs() }
+        try {
+            File(dir, ".vachak_manifest").writeText("# vachak tts manifest (name<TAB>bytes)\nmodel.onnx\t41953954\n")
+            assertFalse("legacy unversioned manifest must read as stale",
+                SherpaAssets.isCurrentGeneration(dir, "tts"))
+            File(dir, ".vachak_manifest").writeText("# vachak tts manifest v1 (name<TAB>bytes)\nmodel.onnx\t41953954\n")
+            assertFalse("superseded generation must read as stale",
+                SherpaAssets.isCurrentGeneration(dir, "tts"))
+            File(dir, ".vachak_manifest").writeText(
+                "# vachak tts manifest v${SherpaAssets.assetVersion("tts")} (name<TAB>bytes)\nmodel.onnx\t114651026\n")
+            assertTrue("current generation must read as fresh",
+                SherpaAssets.isCurrentGeneration(dir, "tts"))
+            assertTrue("shipped voice is generation 2+", SherpaAssets.assetVersion("tts") >= 2)
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
+    @Test
     fun testLexiconNoChinese_packFallback() {
         val baseDir = SherpaAssets.prepare(context, "tts")
         val lexFile = File(baseDir, "lexicon.txt")

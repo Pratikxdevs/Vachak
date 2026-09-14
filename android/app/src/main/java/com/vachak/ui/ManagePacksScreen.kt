@@ -39,15 +39,40 @@ fun ManagePacksScreen(modifier: Modifier = Modifier) {
     var status by remember { mutableStateOf<String?>(null) }
     var isInstalling by remember { mutableStateOf(false) }
     var activeId by remember { mutableStateOf(PackManager.getActivePack(context)?.let { it.substringAfterLast("/") }) }
+    // Installed curriculum grades per pack (v0.2.0+): pack.path/curriculum/class/{g}/manifest.json
+    var packCurriculum by remember { mutableStateOf<Map<String, List<String>>>(emptyMap()) }
+
+    fun refreshCurriculum(ids: List<String>) {
+        scope.launch(Dispatchers.IO) {
+            val found = mutableMapOf<String, List<String>>()
+            for (id in ids) {
+                val packsDir = java.io.File(context.filesDir, "packs/$id/curriculum/class")
+                val rows = (1..5).mapNotNull { g ->
+                    val mf = java.io.File(packsDir, "$g/manifest.json")
+                    if (!mf.isFile) return@mapNotNull null
+                    try {
+                        val m = org.json.JSONObject(mf.readText())
+                        val ch = m.optJSONObject("chapters")?.length() ?: 0
+                        "G$g: $ch ch"
+                    } catch (_: Exception) { null }
+                }
+                if (rows.isNotEmpty()) found[id] = rows
+            }
+            withContext(Dispatchers.Main) { packCurriculum = found }
+        }
+    }
 
     fun refresh() {
         packs = PackManager.packEntities(context)
         freeSpace = PackManager.freeSpaceBytes(context)
         usedSpace = PackManager.storageUsedBytes(context)
         activeId = PackManager.getActivePack(context)?.let { it.substringAfterLast("/") }
+        refreshCurriculum(packs.map { it.id })
     }
+    LaunchedEffect(Unit) { refreshCurriculum(packs.map { it.id }) }
 
     val installer = remember { PackInstaller(context) }
+
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
         if (uri == null) {
             status = "No file selected"
@@ -129,7 +154,7 @@ fun ManagePacksScreen(modifier: Modifier = Modifier) {
                 Surface(shape = MaterialTheme.shapes.medium, tonalElevation = 1.dp, modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text("No packs installed. Bundled assets are used.", style = MaterialTheme.typography.bodyMedium)
-                        Text("Install language-v0.1.0.vachakpack via file picker (Santali / Mundari).", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Install a .vachakpack via file picker — language model packs and sat_Olck-v0.2.0 curriculum content.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             } else {
@@ -153,6 +178,12 @@ fun ManagePacksScreen(modifier: Modifier = Modifier) {
                                 }
                                 Text("Path: ${pack.path}", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 Text("Manifest SHA: ${pack.manifestSha256.take(16)}…", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace)
+                                packCurriculum[pack.id]?.let { rows ->
+                                    Text(
+                                        "Curriculum: ${rows.joinToString(" • ")} (AUTO_EXTRACTED)",
+                                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                                 // Licenses from packs/language-v0.1.0/pack manifest if accessible
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     OutlinedButton(onClick = {

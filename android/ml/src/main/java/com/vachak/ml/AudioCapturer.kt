@@ -70,6 +70,20 @@ data class MicAuditResult(
 }
 
 class AudioCapturer {
+    companion object {
+        /**
+         * Phase 2: last AudioSource that streamed live signal, process-wide.
+         * A repeat mic press on the same tablet almost always reuses the same
+         * route, so trying the cached source first skips the 4-source probe
+         * (400ms x 4 + 900ms deadlines). -1 = no cache yet. Only ever set to
+         * a source that probed LIVE (never a silent fallback), and only tried
+         * when it is in the current press's candidate list (emulator lists
+         * differ). A stale cache costs one failed probe, then the full sweep
+         * below runs unchanged.
+         */
+        @Volatile var cachedSource: Int = -1
+    }
+
     private val sampleRate = 16000
     /** 14s cap = 224k samples at 16kHz — prevents unbounded doubling on 2GB RAM (hard limit from AGENTS.md). */
     private val maxBufferSize = sampleRate * 14 // 224000 samples; log warning when capped
@@ -258,6 +272,8 @@ class AudioCapturer {
         // (unrouted OEM source, muted route). Probe ~400ms of real signal per
         // source and keep the first live one; a dead source must never win by
         // opening successfully. Probe audio is KEPT (appended to the buffer).
+        // Phase 2: the cached source from the last live press goes first — a
+        // hit skips every other probe (same tablet, same route).
         lastRms = 0f
         peakRms = 0f
         audioSourceUsed = -1
@@ -266,7 +282,8 @@ class AudioCapturer {
         var silentRecord: AudioRecord? = null
         var silentSrc = -1
         var silentRms = -1f
-        for (src in sources) {
+        val orderedSources = orderedByProbeCache(sources)
+        for (src in orderedSources) {
             val candidate = try {
                 android.util.Log.d("Vachak-ASR", "Trying AudioSource $src (emulator=$isEmulator)")
                 AudioRecord(src, sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, minBufferSize)
@@ -292,6 +309,12 @@ class AudioCapturer {
                 record = candidate
                 audioSourceUsed = src
                 silentStart = false
+                if (cachedSource != src) {
+                    cachedSource = src
+                    android.util.Log.d("Vachak-ASR", "probe cache STORE src=$src")
+                } else {
+                    android.util.Log.d("Vachak-ASR", "probe cache HIT src=$src (skipped ${orderedSources.size - 1} probes)")
+                }
                 break
             }
             android.util.Log.w("Vachak-ASR", "AudioSource $src streams digital silence — trying next source")
@@ -390,6 +413,17 @@ class AudioCapturer {
             }
             android.util.Log.d("Vachak-ASR", "recordingJob ended isActive=$isActive isRecording=$isRecording bufferSize=$bufferSize")
         }
+    }
+
+    /**
+     * Phase 2: cached source first (when valid for this press), remaining
+     * candidates in declared order. Pure ordering — the probe loop below is
+     * unchanged, so a stale cache degrades to exactly one wasted probe.
+     */
+    private fun orderedByProbeCache(sources: List<Int>): List<Int> {
+        val cached = cachedSource
+        if (cached == -1 || !sources.contains(cached)) return sources
+        return listOf(cached) + sources.filter { it != cached }
     }
 
     /**
@@ -518,6 +552,19 @@ class AudioCapturer {
 
     /** Snapshot for streaming partials while still recording — does NOT stop. Used by LiveScreen partial loop (offline-telugu Path A). */
     fun snapshotShortArray(): ShortArray = synchronized(bufferLock) { shortBuffer.copyOf(bufferSize) }
+
+    /**
+     * Phase 2: delta snapshot — copies ONLY [offset, bufferSize) under one
+     * lock. The 700ms capture lane used to copyOf() the WHOLE buffer every
+     * tick and then copyOfRange() the tail (two full copies, O(total) per
+     * tick, GC churn growing with press length). One bounded copy instead.
+     * Out-of-range offsets (stop raced the lane) yield an empty array, never
+     * a throw — the caller treats it as "no fresh audio".
+     */
+    fun snapshotShortArrayFrom(offset: Int): ShortArray = synchronized(bufferLock) {
+        if (offset < 0 || offset >= bufferSize) return ShortArray(0)
+        shortBuffer.copyOfRange(offset, bufferSize)
+    }
 
     fun snapshotFloatArray(): FloatArray = synchronized(bufferLock) {
         val arr = FloatArray(bufferSize)

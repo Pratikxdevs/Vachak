@@ -1,6 +1,7 @@
 package com.vachak.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -50,58 +51,85 @@ fun HomeScreen(
     engine: EngineProvider,
     onNavigateLive: () -> Unit,
     onNavigateTools: () -> Unit,
+    onNavigateCurriculum: () -> Unit,
     onContinueLesson: (Lesson) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var uiState by remember { mutableStateOf<HomeUiState>(HomeUiState.Loading) }
     var selectedFilter by remember { mutableStateOf("All") }
+    var gradeFilter by remember { mutableStateOf<Int?>(null) }
+    var showGradeSheet by remember { mutableStateOf(false) }
+    var expandedRecents by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
+    var searchOpen by remember { mutableStateOf(false) }
+    var showReminders by remember { mutableStateOf(false) }
     var allLessons by remember { mutableStateOf<List<Lesson>>(emptyList()) }
+    // Real recently-viewed order + completion set, refreshed every time Home
+    // regains focus (returning from a lesson updates both immediately).
+    var recentIds by remember { mutableStateOf<List<String>>(emptyList()) }
+    var doneIds by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var reloadTick by remember { mutableStateOf(0) }
     val scope = rememberCoroutineScope()
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val prefs = remember(context) { com.vachak.ui.prefs.VachakPrefs(context) }
     val activeLang by engine.activeLanguage.collectAsState()
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val obs = androidx.lifecycle.LifecycleEventObserver { _, e ->
+            if (e == androidx.lifecycle.Lifecycle.Event.ON_RESUME) reloadTick++
+        }
+        lifecycleOwner.lifecycle.addObserver(obs)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(obs) }
+    }
 
     suspend fun load() = withContext(Dispatchers.IO) {
         val ce = engine.curriculum as? com.vachak.content.ContentEngine
         val res = ce?.getLessons() ?: engine.curriculum.listLessons(0).let { r ->
             when (r) {
-                is EngineResult.Ok -> EngineResult.Ok(r.value.map { ref -> Lesson(ref.id, ref.title, ref.grade, "", "", true) })
+                is EngineResult.Ok -> EngineResult.Ok(r.value.map { ref -> Lesson(ref.id, ref.title, ref.grade, "", "", true, ref.domain) })
                 is EngineResult.Err -> r as EngineResult<List<Lesson>>
             }
         }
+        // Prefs reads are cheap; do them off-main alongside the query.
+        val recents = prefs.recentlyViewed()
+        val done = prefs.completedLessons()
         withContext(Dispatchers.Main) {
+            recentIds = recents
+            doneIds = done
             when (res) {
                 is EngineResult.Ok -> {
-                    var list = res.value
-                    // fallback to mock if empty (ensures UI always populated per product spec)
-                    if (list.isEmpty()) list = com.vachak.ui.mock.MockData.lessons
+                    val list = res.value
                     allLessons = list
                     if (list.isEmpty()) uiState = HomeUiState.Empty
                     else {
                         val focus = list.first()
                         val secondary = list.getOrNull(1)
-                        val recents = list.drop(1).take(3).ifEmpty { list.take(3) }
-                        uiState = HomeUiState.Ready(focus, secondary, recents, list.size, 0)
+                        // Real recents first; fall back to list order until used.
+                        val tracked = recents.mapNotNull { id -> list.firstOrNull { it.id == id } }
+                        val recents = tracked.ifEmpty { list.drop(1).take(3).ifEmpty { list.take(3) } }
+                        uiState = HomeUiState.Ready(focus, secondary, recents, list.size, list.count { done.contains(it.id) })
                     }
                 }
                 is EngineResult.Err -> {
-                    // mock fallback for offline demo
-                    val mock = com.vachak.ui.mock.MockData.lessons
-                    allLessons = mock
-                    uiState = HomeUiState.Ready(mock.first(), mock.getOrNull(1), mock.drop(1).take(3), mock.size, 2)
+                    allLessons = emptyList()
+                    uiState = HomeUiState.Error(res.message)
                 }
             }
         }
     }
 
-    LaunchedEffect(Unit) { load() }
+    LaunchedEffect(reloadTick) { load() }
 
     // filter derived — computed only when filter or data changes, not on every recomposition
-    val displayState by remember(allLessons, selectedFilter, uiState) {
+    val displayState by remember(allLessons, selectedFilter, gradeFilter, uiState) {
         derivedStateOf {
             when (val s = uiState) {
                 is HomeUiState.Ready -> {
-                    if (selectedFilter == "All") s
+                    if (selectedFilter == "All" && gradeFilter == null) s
                     else {
-                        val filtered = allLessons.filter { l -> LessonFilter.matches(l, selectedFilter) }
+                        var filtered = allLessons
+                        if (selectedFilter != "All") filtered = filtered.filter { l -> LessonFilter.matches(l, selectedFilter) }
+                        gradeFilter?.let { g -> filtered = filtered.filter { it.grade == g } }
                         if (filtered.isEmpty()) s else s.copy(focus = filtered.first(), secondary = filtered.getOrNull(1), recents = filtered.drop(1).take(3))
                     }
                 }
@@ -135,13 +163,17 @@ fun HomeScreen(
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                         Surface(shape = CircleShape, color = Color.White, border = androidx.compose.foundation.BorderStroke(1.dp, VachakColors.Border), shadowElevation = 0.dp, modifier = Modifier.size(44.dp)) {
                              Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                                 Icon(Icons.Outlined.Search, null, tint = VachakColors.TextPrimary, modifier = Modifier.size(20.dp))
+                                 IconButton(onClick = { searchOpen = !searchOpen; if (!searchOpen) searchQuery = "" }, modifier = Modifier.size(44.dp)) {
+                                     Icon(Icons.Outlined.Search, null, tint = VachakColors.TextPrimary, modifier = Modifier.size(20.dp))
+                                 }
                              }
                          }
                          Box(contentAlignment = Alignment.Center, modifier = Modifier.size(44.dp)) {
                              Surface(shape = CircleShape, color = Color.White, border = androidx.compose.foundation.BorderStroke(1.dp, VachakColors.Border), shadowElevation = 0.dp, modifier = Modifier.size(44.dp)) {
                                 Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                                    Icon(Icons.Outlined.Notifications, null, tint = VachakColors.TextPrimary, modifier = Modifier.size(20.dp))
+                                    IconButton(onClick = { showReminders = true }, modifier = Modifier.size(44.dp)) {
+                                        Icon(Icons.Outlined.Notifications, null, tint = VachakColors.TextPrimary, modifier = Modifier.size(20.dp))
+                                    }
                                 }
                             }
                             Box(modifier = Modifier.align(Alignment.TopEnd).offset(x = 2.dp, y = (-2).dp).size(10.dp).clip(CircleShape).background(VachakColors.Lavender500).padding(2.dp))
@@ -149,22 +181,51 @@ fun HomeScreen(
                     }
                 }
             }
+            if (searchOpen) {
+                item {
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        placeholder = { Text("Search lessons…", color = VachakColors.TextSecondary) },
+                        leadingIcon = { Icon(Icons.Outlined.Search, null, tint = VachakColors.TextSecondary) },
+                        trailingIcon = {
+                            if (searchQuery.isNotBlank()) IconButton(onClick = { searchQuery = "" }) { Icon(Icons.Outlined.Close, null) }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = VachakColors.Lavender300,
+                            unfocusedBorderColor = VachakColors.Border,
+                            focusedContainerColor = Color.White,
+                            unfocusedContainerColor = Color.White
+                        ),
+                        singleLine = true
+                    )
+                }
+            }
 
             // Greeting
             item {
+                val hour = remember { java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY) }
+                val daypart = when (hour) { in 0..11 -> "morning"; in 12..16 -> "afternoon"; else -> "evening" }
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("Good morning,", style = MaterialTheme.typography.titleSmall, color = VachakColors.TextSecondary, fontWeight = FontWeight.Medium, fontSize = 14.sp)
-                    Text("Vaibhav \uD83D\uDC4B", style = MaterialTheme.typography.headlineLarge, color = VachakColors.TextPrimary, fontWeight = FontWeight.Bold, fontSize = titleSize, lineHeight = titleSize, letterSpacing = (-0.5).sp, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                    Text("Good $daypart,", style = MaterialTheme.typography.titleSmall, color = VachakColors.TextSecondary, fontWeight = FontWeight.Medium, fontSize = 14.sp)
+                    Text("${prefs.teacherName}", style = MaterialTheme.typography.headlineLarge, color = VachakColors.TextPrimary, fontWeight = FontWeight.Bold, fontSize = titleSize, lineHeight = titleSize, letterSpacing = (-0.5).sp, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                     Text("Let's continue your learning journey.", style = MaterialTheme.typography.bodyMedium, color = VachakColors.TextSecondary, fontSize = 14.sp, lineHeight = 20.sp, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                 }
             }
 
             // Category filters
             item {
-                val filters = remember { listOf("All", "Language", "Mathematics", "EVS", "Stories") }
+                val filters = remember { listOf("All", "Literacy", "Numeracy") }
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(end = 8.dp)) {
                     item(key = "filter-icon") {
-                        FilterPill(label = "Filter", selected = false, onClick = {}, leadingIcon = Icons.Outlined.Tune)
+                        FilterPill(
+                            label = gradeFilter?.let { "Grade $it" } ?: "Filter",
+                            selected = gradeFilter != null,
+                            onClick = { showGradeSheet = true },
+                            leadingIcon = Icons.Outlined.Tune
+                        )
                     }
                     items(filters, key = { it }) { label ->
                         FilterPill(label = label, selected = selectedFilter == label, onClick = { selectedFilter = label })
@@ -190,7 +251,7 @@ fun HomeScreen(
                                 Text("Ready to start learning?", style = MaterialTheme.typography.titleMedium, color = VachakColors.TextPrimary, fontWeight = FontWeight.SemiBold)
                                 Text("Explore the curriculum to begin your first lesson.", style = MaterialTheme.typography.bodyMedium, color = VachakColors.TextSecondary)
                                 Button(
-                                    onClick = { onContinueLesson(allLessons.firstOrNull() ?: return@Button) },
+                                    onClick = { onNavigateCurriculum() },
                                     shape = RoundedCornerShape(50),
                                     colors = ButtonDefaults.buttonColors(containerColor = VachakColors.PrimaryDark, contentColor = Color.White),
                                     modifier = Modifier.height(48.dp)
@@ -201,15 +262,12 @@ fun HomeScreen(
                 }
                 is HomeUiState.Error -> {
                     item {
-                        // Show reference mock card even on DB error so UI matches design preview; Try Again remains accessible
-                        ContinueLearningCard(
-                            title = "Letters & Sounds",
-                            gradeLabel = "Grade 1 • Language",
-                            description = "Learn the first sounds and their corresponding Ol Chiki forms.",
-                            progressLabel = "Progress  •  3 of 8 lessons",
-                            progress = 0.375f,
-                            onContinue = { allLessons.firstOrNull()?.let { onContinueLesson(it) } }
-                        )
+                        Surface(shape = RoundedCornerShape(28.dp), color = VachakColors.SoftLavender, modifier = Modifier.fillMaxWidth()) {
+                            Column(modifier = Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text("Couldn't load lessons", style = MaterialTheme.typography.titleMedium, color = VachakColors.TextPrimary, fontWeight = FontWeight.SemiBold)
+                                Text("Check storage and try again.", style = MaterialTheme.typography.bodyMedium, color = VachakColors.TextSecondary)
+                            }
+                        }
                     }
                     item {
                         Surface(shape = RoundedCornerShape(16.dp), color = Color.White, border = androidx.compose.foundation.BorderStroke(1.dp, VachakColors.Border), modifier = Modifier.fillMaxWidth()) {
@@ -225,7 +283,7 @@ fun HomeScreen(
                     item {
                         ContinueLearningCard(
                             title = ready.focus.title.ifBlank { "Letters & Sounds" },
-                            gradeLabel = "Grade ${ready.focus.grade} • Language",
+                            gradeLabel = "Grade ${ready.focus.grade} • " + LessonFilter.domainLabel(ready.focus),
                             description = ready.focus.sourceTextHi.ifBlank { "Learn the first sounds and their corresponding Ol Chiki forms." }.take(90),
                             progressLabel = "Progress  •  ${ready.completedCount} of ${ready.totalLessons} lessons",
                             progress = if (ready.totalLessons > 0) ready.completedCount.toFloat() / ready.totalLessons.coerceAtLeast(1) else 0.12f,
@@ -237,7 +295,7 @@ fun HomeScreen(
                         item {
                             SecondaryLessonRow(
                                 title = sec.title,
-                                subtitle = "Grade ${sec.grade} • Mathematics",
+                                subtitle = "Grade ${sec.grade} • " + LessonFilter.domainLabel(sec),
                                 onClick = { onContinueLesson(sec) }
                             )
                         }
@@ -263,8 +321,8 @@ fun HomeScreen(
                             title = "Worksheets",
                             subtitle = "Generate practice worksheets",
                             icon = Icons.Outlined.Description,
-                            tint = Color(0xFFD97706),
-                            containerColor = Color(0xFFFFFBEB),
+                            tint = VachakColors.AccentDeep,
+                            containerColor = VachakColors.AccentLight,
                             onClick = onNavigateTools,
                             modifier = Modifier.weight(1f).heightIn(min = 160.dp)
                         )
@@ -275,31 +333,53 @@ fun HomeScreen(
             // Recent Lessons
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    HomeSectionHeader(title = "Recent Lessons", actionLabel = "View All", onAction = { /* TODO navigate Learn */ })
+                    HomeSectionHeader(
+                        title = "Recent Lessons",
+                        actionLabel = if (expandedRecents) "Show Less" else "View All",
+                        onAction = { expandedRecents = !expandedRecents }
+                    )
                     when (val s = uiState) {
                         is HomeUiState.Ready -> {
-                            val ready = displayState ?: s
+                            // Same Literacy/Numeracy + grade + search filters as
+                            // Continue Learning — recents never show stale scope.
+                            // Real tracked order first; collapsed shows 3.
+                            val base = run {
+                                val tracked = recentIds.mapNotNull { id -> allLessons.firstOrNull { it.id == id } }
+                                (if (tracked.isEmpty()) allLessons else tracked)
+                            }
+                            var list = base
+                            if (selectedFilter != "All") list = list.filter { l -> LessonFilter.matches(l, selectedFilter) }
+                            gradeFilter?.let { g -> list = list.filter { it.grade == g } }
+                            if (searchQuery.isNotBlank()) {
+                                list = list.filter { it.title.contains(searchQuery, true) || it.id.contains(searchQuery, true) }
+                            }
+                            val shown = if (expandedRecents) list else list.take(3)
+                            val filtersActive = selectedFilter != "All" || gradeFilter != null || searchQuery.isNotBlank()
                             Surface(shape = RoundedCornerShape(20.dp), color = Color.White, border = androidx.compose.foundation.BorderStroke(1.dp, VachakColors.Border), modifier = Modifier.fillMaxWidth()) {
                                 Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                                    ready.recents.forEachIndexed { idx, lesson ->
+                                    shown.forEachIndexed { idx, lesson ->
+                                        val completed = doneIds.contains(lesson.id)
                                         RecentLessonRow(
                                             title = lesson.title,
-                                            subtitle = "Grade ${lesson.grade} • Language",
-                                            status = when (idx) {
-                                                0 -> "Completed"
-                                                1 -> "50%"
-                                                else -> "In Progress"
-                                            },
-                                            statusIcon = when (idx) {
-                                                0 -> Icons.Outlined.CheckCircle
-                                                else -> null
-                                            },
+                                            subtitle = "Grade ${lesson.grade} • " + LessonFilter.domainLabel(lesson),
+                                            status = if (completed) "Completed" else "In Progress",
+                                            statusIcon = if (completed) Icons.Outlined.CheckCircle else null,
                                             onClick = { onContinueLesson(lesson) }
                                         )
-                                        if (idx < ready.recents.lastIndex) HorizontalDivider(color = VachakColors.Border.copy(alpha = 0.6f), thickness = 0.8.dp)
+                                        if (idx < shown.lastIndex) HorizontalDivider(color = VachakColors.Border.copy(alpha = 0.6f), thickness = 0.8.dp)
                                     }
-                                    if (ready.recents.isEmpty()) {
-                                        Text("No recent lessons yet. Start with the current lesson above.", style = MaterialTheme.typography.bodySmall, color = VachakColors.TextSecondary, modifier = Modifier.padding(vertical = 12.dp))
+                                    if (shown.isEmpty()) {
+                                        Text(
+                                            if (recentIds.isEmpty() && !filtersActive) "Lessons you open will appear here."
+                                            else "No lessons match these filters.",
+                                            style = MaterialTheme.typography.bodySmall, color = VachakColors.TextSecondary, modifier = Modifier.padding(vertical = 12.dp)
+                                        )
+                                        if (filtersActive) {
+                                            TextButton(
+                                                onClick = { selectedFilter = "All"; gradeFilter = null; searchQuery = "" },
+                                                contentPadding = PaddingValues(0.dp)
+                                            ) { Text("Clear Filters") }
+                                        }
                                     }
                                 }
                             }
@@ -320,5 +400,29 @@ fun HomeScreen(
                 }
             }
         }
+    }
+    if (showGradeSheet) {
+        GradeFilterSheet(
+            selected = gradeFilter,
+            onSelect = { gradeFilter = it; showGradeSheet = false },
+            onDismiss = { showGradeSheet = false }
+        )
+    }
+    if (showReminders) {
+        AlertDialog(
+            onDismissRequest = { showReminders = false },
+            title = { Text("Learning reminders") },
+            text = {
+                Text(
+                    if (prefs.notificationsOn) "Reminders are ON — see Settings → Notifications to change."
+                    else "Reminders are OFF — enable them in Settings → Notifications.",
+                    style = MaterialTheme.typography.bodyMedium, color = VachakColors.TextPrimary
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { showReminders = false }) { Text("Close") }
+            },
+            containerColor = Color.White
+        )
     }
 }

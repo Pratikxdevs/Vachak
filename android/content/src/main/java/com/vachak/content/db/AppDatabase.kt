@@ -20,8 +20,8 @@ import org.json.JSONObject
  * Validates Ol Chiki codepoints U+1C50–U+1C7F on insert.
  */
 @Database(
-    entities = [LessonEntity::class, OutcomeEntity::class, WorksheetEntity::class, FlashcardEntity::class],
-    version = 1,
+    entities = [LessonEntity::class, OutcomeEntity::class, WorksheetEntity::class, FlashcardEntity::class, ActivityEntity::class, AssessmentPromptEntity::class],
+    version = 2,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -29,6 +29,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun outcomeDao(): OutcomeDao
     abstract fun worksheetDao(): WorksheetDao
     abstract fun flashcardDao(): FlashcardDao
+    abstract fun activityDao(): ActivityDao
+    abstract fun assessmentPromptDao(): AssessmentPromptDao
 
     companion object {
         @Volatile private var INSTANCE: AppDatabase? = null

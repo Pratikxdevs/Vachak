@@ -77,6 +77,12 @@ interface CurriculumEngine {
     fun listLessons(grade: Int): EngineResult<List<LessonRef>>
     fun getLesson(id: String): EngineResult<Lesson>
     fun getOutcomes(lessonId: String): EngineResult<List<Outcome>>
+    /** Activities for a lesson (frozen spec §6). Empty until authored — never invented. */
+    fun getActivities(lessonId: String): EngineResult<List<Activity>> =
+        EngineResult.Ok(emptyList())
+    /** Assessment prompts for a lesson (frozen spec §6). Empty until authored. */
+    fun getAssessments(lessonId: String): EngineResult<List<AssessmentPrompt>> =
+        EngineResult.Ok(emptyList())
 }
 
 data class LessonRef(val id: String, val title: String, val grade: Int, val domain: String = "")
@@ -90,6 +96,25 @@ data class Lesson(
     val domain: String = ""
 )
 data class Outcome(val id: String, val description: String, val nipunMapped: Boolean)
+
+/** Frozen spec §6: teacher-led activity (Hindi + Santhali instructions). */
+data class Activity(
+    val id: String,
+    val lessonId: String,
+    val titleHi: String,
+    val instructionHi: String,
+    val instructionSat: String,
+    val materials: String = ""
+)
+
+/** Frozen spec §6: assessment prompt (Hindi + Santhali + expected response). */
+data class AssessmentPrompt(
+    val id: String,
+    val lessonId: String,
+    val promptHi: String,
+    val promptSat: String,
+    val expectedResponse: String = ""
+)
 
 /**
  * WorksheetEngine — TEMPLATE-BASED worksheets. Not AI-generated.

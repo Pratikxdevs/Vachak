@@ -290,7 +290,6 @@ class StreamingAsrSessionRegressionTest {
         assertEquals(2, session.zeroChunks)
         assertTrue(session.signalReport().contains("maxRms=0.0"))
     }
-
     @Test
     fun test_loudSpeech_statsShowSignal() {
         val context = ApplicationProvider.getApplicationContext<Context>()
@@ -301,5 +300,32 @@ class StreamingAsrSessionRegressionTest {
         assertEquals("है", session.finish())
         assertTrue("peak above speech gate", session.maxRmsSeen > 0.012f)
         assertEquals(0, session.zeroChunks)
+    }
+
+    @Test
+    fun test_longContinuousSpeech_commitsInChunksWhileSpeaking() {
+        // <3s hard limit: continuous speech flags pending every STREAM_COMMIT_SEC
+        // (3s); the decode lane runs one bounded final decode per flag, so no
+        // decode exceeds ~3s of audio and words land mid-press.
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val session = StreamingAsrSession(context, sampleRate = 16000, testTranscriber = { "शब्द" }, testVad = createFakeVad())
+        session.start()
+        session.pushAudio(ShortArray(16000) { 8000 }) // 1s: partials allowed
+        assertFalse("early chunk: partial lane must run", session.isChunkImminent())
+        repeat(2) { session.pushAudio(ShortArray(16000) { 8000 }) } // 3s continuous
+        assertTrue("late chunk: partial lane must idle for the commit", session.isChunkImminent())
+        assertTrue("3s chunk must flag pending while speaking", session.consumePendingFinalize())
+        session.finalizeCurrentSegment(true) // decode lane's single bounded decode
+        assertTrue("first 3s chunk must commit while speaking", session.committedText.contains("शब्द"))
+        assertEquals(1, session.segmentRecords.size)
+        assertEquals(listOf("शब्द"), session.drainNewCommits())
+        assertTrue("drain consumes", session.drainNewCommits().isEmpty())
+        session.pushAudio(ShortArray(16000) { 8000 }) // +1s remainder
+        val final = session.finish()
+        assertEquals(2, session.segmentRecords.size)
+        assertEquals("शब्द शब्द", final)
+        for (i in 1 until session.segmentRecords.size) {
+            assertFalse("chunks must not overlap", session.segmentRecords[i].startSample < session.segmentRecords[i - 1].endSample)
+        }
     }
 }

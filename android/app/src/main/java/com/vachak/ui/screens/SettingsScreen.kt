@@ -1,6 +1,7 @@
 package com.vachak.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
@@ -37,6 +38,19 @@ fun SettingsScreen(
     modifier: Modifier = Modifier
 ) {
     var showSignOutConfirm by remember { mutableStateOf(false) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val prefs = remember(context) { com.vachak.ui.prefs.VachakPrefs(context) }
+    var teacherName by remember { mutableStateOf(prefs.teacherName) }
+    var grade by remember { mutableStateOf(prefs.grade) }
+    var notificationsOn by remember { mutableStateOf(prefs.notificationsOn) }
+    var autoPlay by remember { mutableStateOf(prefs.autoPlayTts) }
+    var showNameDialog by remember { mutableStateOf(false) }
+    var showGradeDialog by remember { mutableStateOf(false) }
+    var showHelpDialog by remember { mutableStateOf(false) }
+    var showAboutDialog by remember { mutableStateOf(false) }
+    var showSourceDialog by remember { mutableStateOf(false) }
+    var showAppearanceDialog by remember { mutableStateOf(false) }
+    var nameDraft by remember { mutableStateOf("") }
     val activeLang by engine.activeLanguage.collectAsState()
     val debugEnabled by VachakLogger.enabled.collectAsState()
     var langExpanded by remember { mutableStateOf(false) }
@@ -68,7 +82,7 @@ fun SettingsScreen(
 
             // Profile (settings.md §4)
             item {
-                ProfileCard(name = "Vaibhav", role = "Teacher", onEdit = {})
+                ProfileCard(name = teacherName, role = "Teacher", onEdit = { nameDraft = teacherName; showNameDialog = true })
             }
 
             // Learning Preferences
@@ -76,7 +90,7 @@ fun SettingsScreen(
                 Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
                     SettingsSectionHeader(title = "Learning Preferences")
                     SettingsGroup {
-                        SettingsRow(icon = Icons.Outlined.Language, title = "Language", value = "Hindi (source)", onClick = {})
+                        SettingsRow(icon = Icons.Outlined.Language, title = "Language", value = "Hindi (source)", onClick = { showSourceDialog = true })
                         HorizontalDivider(color = VachakColors.Border.copy(alpha = 0.5f), thickness = 0.8.dp, modifier = Modifier.padding(horizontal = 16.dp))
                         // Active target language switcher Santali <-> Mundari
                         Row(
@@ -125,7 +139,7 @@ fun SettingsScreen(
                             }
                         }
                         HorizontalDivider(color = VachakColors.Border.copy(alpha = 0.5f), thickness = 0.8.dp, modifier = Modifier.padding(horizontal = 16.dp))
-                        SettingsRow(icon = Icons.Outlined.School, title = "Grade / Curriculum", value = "Grade 1", onClick = {})
+                        SettingsRow(icon = Icons.Outlined.School, title = "Grade / Curriculum", value = "Grade $grade", onClick = { showGradeDialog = true })
                     }
                 }
             }
@@ -139,7 +153,7 @@ fun SettingsScreen(
                         HorizontalDivider(color = VachakColors.Border.copy(alpha = 0.5f), thickness = 0.8.dp, modifier = Modifier.padding(horizontal = 16.dp))
                         SettingsRow(icon = Icons.Outlined.Storage, title = "Storage", value = "312 MB of 500 MB used", onClick = { onDiagnostics?.invoke() })
                         HorizontalDivider(color = VachakColors.Border.copy(alpha = 0.5f), thickness = 0.8.dp, modifier = Modifier.padding(horizontal = 16.dp))
-                        SettingsRow(icon = Icons.Outlined.CloudOff, title = "Offline Content", value = "Available for offline use", onClick = {})
+                        SettingsRow(icon = Icons.Outlined.CloudOff, title = "Offline Content", value = "Available for offline use", onClick = { onManagePacks?.invoke() })
                     }
                 }
             }
@@ -149,11 +163,45 @@ fun SettingsScreen(
                 Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
                     SettingsSectionHeader(title = "App Preferences")
                     SettingsGroup {
-                        SettingsRow(icon = Icons.Outlined.Notifications, title = "Notifications", value = "Learning reminders ON", onClick = {})
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.weight(1f)) {
+                                Surface(shape = RoundedCornerShape(10.dp), color = VachakColors.SoftLavender, modifier = Modifier.size(40.dp)) {
+                                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                                        Icon(Icons.Outlined.Notifications, null, tint = VachakColors.DeepLavender, modifier = Modifier.size(20.dp))
+                                    }
+                                }
+                                Column {
+                                    Text("Notifications", style = MaterialTheme.typography.bodyLarge, color = VachakColors.TextPrimary, fontWeight = FontWeight.Medium, fontSize = 16.sp)
+                                    Text(if (notificationsOn) "Learning reminders ON" else "Learning reminders OFF", style = MaterialTheme.typography.bodySmall, color = VachakColors.TextSecondary, fontSize = 14.sp)
+                                }
+                            }
+                            Switch(checked = notificationsOn, onCheckedChange = { notificationsOn = it; prefs.notificationsOn = it })
+                        }
                         HorizontalDivider(color = VachakColors.Border.copy(alpha = 0.5f), thickness = 0.8.dp, modifier = Modifier.padding(horizontal = 16.dp))
-                        SettingsRow(icon = Icons.Outlined.Palette, title = "Appearance", value = "Light", onClick = {})
+                        SettingsRow(icon = Icons.Outlined.Palette, title = "Appearance", value = "Light", onClick = { showAppearanceDialog = true })
                         HorizontalDivider(color = VachakColors.Border.copy(alpha = 0.5f), thickness = 0.8.dp, modifier = Modifier.padding(horizontal = 16.dp))
-                        SettingsRow(icon = Icons.AutoMirrored.Outlined.VolumeUp, title = "Audio", value = "Playback enabled • Auto-play", onClick = {})
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.weight(1f)) {
+                                Surface(shape = RoundedCornerShape(10.dp), color = VachakColors.SoftLavender, modifier = Modifier.size(40.dp)) {
+                                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                                        Icon(Icons.AutoMirrored.Outlined.VolumeUp, null, tint = VachakColors.DeepLavender, modifier = Modifier.size(20.dp))
+                                    }
+                                }
+                                Column {
+                                    Text("Audio", style = MaterialTheme.typography.bodyLarge, color = VachakColors.TextPrimary, fontWeight = FontWeight.Medium, fontSize = 16.sp)
+                                    Text(if (autoPlay) "Playback enabled • Auto-play" else "Playback enabled • Tap to play", style = MaterialTheme.typography.bodySmall, color = VachakColors.TextSecondary, fontSize = 14.sp)
+                                }
+                            }
+                            Switch(checked = autoPlay, onCheckedChange = { autoPlay = it; prefs.autoPlayTts = it })
+                        }
                     }
                 }
             }
@@ -163,7 +211,7 @@ fun SettingsScreen(
                 Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
                     SettingsSectionHeader(title = "Support")
                     SettingsGroup {
-                        SettingsRow(icon = Icons.AutoMirrored.Outlined.Help, title = "Help", description = "Usage guidance & offline info", onClick = {})
+                        SettingsRow(icon = Icons.AutoMirrored.Outlined.Help, title = "Help", description = "Usage guidance & offline info", onClick = { showHelpDialog = true })
                         HorizontalDivider(color = VachakColors.Border.copy(alpha = 0.5f), thickness = 0.8.dp, modifier = Modifier.padding(horizontal = 16.dp))
                         SettingsRow(icon = Icons.Outlined.Speed, title = "Diagnostics", description = "Latency, RAM, storage & models", onClick = { onDiagnostics?.invoke() })
                         HorizontalDivider(color = VachakColors.Border.copy(alpha = 0.5f), thickness = 0.8.dp, modifier = Modifier.padding(horizontal = 16.dp))
@@ -187,7 +235,7 @@ fun SettingsScreen(
                             Switch(checked = debugEnabled, onCheckedChange = { VachakLogger.setEnabled(it) })
                         }
                         HorizontalDivider(color = VachakColors.Border.copy(alpha = 0.5f), thickness = 0.8.dp, modifier = Modifier.padding(horizontal = 16.dp))
-                        SettingsRow(icon = Icons.Outlined.Info, title = "About Vachak", value = "Version 1.0.0 • Offline-first", onClick = {})
+                        SettingsRow(icon = Icons.Outlined.Info, title = "About Vachak", value = "Version 1.0.0 • Offline-first", onClick = { showAboutDialog = true })
                     }
                 }
             }
@@ -224,6 +272,116 @@ fun SettingsScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showSignOutConfirm = false }) { Text("Cancel") }
+            },
+            containerColor = Color.White
+        )
+    }
+    if (showNameDialog) {
+        AlertDialog(
+            onDismissRequest = { showNameDialog = false },
+            title = { Text("Teacher name") },
+            text = {
+                OutlinedTextField(
+                    value = nameDraft,
+                    onValueChange = { nameDraft = it },
+                    label = { Text("Name") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    prefs.teacherName = nameDraft
+                    teacherName = prefs.teacherName
+                    showNameDialog = false
+                }) { Text("Save") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showNameDialog = false }) { Text("Cancel") }
+            },
+            containerColor = Color.White
+        )
+    }
+    if (showGradeDialog) {
+        AlertDialog(
+            onDismissRequest = { showGradeDialog = false },
+            title = { Text("Grade / Curriculum") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    (1..5).forEach { g ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                                .clickable { grade = g; prefs.grade = g; showGradeDialog = false }
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            RadioButton(selected = grade == g, onClick = { grade = g; prefs.grade = g; showGradeDialog = false })
+                            Text("Grade $g", style = MaterialTheme.typography.bodyMedium, color = VachakColors.TextPrimary)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showGradeDialog = false }) { Text("Done") }
+            },
+            containerColor = Color.White
+        )
+    }
+    if (showAppearanceDialog) {
+        AlertDialog(
+            onDismissRequest = { showAppearanceDialog = false },
+            title = { Text("Appearance") },
+            text = { Text("The offline build ships the light lavender theme. Dark theme is not bundled (APK budget).") },
+            confirmButton = {
+                TextButton(onClick = { showAppearanceDialog = false }) { Text("OK") }
+            },
+            containerColor = Color.White
+        )
+    }
+    if (showHelpDialog) {
+        AlertDialog(
+            onDismissRequest = { showHelpDialog = false },
+            title = { Text("Help") },
+            text = {
+                Text(
+                    "1. Open Live and tap the mic — speak Hindi.\n" +
+                        "2. Watch the Hindi appear live, then the Santali (Ol Chiki) translation.\n" +
+                        "3. Play audio with the speaker buttons.\n" +
+                        "4. Tools → Worksheets → Generate → Print for an offline PDF.\n" +
+                        "5. Everything runs offline after first launch — no internet needed.",
+                    style = MaterialTheme.typography.bodyMedium, color = VachakColors.TextPrimary
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { showHelpDialog = false }) { Text("Close") }
+            },
+            containerColor = Color.White
+        )
+    }
+    if (showSourceDialog) {
+        AlertDialog(
+            onDismissRequest = { showSourceDialog = false },
+            title = { Text("Source language") },
+            text = { Text("Hindi (Devanagari) is the fixed speech and typing input — the ASR model is Hindi-only. Target is Santali (Ol Chiki) or Mundari via the toggle.") },
+            confirmButton = {
+                TextButton(onClick = { showSourceDialog = false }) { Text("OK") }
+            },
+            containerColor = Color.White
+        )
+    }
+    if (showAboutDialog) {
+        AlertDialog(
+            onDismissRequest = { showAboutDialog = false },
+            title = { Text("About Vachak") },
+            text = {
+                Text(
+                    "Vachak 1.0.0 • SIH26042 • Jharkhand\nOffline-first Hindi→Santali (Ol Chiki) classroom aid.\nNo INTERNET permission.\nASR: IndicConformer (sherpa-onnx) • MT: IndicTrans2 INT8 • TTS: sherpa-onnx.\nSee THIRD_PARTY_NOTICES for licenses.",
+                    style = MaterialTheme.typography.bodyMedium, color = VachakColors.TextPrimary
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { showAboutDialog = false }) { Text("Close") }
             },
             containerColor = Color.White
         )

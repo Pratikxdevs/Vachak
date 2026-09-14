@@ -12,8 +12,9 @@ import java.security.MessageDigest
  *
  * Why this exists: filesDir models survive app updates (`install -r` keeps
  * app data), so a tablet can run a NEW app build against a STALE model from
- * months ago — e.g. the pre-fix [B,80,T] layout vs the fixed [B,T,80]. The
- * resulting ORT shape errors are otherwise indistinguishable from code bugs.
+ * months ago — e.g. the broken [B,T,80] rewrite vs the correct [B,80,T]
+ * sherpa-native layout (Sep 2026 revert). The resulting ORT shape errors are
+ * otherwise indistinguishable from code bugs.
  * This reads ground truth (input dims, metadata, sha256) straight from the
  * resolved model file. One-shot, on-demand (Diagnostics button): opening an
  * ORT session transiently maps ~140MB, so never on the hot path.
