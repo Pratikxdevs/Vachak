@@ -1,28 +1,78 @@
 package com.vachak.ui.components
 
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.automirrored.outlined.MenuBook
-import androidx.compose.material.icons.outlined.*
-import androidx.compose.material3.*
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.outlined.Calculate
+import androidx.compose.material.icons.outlined.ChevronRight
+import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.vachak.ui.theme.VachakColors
+import com.vachak.ui.theme.VachakLayer
+import com.vachak.ui.theme.cardShadow
+import com.vachak.ui.theme.color
+import com.vachak.ui.theme.raisedShadow
 
-// ── Filter pill (home §7) ─────────────────────────────────────────────
+private val EaseSnap = CubicBezierEasing(0.2f, 0f, 0f, 1f)
+
+/** Tactile press: exactly 0.96 over 140ms ease-out. Wrap custom clickables. */
+@Composable
+fun pressScale(interaction: MutableInteractionSource): Float {
+    val pressed by interaction.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.96f else 1f,
+        animationSpec = tween(durationMillis = 140, easing = EaseSnap),
+        label = "press"
+    )
+    return scale
+}
+
+// ── Filter pill ─────────────────────────────────────────────────────
+// Selected pills ELEVATE (tint + pine border + shadow); unselected recede.
 @Composable
 fun FilterPill(
     label: String,
@@ -31,15 +81,20 @@ fun FilterPill(
     modifier: Modifier = Modifier,
     leadingIcon: ImageVector? = null
 ) {
-    val bg = if (selected) VachakColors.Lavender100 else VachakColors.Surface
+    val bg = if (selected) VachakColors.Lavender100 else VachakLayer.Card.color()
     val contentColor = if (selected) VachakColors.DeepLavender else VachakColors.TextSecondary
-    val border = if (selected) VachakColors.Lavender200 else VachakColors.Border
     Surface(
-        modifier = modifier.height(36.dp).clickable(onClick = onClick),
+        onClick = onClick,
         shape = RoundedCornerShape(50),
         color = bg,
         tonalElevation = 0.dp,
-        border = androidx.compose.foundation.BorderStroke(1.dp, border)
+        border = androidx.compose.foundation.BorderStroke(
+            if (selected) 1.5.dp else 1.dp,
+            if (selected) VachakColors.DeepLavender else VachakColors.Border
+        ),
+        modifier = modifier.height(36.dp).then(
+            if (selected) Modifier.raisedShadow(RoundedCornerShape(50)) else Modifier
+        )
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
@@ -54,7 +109,9 @@ fun FilterPill(
     }
 }
 
-// ── Continue Learning feature card (home §8-15) ───────────────────────
+// ── Continue Learning hero ──────────────────────────────────────────
+// Pine feature card: the ONE thing that pops. Progress sits in a recessed
+// pine well; CTA is marigold. Count chip is tabular so digits never jitter.
 @Composable
 fun ContinueLearningCard(
     title: String,
@@ -62,59 +119,72 @@ fun ContinueLearningCard(
     description: String,
     progressLabel: String,
     progress: Float,
+    countText: String,
     onContinue: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Surface(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth().raisedShadow(RoundedCornerShape(24.dp)),
         shape = RoundedCornerShape(24.dp),
-        color = VachakColors.SoftLavender,
+        color = VachakColors.DeepLavender,
         tonalElevation = 0.dp
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            // top label + overflow
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text("CONTINUE LEARNING", style = MaterialTheme.typography.labelSmall, color = VachakColors.Lavender600, letterSpacing = 1.2.sp, fontWeight = FontWeight.SemiBold)
-                Icon(Icons.Outlined.MoreHoriz, contentDescription = "More", tint = VachakColors.TextSecondary, modifier = Modifier.size(20.dp))
+                Text("CONTINUE LEARNING", style = MaterialTheme.typography.labelSmall, color = VachakColors.Lavender200, letterSpacing = 1.2.sp, fontWeight = FontWeight.SemiBold)
+                Surface(shape = RoundedCornerShape(50), color = Color.White.copy(alpha = 0.14f)) {
+                    Text(
+                        countText,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White,
+                        fontWeight = FontWeight.SemiBold,
+                        fontFamily = FontFamily.Monospace,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                    )
+                }
             }
-            // title + visual row
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Top) {
                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(title, style = MaterialTheme.typography.titleLarge, color = VachakColors.TextPrimary, fontWeight = FontWeight.Bold, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-                    Text(gradeLabel, style = MaterialTheme.typography.bodySmall, color = VachakColors.TextSecondary)
-                    Text(description, style = MaterialTheme.typography.bodySmall, color = VachakColors.TextSecondary, lineHeight = 18.sp, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                    Text(title, style = MaterialTheme.typography.titleLarge, color = Color.White, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(gradeLabel, style = MaterialTheme.typography.bodySmall, color = VachakColors.Lavender200)
+                    Text(description, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.82f), lineHeight = 18.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 }
-                // placeholder visual — soft white rounded container with Ol Chiki hint
+                // Ol Chiki mark — glass tile, the card's character detail.
                 Surface(
                     modifier = Modifier.size(72.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    color = Color.White.copy(alpha = 0.85f),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color.White)
+                    shape = RoundedCornerShape(18.dp),
+                    color = Color.White.copy(alpha = 0.14f),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.4f))
                 ) {
                     Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                        Text("ᱚ", style = MaterialTheme.typography.headlineMedium, color = VachakColors.DeepLavender.copy(alpha = 0.7f), fontWeight = FontWeight.Bold)
+                        Text("ᱚ", style = MaterialTheme.typography.headlineMedium, color = Color.White, fontWeight = FontWeight.Bold)
                     }
                 }
             }
-            // progress
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Icon(Icons.AutoMirrored.Outlined.MenuBook, null, tint = VachakColors.Lavender600, modifier = Modifier.size(16.dp))
-                    Text(progressLabel, style = MaterialTheme.typography.labelMedium, color = VachakColors.TextSecondary)
+            // Recessed progress well: darker pine bed, lighter bar.
+            Surface(
+                shape = RoundedCornerShape(14.dp),
+                color = VachakColors.ForestDark,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Icon(Icons.AutoMirrored.Outlined.MenuBook, null, tint = VachakColors.Lavender200, modifier = Modifier.size(16.dp))
+                        Text(progressLabel, style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.9f))
+                    }
+                    LinearProgressIndicator(
+                        progress = { progress.coerceIn(0f, 1f) },
+                        modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(50)),
+                        color = VachakColors.Accent,
+                        trackColor = Color.White.copy(alpha = 0.22f)
+                    )
                 }
-                LinearProgressIndicator(
-                    progress = { progress.coerceIn(0f, 1f) },
-                    modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(50)),
-                    color = VachakColors.Lavender500,
-                    trackColor = Color.White.copy(alpha = 0.8f)
-                )
             }
-            // CTA
             Button(
                 onClick = onContinue,
                 modifier = Modifier.fillMaxWidth().height(48.dp),
                 shape = RoundedCornerShape(50),
-                colors = ButtonDefaults.buttonColors(containerColor = VachakColors.PrimaryDark, contentColor = Color.White),
+                colors = ButtonDefaults.buttonColors(containerColor = VachakColors.Accent, contentColor = VachakColors.ForestDark),
                 contentPadding = PaddingValues(horizontal = 20.dp)
             ) {
                 Text("Continue Lesson", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, maxLines = 1)
@@ -125,7 +195,7 @@ fun ContinueLearningCard(
     }
 }
 
-// ── Secondary lesson row (home §16) ──────────────────────────────────
+// ── Secondary lesson row ────────────────────────────────────────────
 @Composable
 fun SecondaryLessonRow(
     title: String,
@@ -134,20 +204,22 @@ fun SecondaryLessonRow(
     modifier: Modifier = Modifier
 ) {
     Surface(
-        modifier = modifier.fillMaxWidth().clickable(onClick = onClick),
+        onClick = onClick,
         shape = RoundedCornerShape(20.dp),
-        color = VachakColors.SoftLavender.copy(alpha = 0.7f),
-        border = androidx.compose.foundation.BorderStroke(1.dp, VachakColors.Lavender100)
+        color = VachakLayer.Card.color(),
+        border = androidx.compose.foundation.BorderStroke(1.dp, VachakColors.Border),
+        modifier = modifier.fillMaxWidth().cardShadow()
     ) {
-        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            Surface(shape = RoundedCornerShape(12.dp), color = Color.White, modifier = Modifier.size(44.dp)) {
+        Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            Surface(shape = RoundedCornerShape(12.dp), color = VachakColors.Lavender100, modifier = Modifier.size(44.dp)) {
                 Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                     Icon(Icons.Outlined.Calculate, null, tint = VachakColors.DeepLavender, modifier = Modifier.size(22.dp))
                 }
             }
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(title, style = MaterialTheme.typography.titleSmall, color = VachakColors.TextPrimary, fontWeight = FontWeight.SemiBold)
-                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = VachakColors.TextSecondary)
+                Text("Up next", style = MaterialTheme.typography.labelSmall, color = VachakColors.Lavender600, fontWeight = FontWeight.SemiBold, letterSpacing = 0.8.sp)
+                Text(title, style = MaterialTheme.typography.titleSmall, color = VachakColors.TextPrimary, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = VachakColors.TextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             Surface(shape = CircleShape, color = VachakColors.Lavender100, modifier = Modifier.size(36.dp)) {
                 Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
@@ -158,7 +230,7 @@ fun SecondaryLessonRow(
     }
 }
 
-// ── Quick action card (home §17) ─────────────────────────────────────
+// ── Quick action card ───────────────────────────────────────────────
 @Composable
 fun QuickActionCard(
     title: String,
@@ -169,12 +241,19 @@ fun QuickActionCard(
     modifier: Modifier = Modifier,
     containerColor: Color = VachakColors.Surface
 ) {
+    val interaction = remember { MutableInteractionSource() }
+    val scale = pressScale(interaction)
     Surface(
-        modifier = modifier.clickable(onClick = onClick).heightIn(min = 120.dp),
+        onClick = onClick,
+        interactionSource = interaction,
         shape = RoundedCornerShape(20.dp),
         color = containerColor,
         border = androidx.compose.foundation.BorderStroke(1.dp, VachakColors.Border),
-        tonalElevation = 0.dp
+        tonalElevation = 0.dp,
+        modifier = modifier
+            .graphicsLayer(scaleX = scale, scaleY = scale)
+            .cardShadow()
+            .heightIn(min = 120.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
@@ -183,27 +262,28 @@ fun QuickActionCard(
                         Icon(icon, null, tint = tint, modifier = Modifier.size(20.dp))
                     }
                 }
-                Surface(shape = CircleShape, color = Color.White, border = androidx.compose.foundation.BorderStroke(1.dp, VachakColors.Border), modifier = Modifier.size(28.dp)) {
+                Surface(shape = CircleShape, color = VachakColors.Surface, border = androidx.compose.foundation.BorderStroke(1.dp, VachakColors.Border), modifier = Modifier.size(28.dp)) {
                     Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                        Icon(Icons.AutoMirrored.Outlined.ArrowForward, null, tint = VachakColors.TextPrimary, modifier = Modifier.size(14.dp))
+                        // Optical nudge: forward arrows read centered 1dp left.
+                        Icon(Icons.AutoMirrored.Outlined.ArrowForward, null, tint = VachakColors.TextPrimary, modifier = Modifier.size(14.dp).padding(end = 1.dp))
                     }
                 }
             }
             Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Text(title, style = MaterialTheme.typography.titleSmall, color = VachakColors.TextPrimary, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = VachakColors.TextSecondary, lineHeight = 16.sp, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                Text(title, style = MaterialTheme.typography.titleSmall, color = VachakColors.TextPrimary, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = VachakColors.TextSecondary, lineHeight = 16.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
         }
     }
 }
 
-// ── Recent lesson row (home §19-21) ──────────────────────────────────
+// ── Recent lesson row ───────────────────────────────────────────────
+// Status is a color-coded chip WITH text — color never the only signal.
 @Composable
 fun RecentLessonRow(
     title: String,
     subtitle: String,
-    status: String,
-    statusIcon: ImageVector?,
+    completed: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -218,41 +298,32 @@ fun RecentLessonRow(
             }
         }
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
-            Text(title, style = MaterialTheme.typography.titleSmall, color = VachakColors.TextPrimary, fontWeight = FontWeight.Medium, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = VachakColors.TextSecondary, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+            Text(title, style = MaterialTheme.typography.titleSmall, color = VachakColors.TextPrimary, fontWeight = FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = VachakColors.TextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            when (status) {
-                "Completed" -> {
-                    Icon(Icons.Filled.CheckCircle, null, tint = VachakColors.Lavender600, modifier = Modifier.size(18.dp))
-                    Text(status, style = MaterialTheme.typography.labelSmall, color = VachakColors.TextSecondary)
-                }
-                "50%" -> {
-                    Box(contentAlignment = Alignment.Center, modifier = Modifier.size(24.dp)) {
-                        CircularProgressIndicator(progress = { 0.5f }, modifier = Modifier.size(24.dp), strokeWidth = 2.5.dp, color = VachakColors.Lavender600, trackColor = VachakColors.Border)
-                    }
-                    Text(status, style = MaterialTheme.typography.labelSmall, color = VachakColors.TextSecondary, fontWeight = FontWeight.Medium)
-                }
-                "In Progress" -> {
-                    Icon(Icons.Outlined.Schedule, null, tint = VachakColors.TextSecondary, modifier = Modifier.size(18.dp))
-                    Text(status, style = MaterialTheme.typography.labelSmall, color = VachakColors.TextSecondary)
-                }
-                else -> {
-                    if (statusIcon != null) Icon(statusIcon, null, tint = VachakColors.TextSecondary, modifier = Modifier.size(16.dp))
-                    Text(status, style = MaterialTheme.typography.labelSmall, color = VachakColors.TextSecondary)
-                }
-            }
-            Surface(shape = CircleShape, color = Color.White, border = androidx.compose.foundation.BorderStroke(1.dp, VachakColors.Border), modifier = Modifier.size(32.dp)) {
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                    Icon(Icons.Outlined.ChevronRight, null, tint = VachakColors.TextSecondary, modifier = Modifier.size(16.dp))
+        Surface(
+            shape = RoundedCornerShape(50),
+            color = if (completed) VachakColors.SuccessLight else VachakLayer.Section.color(),
+            border = androidx.compose.foundation.BorderStroke(1.dp, if (completed) VachakColors.Success.copy(alpha = 0.35f) else VachakColors.Border)
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                if (completed) {
+                    Icon(Icons.Filled.CheckCircle, null, tint = VachakColors.Success, modifier = Modifier.size(14.dp))
+                    Text("Done", style = MaterialTheme.typography.labelSmall, color = VachakColors.Success, fontWeight = FontWeight.SemiBold)
+                } else {
+                    Icon(Icons.Outlined.Schedule, null, tint = VachakColors.TextSecondary, modifier = Modifier.size(14.dp))
+                    Text("Ongoing", style = MaterialTheme.typography.labelSmall, color = VachakColors.TextSecondary, fontWeight = FontWeight.Medium)
                 }
             }
         }
     }
 }
 
-
-// ── Decorative arcs (Home/Curriculum header, static, no recomposition) ──
+// ── Decorative arcs (header, static, no recomposition) ──
 @Composable
 fun HomeDecorativeArcs(modifier: Modifier = Modifier) {
     // Cache colors to avoid copy(alpha) allocation on every frame (120Hz = 120 allocs/sec)
@@ -280,16 +351,31 @@ fun HomeDecorativeArcs(modifier: Modifier = Modifier) {
     }
 }
 
-// ── Section header (home §17, §19) ────────────────────────────────────
+// ── Section header with optional tabular count ──────────────────────
 @Composable
 fun HomeSectionHeader(
     title: String,
     actionLabel: String? = null,
     onAction: (() -> Unit)? = null,
+    count: Int? = null,
     modifier: Modifier = Modifier
 ) {
     Row(modifier = modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-        Text(title, style = MaterialTheme.typography.titleMedium, color = VachakColors.TextPrimary, fontWeight = FontWeight.SemiBold)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(title, style = MaterialTheme.typography.titleMedium, color = VachakColors.TextPrimary, fontWeight = FontWeight.SemiBold)
+            if (count != null) {
+                Surface(shape = RoundedCornerShape(50), color = VachakLayer.Section.color()) {
+                    Text(
+                        "$count",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = VachakColors.TextSecondary,
+                        fontWeight = FontWeight.SemiBold,
+                        fontFamily = FontFamily.Monospace,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                    )
+                }
+            }
+        }
         if (actionLabel != null && onAction != null) {
             TextButton(onClick = onAction, contentPadding = PaddingValues(horizontal = 8.dp)) {
                 Text(actionLabel, style = MaterialTheme.typography.labelMedium, color = VachakColors.Lavender600)

@@ -119,6 +119,7 @@ fun VachakApp(
                                 onNavigateLive = { navOnce(NavDest.Live.route) },
                                 onNavigateTools = { navOnce(NavDest.Tools.route) },
                                 onNavigateCurriculum = { navOnce(NavDest.Curriculum.route) },
+                                onNavigateSettings = { navOnce(NavDest.Settings.route) },
                                 onContinueLesson = { lesson ->
                                     // Single canonical lesson route — the Learn tree owns
                                     // lesson detail (never a second curriculum/* alias that

@@ -254,8 +254,9 @@ fun CurriculumScreen(
                                 title = focus.title.ifBlank { "Letters & Sounds" },
                                 gradeLabel = "Grade ${focus.grade} • " + LessonFilter.domainLabel(focus),
                                 description = focus.sourceTextHi.ifBlank { "Learn the first sounds and their corresponding Ol Chiki forms." }.take(90),
-                                progressLabel = "Progress  •  $doneCount of ${lessons.size} lessons",
+                                progressLabel = "Progress",
                                 progress = doneCount.toFloat() / lessons.size.coerceAtLeast(1).toFloat(),
+                                countText = "$doneCount/${lessons.size}",
                                 onContinue = { onOpenLesson(focus) }
                             )
                         }
@@ -283,8 +284,7 @@ fun CurriculumScreen(
                                 RecentLessonRow(
                                     title = lesson.title,
                                     subtitle = "Grade ${lesson.grade} • " + LessonFilter.domainLabel(lesson),
-                                    status = "${lesson.grade}",
-                                    statusIcon = null,
+                                    completed = doneIds.contains(lesson.id),
                                     onClick = { onOpenLesson(lesson) }
                                 )
                             }
@@ -380,12 +380,10 @@ fun CurriculumScreen(
                                         )
                                     } else {
                                         recents.forEachIndexed { idx, lesson ->
-                                            val completed = doneIds.contains(lesson.id)
                                             RecentLessonRow(
                                                 title = lesson.title,
                                                 subtitle = "Grade ${lesson.grade} • " + LessonFilter.domainLabel(lesson),
-                                                status = if (completed) "Completed" else "In Progress",
-                                                statusIcon = if (completed) Icons.Outlined.CheckCircle else null,
+                                                completed = doneIds.contains(lesson.id),
                                                 onClick = { onOpenLesson(lesson) }
                                             )
                                             if (idx < recents.lastIndex) HorizontalDivider(color = VachakColors.Border.copy(alpha = 0.6f), thickness = 0.8.dp)
