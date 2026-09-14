@@ -65,6 +65,7 @@ sealed class NavRoute(val route: String) {
     data object LearnWorksheets : NavRoute("learn/worksheets")
     data object LearnFlashcards : NavRoute("learn/flashcards")
     data object LearnSaved : NavRoute("learn/saved")
+    data object LearnGrades : NavRoute("learn/grades")
     data object Settings : NavRoute("settings")
     data object ManagePacks : NavRoute("packs")
     data object Diagnostics : NavRoute("diagnostics")
@@ -143,7 +144,15 @@ fun VachakApp(
                                 },
                                 onOpenWorksheets = { navOnce(NavRoute.LearnWorksheets.route) },
                                 onOpenFlashcards = { navOnce(NavRoute.LearnFlashcards.route) },
-                                onOpenSaved = { navOnce(NavRoute.LearnSaved.route) }
+                                onOpenSaved = { navOnce(NavRoute.LearnSaved.route) },
+                                onOpenGrades = { navOnce(NavRoute.LearnGrades.route) }
+                            )
+                        }
+                        composable(NavRoute.LearnGrades.route) {
+                            GradeListScreen(
+                                engine = engine,
+                                onOpenGrade = { grade -> navOnce(NavRoute.Grade.path(grade)) },
+                                onBack = { navController.popBackStack() }
                             )
                         }
                         composable(

@@ -104,6 +104,7 @@ fun CurriculumScreen(
     engine: EngineProvider,
     onOpenLesson: (Lesson) -> Unit,
     onOpenGrade: (Int) -> Unit,
+    onOpenGrades: () -> Unit = {},
     onOpenWorksheets: () -> Unit = {},
     onOpenFlashcards: () -> Unit = {},
     onOpenSaved: () -> Unit = {},
@@ -114,7 +115,6 @@ fun CurriculumScreen(
     var selectedFilter by remember { mutableStateOf("All") }
     var gradeFilter by remember { mutableStateOf<Int?>(null) }
     var showGradeSheet by remember { mutableStateOf(false) }
-    var expandedGrades by remember { mutableStateOf(false) }
     var expandedRecents by remember { mutableStateOf(false) }
     var expandedDecks by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
@@ -214,7 +214,7 @@ fun CurriculumScreen(
     Box(modifier = modifier.fillMaxSize().background(VachakColors.Background)) {
         LazyColumn(
             modifier = Modifier.fillMaxSize().statusBarsPadding(),
-            contentPadding = PaddingValues(start = hPad, end = hPad, top = 12.dp, bottom = 16.dp),
+            contentPadding = PaddingValues(start = hPad, end = hPad, top = 6.dp, bottom = 16.dp),
             verticalArrangement = Arrangement.spacedBy(if (isTablet) 20.dp else 14.dp)
         ) {
             // Header
@@ -349,30 +349,18 @@ fun CurriculumScreen(
                 }
             }
 
-            // Browse by Grade
+            // Browse by Grade — cards inline, full list lives on its own page.
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     HomeSectionHeader(
                         title = "Browse by Grade",
-                        actionLabel = if (expandedGrades) "Show Less" else "View All",
-                        onAction = { expandedGrades = !expandedGrades }
+                        actionLabel = "View All",
+                        onAction = onOpenGrades
                     )
                     val grades = (1..5).toList()
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(end = 8.dp)) {
                         items(grades, key = { "grade-$it" }) { g ->
                             GradeCard(grade = g, lessonCount = gradeCounts[g] ?: 0, onClick = { onOpenGrade(g) })
-                        }
-                    }
-                    if (expandedGrades) {
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            filteredLessons.forEach { lesson ->
-                                RecentLessonRow(
-                                    title = lesson.title,
-                                    subtitle = "Grade ${lesson.grade} • " + LessonFilter.domainLabel(lesson),
-                                    completed = doneIds.contains(lesson.id),
-                                    onClick = { onOpenLesson(lesson) }
-                                )
-                            }
                         }
                     }
                 }
