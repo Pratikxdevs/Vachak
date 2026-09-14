@@ -128,6 +128,7 @@ fun HomeScreen(
     engine: EngineProvider,
     onNavigateLive: () -> Unit,
     onNavigateTools: () -> Unit,
+    onNavigateLibrary: () -> Unit,
     onNavigateCurriculum: () -> Unit,
     onNavigateSettings: () -> Unit,
     onContinueLesson: (Lesson) -> Unit,
@@ -451,7 +452,7 @@ fun HomeScreen(
             item {
                 EnterStage(3, staged) {
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        HomeSectionHeader(title = "Quick Actions", actionLabel = "Library", onAction = onNavigateTools)
+                        HomeSectionHeader(title = "Quick Actions", actionLabel = "Library", onAction = onNavigateLibrary)
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             QuickActionCard(
                                 title = "Live Translate",

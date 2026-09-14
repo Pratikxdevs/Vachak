@@ -30,9 +30,14 @@ fun AdaptiveScaffold(
     isTablet: Boolean = windowSizeClass?.widthSizeClass == WindowWidthSizeClass.Expanded,
     content: @Composable () -> Unit
 ) {
-    // Packs + Diagnostics live under More: keep their tab highlighted while inside.
+    // Packs + Diagnostics live under More; legacy tools/* routes live under
+    // Learn now. Keep their tabs highlighted while inside.
     // (NavDest.fromRoute mapping is test-pinned; this is presentation only.)
-    val tabHighlight = if (current == NavDest.Diagnostics || current == NavDest.ManagePacks) NavDest.Settings else current
+    val tabHighlight = when (current) {
+        NavDest.Diagnostics, NavDest.ManagePacks -> NavDest.Settings
+        NavDest.Tools -> NavDest.Curriculum
+        else -> current
+    }
     if (isTablet) {
         Row(modifier = Modifier.fillMaxSize()) {
             NavigationRail(

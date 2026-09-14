@@ -23,10 +23,11 @@ sealed class NavDest(
 
     companion object {
         val all: List<NavDest> get() = listOf(Home, Live, Curriculum, Tools, Settings, Diagnostics)
-        /** Classroom-first tab order: Today → Translate → Learn → Library → More.
-         *  Packs + Diagnostics are NOT tabs — they live under More (Settings
-         *  screen entries). Routes are unchanged; only tab membership changed. */
-        val tabs: List<NavDest> get() = listOf(Home, Live, Curriculum, Tools, Settings)
+        /** Classroom-first tab order: Today → Translate → Learn → More.
+         *  Library merged INTO Learn (worksheets/decks/saved are Learn
+         *  sections plus learn sub-pages). Packs + Diagnostics live under
+         *  More. Routes are unchanged; only tab membership changed. */
+        val tabs: List<NavDest> get() = listOf(Home, Live, Curriculum, Settings)
         /** Bottom-nav highlight root for any destination route, including nested
          *  Learn (learn/grade/…/chapter/…/worksheet, learn/lesson/…) and Tools
          *  (tools/worksheets|flashcards|saved) sub-routes. Unknown routes fall

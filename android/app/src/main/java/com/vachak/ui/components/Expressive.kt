@@ -176,8 +176,8 @@ fun GuidedEmpty(
     icon: ImageVector,
     title: String,
     why: String,
-    actionLabel: String,
-    onAction: () -> Unit,
+    actionLabel: String? = null,
+    onAction: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -212,15 +212,17 @@ fun GuidedEmpty(
                 color = VachakColors.TextSecondary
             )
             Spacer(Modifier.height(4.dp))
-            Button(
-                onClick = onAction,
-                shape = RoundedCornerShape(50),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = VachakColors.PrimaryDark,
-                    contentColor = Color.White
-                ),
-                modifier = Modifier.height(48.dp).raisedShadow(RoundedCornerShape(50))
-            ) { Text(actionLabel) }
+            if (actionLabel != null && onAction != null) {
+                Button(
+                    onClick = onAction,
+                    shape = RoundedCornerShape(50),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = VachakColors.PrimaryDark,
+                        contentColor = Color.White
+                    ),
+                    modifier = Modifier.height(48.dp).raisedShadow(RoundedCornerShape(50))
+                ) { Text(actionLabel) }
+            }
         }
     }
 }

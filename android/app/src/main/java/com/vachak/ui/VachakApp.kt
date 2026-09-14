@@ -12,6 +12,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.navigation.NavController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -63,6 +64,12 @@ sealed class NavRoute(val route: String) {
     data object ToolsWorksheets : NavRoute("tools/worksheets")
     data object ToolsFlashcards : NavRoute("tools/flashcards")
     data object ToolsSaved : NavRoute("tools/saved")
+    // Learn sub-pages: worksheets / decks / saved live here now (Library tab
+    // merged into Learn). tools/* routes below are pure redirects for
+    // deep-link compat — see RedirectOnce.
+    data object LearnWorksheets : NavRoute("learn/worksheets")
+    data object LearnFlashcards : NavRoute("learn/flashcards")
+    data object LearnSaved : NavRoute("learn/saved")
     data object Settings : NavRoute("settings")
     data object ManagePacks : NavRoute("packs")
     data object Diagnostics : NavRoute("diagnostics")
@@ -117,7 +124,8 @@ fun VachakApp(
                             HomeScreen(
                                 engine = engine,
                                 onNavigateLive = { navOnce(NavDest.Live.route) },
-                                onNavigateTools = { navOnce(NavDest.Tools.route) },
+                                onNavigateTools = { navOnce(NavRoute.LearnWorksheets.route) },
+                                onNavigateLibrary = { navOnce(NavDest.Curriculum.route) },
                                 onNavigateCurriculum = { navOnce(NavDest.Curriculum.route) },
                                 onNavigateSettings = { navOnce(NavDest.Settings.route) },
                                 onContinueLesson = { lesson ->
@@ -139,7 +147,10 @@ fun VachakApp(
                                 },
                                 onOpenGrade = { grade ->
                                     navOnce(NavRoute.Grade.path(grade))
-                                }
+                                },
+                                onOpenWorksheets = { navOnce(NavRoute.LearnWorksheets.route) },
+                                onOpenFlashcards = { navOnce(NavRoute.LearnFlashcards.route) },
+                                onOpenSaved = { navOnce(NavRoute.LearnSaved.route) }
                             )
                         }
                         composable(
@@ -231,36 +242,44 @@ fun VachakApp(
                                 onBack = { navController.popBackStack() }
                             )
                         }
-                        composable(NavRoute.Tools.route) {
-                            ToolsScreen(
+                        composable(NavRoute.LearnWorksheets.route) {
+                            WorksheetPane(
                                 engine = engine,
-                                onOpenPanel = { panel -> navOnce("tools/${panel.name.lowercase()}") },
+                                lesson = null,
+                                allLessons = emptyList(),
                                 onBack = { navController.popBackStack() }
                             )
+                        }
+                        composable(NavRoute.LearnFlashcards.route) {
+                            FlashcardPane(
+                                engine = engine,
+                                lesson = null,
+                                allLessons = emptyList(),
+                                onBack = { navController.popBackStack() }
+                            )
+                        }
+                        composable(NavRoute.LearnSaved.route) {
+                            SavedPane(
+                                onBack = { navController.popBackStack() },
+                                onOpenWorksheets = { navOnce(NavRoute.LearnWorksheets.route) },
+                                onOpenLive = { navOnce(NavDest.Live.route) }
+                            )
+                        }
+                        // Legacy Library routes → Learn. The tab is gone; these
+                        // exist so old deep links land on the right sub-page
+                        // instead of a dead end. Routes stay registered so the
+                        // route-table tests keep passing.
+                        composable(NavRoute.Tools.route) {
+                            RedirectOnce(navController, NavRoute.Curriculum.route, NavRoute.Tools.route)
                         }
                         composable(NavRoute.ToolsWorksheets.route) {
-                            ToolsScreen(
-                                engine = engine,
-                                startPanel = ToolsPanel.Worksheets,
-                                onOpenPanel = { panel -> navOnce("tools/${panel.name.lowercase()}") },
-                                onBack = { navController.popBackStack() }
-                            )
+                            RedirectOnce(navController, NavRoute.LearnWorksheets.route, NavRoute.ToolsWorksheets.route)
                         }
                         composable(NavRoute.ToolsFlashcards.route) {
-                            ToolsScreen(
-                                engine = engine,
-                                startPanel = ToolsPanel.Flashcards,
-                                onOpenPanel = { panel -> navOnce("tools/${panel.name.lowercase()}") },
-                                onBack = { navController.popBackStack() }
-                            )
+                            RedirectOnce(navController, NavRoute.LearnFlashcards.route, NavRoute.ToolsFlashcards.route)
                         }
                         composable(NavRoute.ToolsSaved.route) {
-                            ToolsScreen(
-                                engine = engine,
-                                startPanel = ToolsPanel.Saved,
-                                onOpenPanel = { panel -> navOnce("tools/${panel.name.lowercase()}") },
-                                onBack = { navController.popBackStack() }
-                            )
+                            RedirectOnce(navController, NavRoute.LearnSaved.route, NavRoute.ToolsSaved.route)
                         }
                         composable(NavRoute.Settings.route) {
                             SettingsScreen(
@@ -300,6 +319,18 @@ fun VachakApp(
                     )
                 }
             }
+        }
+    }
+}
+
+/** Legacy-route redirect: lands on `to`, pops the legacy route so Back never
+ *  returns to an empty redirect page. */
+@Composable
+private fun RedirectOnce(navController: NavController, to: String, popRoute: String) {
+    LaunchedEffect(to) {
+        navController.navigate(to) {
+            popUpTo(popRoute) { inclusive = true }
+            launchSingleTop = true
         }
     }
 }
