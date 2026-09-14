@@ -237,44 +237,40 @@ fun HomeScreen(
             when (val state = uiState) {
                 is HomeUiState.Loading -> {
                     item {
-                        Surface(shape = RoundedCornerShape(28.dp), color = VachakColors.SoftLavender, modifier = Modifier.fillMaxWidth().height(280.dp)) {
-                            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                                CircularProgressIndicator(color = VachakColors.Lavender600, strokeWidth = 3.dp, modifier = Modifier.size(32.dp))
-                            }
-                        }
+                        SteppedLoading(
+                            steps = listOf("Opening your library…", "Finding where you left off…"),
+                            currentStep = 0,
+                            fraction = null,
+                            modifier = Modifier.fillMaxWidth()
+                        )
                     }
                 }
                 is HomeUiState.Empty -> {
                     item {
-                        Surface(shape = RoundedCornerShape(28.dp), color = VachakColors.SoftLavender, modifier = Modifier.fillMaxWidth()) {
-                            Column(modifier = Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text("Ready to start learning?", style = MaterialTheme.typography.titleMedium, color = VachakColors.TextPrimary, fontWeight = FontWeight.SemiBold)
-                                Text("Explore the curriculum to begin your first lesson.", style = MaterialTheme.typography.bodyMedium, color = VachakColors.TextSecondary)
-                                Button(
-                                    onClick = { onNavigateCurriculum() },
-                                    shape = RoundedCornerShape(50),
-                                    colors = ButtonDefaults.buttonColors(containerColor = VachakColors.PrimaryDark, contentColor = Color.White),
-                                    modifier = Modifier.height(48.dp)
-                                ) { Text("Explore Curriculum") }
-                            }
-                        }
+                        GuidedEmpty(
+                            icon = Icons.Outlined.MenuBook,
+                            title = "Ready to start learning?",
+                            why = "Lessons live in Learn, grouped by grade — open it and pick your class to begin.",
+                            actionLabel = "Explore Learn",
+                            onAction = { onNavigateCurriculum() },
+                            modifier = Modifier.fillMaxWidth()
+                        )
                     }
                 }
                 is HomeUiState.Error -> {
                     item {
-                        Surface(shape = RoundedCornerShape(28.dp), color = VachakColors.SoftLavender, modifier = Modifier.fillMaxWidth()) {
-                            Column(modifier = Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Text("Couldn't load lessons", style = MaterialTheme.typography.titleMedium, color = VachakColors.TextPrimary, fontWeight = FontWeight.SemiBold)
-                                Text("Check storage and try again.", style = MaterialTheme.typography.bodyMedium, color = VachakColors.TextSecondary)
-                            }
-                        }
-                    }
-                    item {
-                        Surface(shape = RoundedCornerShape(16.dp), color = Color.White, border = androidx.compose.foundation.BorderStroke(1.dp, VachakColors.Border), modifier = Modifier.fillMaxWidth()) {
-                            Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Text(state.msg.take(80), style = MaterialTheme.typography.bodySmall, color = VachakColors.TextSecondary, modifier = Modifier.weight(1f))
-                                TextButton(onClick = { scope.launch { uiState = HomeUiState.Loading; load() } }, contentPadding = PaddingValues(horizontal = 8.dp)) { Text("Try Again") }
-                            }
+                        SectionCard(
+                            title = "Couldn't load lessons",
+                            subtitle = "Your progress is safe — this is a storage read problem, not lost data.",
+                            actionLabel = "Try Again",
+                            onAction = { scope.launch { uiState = HomeUiState.Loading; load() } },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            StatusRow(
+                                dot = VachakColors.ErrorRed,
+                                title = "Library unreadable",
+                                detail = state.msg.take(120)
+                            )
                         }
                     }
                 }

@@ -13,16 +13,20 @@ sealed class NavDest(
     val icon: ImageVector,
     val selectedIcon: ImageVector
 ) {
-    data object Home : NavDest("home", "Home", Icons.Outlined.Home, Icons.Filled.Home)
-    data object Live : NavDest("live", "Live", Icons.Outlined.Mic, Icons.Filled.Mic)
+    data object Home : NavDest("home", "Today", Icons.Outlined.Home, Icons.Filled.Home)
+    data object Live : NavDest("live", "Translate", Icons.Outlined.Mic, Icons.Filled.Mic)
     data object Curriculum : NavDest("curriculum", "Learn", Icons.AutoMirrored.Outlined.MenuBook, Icons.AutoMirrored.Filled.MenuBook)
-    data object Tools : NavDest("tools", "Tools", Icons.Outlined.GridView, Icons.Filled.GridView)
-    data object Settings : NavDest("settings", "Settings", Icons.Outlined.Settings, Icons.Filled.Settings)
+    data object Tools : NavDest("tools", "Library", Icons.Outlined.CollectionsBookmark, Icons.Filled.CollectionsBookmark)
+    data object Settings : NavDest("settings", "More", Icons.Outlined.Menu, Icons.Filled.Menu)
     data object ManagePacks : NavDest("packs", "Packs", Icons.Outlined.Description, Icons.Filled.Description)
     data object Diagnostics : NavDest("diagnostics", "Diagnostics", Icons.Outlined.Info, Icons.Filled.Info)
 
     companion object {
         val all: List<NavDest> get() = listOf(Home, Live, Curriculum, Tools, Settings, Diagnostics)
+        /** Classroom-first tab order: Today → Translate → Learn → Library → More.
+         *  Packs + Diagnostics are NOT tabs — they live under More (Settings
+         *  screen entries). Routes are unchanged; only tab membership changed. */
+        val tabs: List<NavDest> get() = listOf(Home, Live, Curriculum, Tools, Settings)
         /** Bottom-nav highlight root for any destination route, including nested
          *  Learn (learn/grade/…/chapter/…/worksheet, learn/lesson/…) and Tools
          *  (tools/worksheets|flashcards|saved) sub-routes. Unknown routes fall

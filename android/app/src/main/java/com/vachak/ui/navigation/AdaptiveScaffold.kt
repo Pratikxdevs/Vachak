@@ -30,6 +30,9 @@ fun AdaptiveScaffold(
     isTablet: Boolean = windowSizeClass?.widthSizeClass == WindowWidthSizeClass.Expanded,
     content: @Composable () -> Unit
 ) {
+    // Packs + Diagnostics live under More: keep their tab highlighted while inside.
+    // (NavDest.fromRoute mapping is test-pinned; this is presentation only.)
+    val tabHighlight = if (current == NavDest.Diagnostics || current == NavDest.ManagePacks) NavDest.Settings else current
     if (isTablet) {
         Row(modifier = Modifier.fillMaxSize()) {
             NavigationRail(
@@ -37,8 +40,8 @@ fun AdaptiveScaffold(
                 containerColor = VachakColors.Surface,
                 header = { Spacer(Modifier.height(12.dp)) }
             ) {
-                NavDest.all.filterNotNull().filter { it.route != "diagnostics" && it.route != "packs" }.forEach { dest ->
-                    val selected = dest == current
+                NavDest.tabs.forEach { dest ->
+                    val selected = dest == tabHighlight
                     NavigationRailItem(
                         selected = selected,
                         onClick = { onNavigate(dest) },
@@ -82,8 +85,8 @@ fun AdaptiveScaffold(
                             horizontalArrangement = Arrangement.SpaceEvenly,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            NavDest.all.filterNotNull().filter { it.route != "diagnostics" && it.route != "packs" }.forEach { dest ->
-                                val selected = dest == current
+                            NavDest.tabs.forEach { dest ->
+                                val selected = dest == tabHighlight
                                 val bg = if (selected) VachakColors.DeepLavender else Color.Transparent
                                 val tint = if (selected) Color.White else VachakColors.TextSecondary
                                 val labelColor = if (selected) Color.White else VachakColors.TextSecondary
