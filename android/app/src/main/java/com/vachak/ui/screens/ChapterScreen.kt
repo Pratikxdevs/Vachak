@@ -9,6 +9,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Style
@@ -63,6 +64,8 @@ fun ChapterScreen(
     var showNotices by remember(grade, slug) { mutableStateOf(false) }
     var metaTitle by remember(grade, slug) { mutableStateOf(slug) }
     var metaSubject by remember(grade, slug) { mutableStateOf("") }
+    val prefs = remember(ctx) { com.vachak.ui.prefs.VachakPrefs(ctx) }
+    var done by remember(grade, slug) { mutableStateOf(prefs.isChapterComplete(grade, slug)) }
 
     LaunchedEffect(grade, slug) {
         ui = ChapterUi.Loading
@@ -117,6 +120,14 @@ fun ChapterScreen(
                         style = MaterialTheme.typography.bodySmall, color = VachakColors.TextSecondary, maxLines = 1
                     )
                 }
+                if (done) {
+                    Surface(shape = RoundedCornerShape(50), color = VachakColors.SuccessLight) {
+                        Row(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Icon(Icons.Outlined.CheckCircle, null, tint = VachakColors.Success, modifier = Modifier.size(14.dp))
+                            Text("Done", style = MaterialTheme.typography.labelSmall, color = VachakColors.Success, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+                }
             }
         }
 
@@ -153,7 +164,9 @@ fun ChapterScreen(
                 showNotices = showNotices,
                 onToggleNotices = { showNotices = !showNotices },
                 onOpenWorksheets = onOpenWorksheets,
-                onOpenFlashcards = onOpenFlashcards
+                onOpenFlashcards = onOpenFlashcards,
+                done = done,
+                onMarkComplete = { prefs.markChapterComplete(grade, slug); done = true }
             )
         }
     }
@@ -168,7 +181,9 @@ private fun ChapterContent(
     showNotices: Boolean,
     onToggleNotices: () -> Unit,
     onOpenWorksheets: () -> Unit,
-    onOpenFlashcards: () -> Unit
+    onOpenFlashcards: () -> Unit,
+    done: Boolean,
+    onMarkComplete: () -> Unit
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -256,6 +271,19 @@ private fun ChapterContent(
                     onClick = onOpenFlashcards,
                     modifier = Modifier.weight(1f)
                 )
+            }
+        }
+        item {
+            Button(
+                onClick = onMarkComplete,
+                enabled = !done,
+                shape = RoundedCornerShape(50),
+                colors = ButtonDefaults.buttonColors(containerColor = VachakColors.PrimaryDark, contentColor = Color.White),
+                modifier = Modifier.fillMaxWidth().height(52.dp)
+            ) {
+                Icon(Icons.Outlined.CheckCircle, null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(if (done) "Completed ✓" else "Mark Chapter Complete")
             }
         }
 

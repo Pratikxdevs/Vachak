@@ -352,7 +352,7 @@ private fun ActivityPane(
         Box(modifier = Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("No activities authored for this lesson yet.", style = MaterialTheme.typography.bodyMedium, color = VachakColors.TextSecondary)
-                Text("Activities ship with the book-sourced curriculum manifest (docs/curriculum.md §12).", style = MaterialTheme.typography.bodySmall, color = VachakColors.TextSecondary)
+                Text("Activities ship inside the installed content pack.", style = MaterialTheme.typography.bodySmall, color = VachakColors.TextSecondary)
             }
         }
         return
@@ -416,7 +416,7 @@ private fun AssessmentPane(
         Box(modifier = Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("No assessment prompts authored for this lesson yet.", style = MaterialTheme.typography.bodyMedium, color = VachakColors.TextSecondary)
-                Text("Prompts ship with the book-sourced curriculum manifest (docs/curriculum.md §12).", style = MaterialTheme.typography.bodySmall, color = VachakColors.TextSecondary)
+                Text("Prompts ship inside the installed content pack.", style = MaterialTheme.typography.bodySmall, color = VachakColors.TextSecondary)
             }
         }
         return

@@ -18,8 +18,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Help
 import androidx.compose.material.icons.automirrored.outlined.VolumeUp
-import androidx.compose.material.icons.outlined.BugReport
-import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Language
@@ -66,7 +64,6 @@ import com.vachak.ui.components.ProfileCard
 import com.vachak.ui.components.SettingsGroup
 import com.vachak.ui.components.SettingsRow
 import com.vachak.ui.components.SettingsSectionHeader
-import com.vachak.ui.debug.VachakLogger
 import com.vachak.ui.theme.VachakColors
 import com.vachak.ui.theme.overlayShadow
 import kotlinx.coroutines.Dispatchers
@@ -99,7 +96,6 @@ fun SettingsScreen(
     var showAppearanceDialog by remember { mutableStateOf(false) }
     var nameDraft by remember { mutableStateOf("") }
     val activeLang by engine.activeLanguage.collectAsState()
-    val debugEnabled by VachakLogger.enabled.collectAsState()
     var langExpanded by remember { mutableStateOf(false) }
     // Measured storage (never a hardcoded number): apk + models + db + packs.
     var storageLine by remember { mutableStateOf<String?>(null) }
@@ -288,26 +284,6 @@ fun SettingsScreen(
                         SettingsRow(icon = Icons.AutoMirrored.Outlined.Help, title = "Help", description = "Usage guidance & offline info", onClick = { showHelpDialog = true })
                         HorizontalDivider(color = VachakColors.Border.copy(alpha = 0.5f), thickness = 0.8.dp, modifier = Modifier.padding(horizontal = 16.dp))
                         SettingsRow(icon = Icons.Outlined.Speed, title = "Diagnostics", description = "Latency, models, storage & live log", onClick = { onDiagnostics?.invoke() })
-                        HorizontalDivider(color = VachakColors.Border.copy(alpha = 0.5f), thickness = 0.8.dp, modifier = Modifier.padding(horizontal = 16.dp))
-                        // Debug overlay toggle (Vachak-* ring buffer, 300 lines)
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.weight(1f)) {
-                                Surface(shape = RoundedCornerShape(10.dp), color = VachakColors.SoftLavender, modifier = Modifier.size(40.dp)) {
-                                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                                        Icon(Icons.Outlined.BugReport, null, tint = VachakColors.DeepLavender, modifier = Modifier.size(20.dp))
-                                    }
-                                }
-                                Column {
-                                    Text("Debug Overlay", style = MaterialTheme.typography.bodyLarge, color = VachakColors.TextPrimary, fontWeight = FontWeight.Medium, fontSize = 16.sp)
-                                    Text("Floating Vachak-* log viewer", style = MaterialTheme.typography.bodySmall, color = VachakColors.TextSecondary, fontSize = 13.sp)
-                                }
-                            }
-                            Switch(checked = debugEnabled, onCheckedChange = { VachakLogger.setEnabled(it) })
-                        }
                         HorizontalDivider(color = VachakColors.Border.copy(alpha = 0.5f), thickness = 0.8.dp, modifier = Modifier.padding(horizontal = 16.dp))
                         SettingsRow(icon = Icons.Outlined.Info, title = "About Vachak", value = "Version 1.0.0 • Offline-first", onClick = { showAboutDialog = true })
                     }

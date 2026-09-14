@@ -4,11 +4,9 @@ import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.*
 import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -21,10 +19,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
 import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
-import com.vachak.engine.ActiveLanguage
 import com.vachak.engine.EngineProvider
-import com.vachak.ui.debug.DebugOverlay
-import com.vachak.ui.debug.VachakLogger
 import com.vachak.ui.navigation.AdaptiveScaffold
 import com.vachak.ui.navigation.NavDest
 import com.vachak.ui.screens.*
@@ -86,8 +81,6 @@ fun VachakApp(
     fun navOnce(route: String) {
         navController.navigate(route) { launchSingleTop = true }
     }
-    val activeLang by engine.activeLanguage.collectAsState()
-    val debugEnabled by VachakLogger.enabled.collectAsState()
     val context = LocalContext.current
     val activity = context as? ComponentActivity
     val windowSizeClass = activity?.let { calculateWindowSizeClass(it) }
@@ -295,28 +288,6 @@ fun VachakApp(
                             com.vachak.ui.screens.DiagnosticsScreen(engine = engine)
                         }
                     }
-                }
-                // Top-bar language switcher (overlay, minimal, global).
-                // P4: statusBarsPadding — under edge-to-edge transparent bars
-                // the chip sat behind the status bar, untappable.
-                Box(
-                    modifier = Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(top = 4.dp, end = 8.dp)
-                ) {
-                    com.vachak.ui.debug.LanguageSwitcher(
-                        activeLang = activeLang,
-                        onSelect = { lang ->
-                            ActiveLanguage.set(lang)
-                            (engine.translation as? com.vachak.ml.adapter.AdapterTranslationEngine)?.setActiveLanguage(lang)
-                        }
-                    )
-                }
-                // Debug overlay floating log viewer (200 line ring buffer Vachak-*)
-                if (debugEnabled) {
-                    DebugOverlay(
-                        visible = true,
-                        onClose = { VachakLogger.setEnabled(false) },
-                        modifier = Modifier.align(Alignment.BottomCenter)
-                    )
                 }
             }
         }

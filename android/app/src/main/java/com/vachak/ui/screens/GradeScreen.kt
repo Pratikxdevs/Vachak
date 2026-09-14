@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Translate
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -49,6 +50,19 @@ fun GradeScreen(
     var pack by remember(grade) { mutableStateOf<PackGrade?>(null) }
     var packMissing by remember(grade) { mutableStateOf(false) }
     var lang by remember(grade) { mutableStateOf(prefs.chapterTitleLang) }
+    // Done-chapter keys, refreshed on resume so returning from a chapter
+    // updates chips immediately.
+    var doneSlugs by remember(grade) { mutableStateOf(prefs.completedChapters()) }
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val obs = androidx.lifecycle.LifecycleEventObserver { _, e ->
+            if (e == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                doneSlugs = prefs.completedChapters()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(obs)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(obs) }
+    }
     // (Santali Deva line, Hindi line) per chapter slug — real source text.
     var titleLines by remember(grade) { mutableStateOf<Map<String, Pair<String?, String?>>>(emptyMap()) }
 
@@ -111,6 +125,7 @@ fun GradeScreen(
                         satLine = titleLines[ch.slug]?.first,
                         hiLine = titleLines[ch.slug]?.second,
                         lang = lang,
+                        completed = doneSlugs.contains("$grade/${ch.slug}"),
                         onCycleLang = ::cycleLang,
                         onOpen = { onOpenChapter(ch.slug) }
                     )
@@ -143,6 +158,7 @@ private fun ChapterRow(
     satLine: String?,
     hiLine: String?,
     lang: Int,
+    completed: Boolean,
     onCycleLang: () -> Unit,
     onOpen: () -> Unit
 ) {
@@ -163,6 +179,12 @@ private fun ChapterRow(
                 )
                 if (fallbackNote != null) {
                     Text(fallbackNote, style = MaterialTheme.typography.labelSmall, color = VachakColors.Amber, maxLines = 1)
+                }
+                if (completed) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Icon(Icons.Outlined.CheckCircle, null, tint = VachakColors.Success, modifier = Modifier.size(12.dp))
+                        Text("Completed", style = MaterialTheme.typography.labelSmall, color = VachakColors.Success, fontWeight = FontWeight.SemiBold)
+                    }
                 }
             }
             // Language toggle — extreme right, same row as number + title.

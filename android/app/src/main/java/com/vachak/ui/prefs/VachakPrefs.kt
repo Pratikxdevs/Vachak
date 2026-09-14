@@ -37,6 +37,19 @@ class VachakPrefs(context: Context) {
 
     fun isLessonComplete(id: String): Boolean = completedLessons().contains(id)
 
+    /** Completed chapters as "grade/slug" keys (pack-based study progress —
+     *  separate from lesson ids, shown as Done chips on grade pages). */
+    fun completedChapters(): Set<String> =
+        sp.getStringSet("completed_chapters", emptySet()) ?: emptySet()
+
+    fun markChapterComplete(grade: Int, slug: String) {
+        if (slug.isBlank()) return
+        sp.edit { putStringSet("completed_chapters", completedChapters() + "$grade/$slug") }
+    }
+
+    fun isChapterComplete(grade: Int, slug: String): Boolean =
+        completedChapters().contains("$grade/$slug")
+
     /** Recently viewed lesson ids, most-recent first (max 10). Empty until used. */
     fun recentlyViewed(): List<String> =
         (sp.getStringSet("recently_viewed", emptySet()) ?: emptySet())
