@@ -18,6 +18,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.vachak.ui.theme.VachakColors
+import com.vachak.ui.theme.cardShadow
 
 @Composable
 fun ProfileCard(
@@ -27,11 +28,12 @@ fun ProfileCard(
     modifier: Modifier = Modifier
 ) {
     Surface(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth().cardShadow(RoundedCornerShape(24.dp)),
         shape = RoundedCornerShape(24.dp),
         color = Color.White,
         border = androidx.compose.foundation.BorderStroke(1.dp, VachakColors.Border),
-        shadowElevation = 0.dp
+        shadowElevation = 0.dp,
+        tonalElevation = 0.dp
     ) {
         Row(modifier = Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             Box(
@@ -102,10 +104,12 @@ fun SettingsGroup(
     content: @Composable ColumnScope.() -> Unit
 ) {
     Surface(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth().cardShadow(),
         shape = RoundedCornerShape(20.dp),
         color = Color.White,
-        border = androidx.compose.foundation.BorderStroke(1.dp, VachakColors.Border)
+        border = androidx.compose.foundation.BorderStroke(1.dp, VachakColors.Border),
+        shadowElevation = 0.dp,
+        tonalElevation = 0.dp
     ) {
         Column(modifier = Modifier.padding(vertical = 4.dp)) {
             content()
