@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Launcher background: deep pine ink so the violet hunter mark pops. -->
-    <color name="ic_launcher_background">#1D1B2E</color>
+    <!-- Launcher background: pure white so the logo's white field blends seamlessly. -->
+    <color name="ic_launcher_background">#FFFFFF</color>
 </resources>
