@@ -230,7 +230,10 @@ private fun ChapterContent(
             item { HomeSectionHeader(title = "Read (${bundle.assignments.size})", actionLabel = null, onAction = null) }
             item { ScriptToggle(selected = script, onSelect = onScript) }
             val shown = bundle.assignments.take(20)
-            items(shown, key = { "${it.page}-${it.type}-${it.text.hashCode()}" }) { a ->
+            // Index-suffixed keys: pack data legitimately repeats identical
+            // prompts (fill-in-the-blank pages), so content-derived keys
+            // collide and crash LazyColumn. Index makes them unique by construction.
+            items(shown.withIndex().toList(), key = { (idx, a) -> "${a.page}-${a.type}-${a.text.hashCode()}-$idx" }) { (_, a) ->
                 Surface(shape = RoundedCornerShape(16.dp), color = Color.White, border = androidx.compose.foundation.BorderStroke(1.dp, VachakColors.Border), modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {

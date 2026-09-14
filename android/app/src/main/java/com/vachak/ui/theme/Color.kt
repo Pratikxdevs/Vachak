@@ -75,40 +75,40 @@ val surfaceContainerDark = Color(0xFF1B2122)
 val surfaceContainerHighDark = Color(0xFF252B2C)
 val surfaceContainerHighestDark = Color(0xFF303637)
 
-// — Vachak Design System — Warm Classroom identity (deep pine + marigold on warm paper)
-// NOTE: field names (Lavender*, Forest, PalashOrange) are legacy and kept to avoid
-// churn across ~470 call sites — values are the new palette, NOT lavender.
-// Mapped to Material Theme where possible; retains custom #FAF6EE background.
+// — Vachak Design System — Soft Editorial Lavender (purple identity)
+// NOTE: field names (Lavender*, Forest, PalashOrange) predate the pine
+// experiment and are kept to avoid churn across ~470 call sites — values
+// are the lavender palette. Structure unchanged, only values restored.
 object VachakColors {
-    val Background = Color(0xFFFAF6EE) // warm paper
+    val Background = Color(0xFFFAF9FF) // editorial paper
     val Surface = Color(0xFFFFFFFF)
-    val SoftLavender = Color(0xFFF2EDE0) // warm sand tint
-    val Lavender100 = Color(0xFFDCEFE6) // maps to primaryContainerLight
-    val Lavender200 = Color(0xFFC2E2D3)
-    val Lavender300 = Color(0xFF9CD2B9)
-    val Lavender400 = Color(0xFF63B393)
-    val Lavender500 = Color(0xFF3E9B78)
-    val Lavender600 = Color(0xFF2C7D60) // brand mid
-    val Lavender700 = Color(0xFF235F4B)
-    val DeepLavender = Color(0xFF1D5B46) // brand primary — deep pine
-    val TextPrimary = Color(0xFF201A13)
-    val TextSecondary = Color(0xFF5C5346)
-    val Border = Color(0xFFE6DDC9)
-    val PrimaryDark = Color(0xFF211B12) // warm-black CTA
+    val SoftLavender = Color(0xFFF7F2FF) // lavender tint
+    val Lavender100 = Color(0xFFEEE5FF) // maps to primaryContainerLight
+    val Lavender200 = Color(0xFFE2D2F3)
+    val Lavender300 = Color(0xFFD4BFF0)
+    val Lavender400 = Color(0xFFC4A7E7)
+    val Lavender500 = Color(0xFFA984D6)
+    val Lavender600 = Color(0xFF8B6BB5) // brand mid
+    val Lavender700 = Color(0xFF70539A)
+    val DeepLavender = Color(0xFF69548D) // brand primary — purple
+    val TextPrimary = Color(0xFF1D1A20)
+    val TextSecondary = Color(0xFF49454E)
+    val Border = Color(0xFFE7E1EF)
+    val PrimaryDark = Color(0xFF171717) // near-black CTA
     val OnPrimaryDark = Color.White
-    val Accent = Color(0xFFE59A12) // marigold — highlights, progress, badges only
-    val AccentDeep = Color(0xFF9A5F06) // marigold text on light surfaces
-    val AccentLight = Color(0xFFFFEFC7) // marigold tint surface
+    val Accent = Color(0xFF8B6BB5) // vivid purple — highlights, progress, badges only
+    val AccentDeep = Color(0xFF70539A) // purple text on light surfaces
+    val AccentLight = Color(0xFFEEE5FF) // lavender tint surface
     val Success = Color(0xFF2E7D32)
-    val SuccessLight = Color(0xFFE4F2E5)
-    val Amber = Color(0xFFE59A12)
+    val SuccessLight = Color(0xFFE8F5E9)
+    val Amber = Color(0xFFF9A825)
     val ErrorRed = Color(0xFFBA1A1A) // errorLight
     // Legacy aliases
     val Forest = DeepLavender
-    val ForestDark = Color(0xFF14342A)
+    val ForestDark = Color(0xFF2A2040)
     val ForestLight = Lavender600
-    val PalashOrange = Accent
-    val PalashOrangeDark = AccentDeep
+    val PalashOrange = Lavender500
+    val PalashOrangeDark = Lavender700
     val PaperWhite = Background
     val PaperWhiteDark = SoftLavender
     val OfflineGreen = Success

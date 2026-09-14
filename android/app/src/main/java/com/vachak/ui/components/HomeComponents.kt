@@ -184,7 +184,7 @@ fun ContinueLearningCard(
                 onClick = onContinue,
                 modifier = Modifier.fillMaxWidth().height(48.dp),
                 shape = RoundedCornerShape(50),
-                colors = ButtonDefaults.buttonColors(containerColor = VachakColors.Accent, contentColor = VachakColors.ForestDark),
+                colors = ButtonDefaults.buttonColors(containerColor = VachakColors.Accent, contentColor = Color.White),
                 contentPadding = PaddingValues(horizontal = 20.dp)
             ) {
                 Text("Continue Lesson", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, maxLines = 1)

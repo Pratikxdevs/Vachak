@@ -36,7 +36,9 @@ fun PackWorksheetView(questions: List<PackQuestionAlias>) {
         contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        items(questions, key = { it.id }) { q ->
+        // Index-suffixed keys (same duplicate-prompt hazard as the chapter
+        // Read list — pack ids are not guaranteed unique).
+        items(questions.withIndex().toList(), key = { (idx, q) -> "${q.id}-$idx" }) { (_, q) ->
             Surface(shape = RoundedCornerShape(16.dp), color = Color.White, border = androidx.compose.foundation.BorderStroke(1.dp, VachakColors.Border), shadowElevation = 0.dp, tonalElevation = 0.dp, modifier = Modifier.fillMaxWidth().cardShadow(RoundedCornerShape(16.dp))) {
                 Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
