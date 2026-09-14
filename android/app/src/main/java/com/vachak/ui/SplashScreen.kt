@@ -1,82 +1,81 @@
 package com.vachak.ui
 
+import android.net.Uri
+import android.widget.VideoView
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.vachak.ml.ModelStatus
-import com.vachak.ui.theme.VachakColors
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.viewinterop.AndroidView
+import com.vachak.R
+import com.vachak.engine.VachakLog
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+
+private val EaseSnap = CubicBezierEasing(0.2f, 0f, 0f, 1f)
 
 /**
- * Fixed 4s splash (latency plan Phase 0): branding + honest per-model
- * progress from ModelStatus. Non-blocking — MainActivity preload continues
- * sequentially in background after the splash; mic stays gated until READY.
+ * Launch splash: plays `res/raw/loadingscreen.mp4` EXACTLY once while models
+ * preload underneath (MainActivity's sequential preload is untouched — the
+ * video covers it, it never gates on it). Muted (classroom-appropriate;
+ * unmute by dropping the setVolume call). On completion (or error, or a 30s
+ * safety cap if completion never fires) the video fades out over 600ms into
+ * the app. No fixed-duration splash remains.
  */
 @Composable
-fun SplashScreen() {
-    val asr by ModelStatus.asr.collectAsState()
-    val mt by ModelStatus.mt.collectAsState()
-    val tts by ModelStatus.tts.collectAsState()
-    Surface(modifier = Modifier.fillMaxSize(), color = VachakColors.DeepLavender) {
-        Box(modifier = Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                // Brand tile — Ol Chiki letter, the script this app teaches in.
-                Box(
-                    modifier = Modifier.size(88.dp)
-                        .clip(RoundedCornerShape(26.dp))
-                        .background(VachakColors.Accent),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        "ᱚ",
-                        style = MaterialTheme.typography.displayMedium,
-                        color = VachakColors.DeepLavender,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 44.sp
-                    )
-                }
-                Text(
-                    "Vachak",
-                    style = MaterialTheme.typography.headlineLarge,
-                    color = VachakColors.Surface,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = (-0.5).sp
-                )
-                Text(
-                    "Hindi → Santali (Ol Chiki) • Offline",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = VachakColors.Lavender200,
-                    textAlign = TextAlign.Center
-                )
-                CircularProgressIndicator(color = VachakColors.Accent)
-                Text(
-                    "Loading voices: MT ${mt.state} • ASR ${asr.state} • TTS ${tts.state}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = VachakColors.Lavender200,
-                    textAlign = TextAlign.Center
-                )
-            }
+fun VideoSplash(onDone: () -> Unit) {
+    var dismiss by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    fun finish(source: String) {
+        if (dismiss) return
+        dismiss = true
+        VachakLog.d("Vachak-Splash", "video done ($source) — fading out")
+        scope.launch {
+            delay(650)
+            onDone()
         }
+    }
+    // Safety: never trap the user on this screen.
+    LaunchedEffect(Unit) {
+        delay(30_000)
+        finish("timeout")
+    }
+    AnimatedVisibility(
+        visible = !dismiss,
+        exit = fadeOut(animationSpec = tween(durationMillis = 600, easing = EaseSnap)),
+        label = "splashFade"
+    ) {
+        AndroidView(
+            factory = { ctx ->
+                VideoView(ctx).apply {
+                    setVideoURI(Uri.parse("android.resource://${ctx.packageName}/${R.raw.loadingscreen}"))
+                    setOnPreparedListener { mp ->
+                        mp.setVolume(0f, 0f)
+                        mp.isLooping = false
+                        VachakLog.d("Vachak-Splash", "video prepared — playing once")
+                        start()
+                    }
+                    setOnCompletionListener { finish("completed") }
+                    setOnErrorListener { _, what, extra ->
+                        VachakLog.e("Vachak-Splash", "video error what=$what extra=$extra — skipping")
+                        finish("error")
+                        true
+                    }
+                }
+            },
+            onRelease = { it.stopPlayback() },
+            modifier = Modifier.fillMaxSize().background(Color.Black)
+        )
     }
 }

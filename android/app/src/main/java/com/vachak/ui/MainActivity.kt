@@ -142,18 +142,15 @@ class MainActivity : ComponentActivity() {
             } catch (e: Throwable) { VachakLog.w("Vachak-ASR", "startup ASR warm-up threw (first mic press will cold-load)", e) }
         }
         setContent {
-            // Fixed 4s splash then interactive (latency plan Phase 0):
-            // cold MT 8-11s + ASR 2.7-4s keeps loading in background after the
-            // splash; mic stays gated on ModelStatus until READY (see LiveScreen
-            // guardedStart + "Warming models…"), so first tap never cold-loads
+            // Launch splash: loadingscreen.mp4 plays ONCE (muted) while the
+            // sequential model preload above keeps running underneath — the
+            // video covers loading, it never gates on it. Completion (or
+            // error/timeout inside VideoSplash) fades into the app. Mic stays
+            // gated on ModelStatus until READY, so first tap never cold-loads
             // silently. Sequential preload order unchanged (2GB RAM rule).
             var showSplash by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(true) }
-            androidx.compose.runtime.LaunchedEffect(Unit) {
-                kotlinx.coroutines.delay(4000)
-                showSplash = false
-            }
             if (showSplash) {
-                com.vachak.ui.SplashScreen()
+                com.vachak.ui.VideoSplash(onDone = { showSplash = false })
             } else {
             // Adapt system bars to device dark/light setting — avoids contradicting user theme
             // isSystemInDarkTheme() respects Settings > Display > Dark theme / scheduled dark mode
