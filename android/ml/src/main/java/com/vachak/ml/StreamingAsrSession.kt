@@ -2,7 +2,7 @@ package com.vachak.ml
 
 import android.content.Context
 import android.os.SystemClock
-import android.util.Log
+import com.vachak.engine.VachakLog
 
 /**
  * Windowed-streaming ASR session: mic chunks in, Hindi text out.
@@ -236,14 +236,14 @@ class StreamingAsrSession(
         pendingFinalize = false
         // Lightweight start: DO NOT block UI with model IO. Warm-up is offloaded to Dispatchers.IO.
         if (testTranscriber != null) {
-            Log.d(tagAsr, "StreamingAsrSession start t0=${t0Ns} test mode — skipping native warm mode=$streamingModeLabel windowSamples=$windowSamples")
+            VachakLog.d(tagAsr, "StreamingAsrSession start t0=${t0Ns} test mode — skipping native warm mode=$streamingModeLabel windowSamples=$windowSamples")
         } else {
-            Log.d(tagAsr, "StreamingAsrSession start t0=${t0Ns} lightweight mode=$streamingModeLabel windowSamples=$windowSamples (warm-up offloaded to IO)")
+            VachakLog.d(tagAsr, "StreamingAsrSession start t0=${t0Ns} lightweight mode=$streamingModeLabel windowSamples=$windowSamples (warm-up offloaded to IO)")
         }
-        try { vad.flush() } catch (e: Exception) { Log.w(tagVad, "vad.flush failed (VAD state may leak into next segment)", e) }
-        Log.d(tagVad, "Streaming session start t0=${t0Ns} segmentId reset")
-        Log.d(tagVad, "SEGMENT_START id=0 startSample=${currentSegmentStartSample} (session start, awaiting speech)")
-        Log.d(tagAsr, "Streaming mode determination: OfflineRecognizer (OfflineWhisper/OfflineNemoEncDecCtc offline, OfflineModelConfig) incompatible with OnlineRecognizer true streaming (requires OnlineTransducer/OnlineNeMoCtc streaming model with incremental state) — using $streamingModeLabel fallback: fixed ${windowSamples} samples (${windowSamples * 1000 / sampleRate}ms) overlapping windows, bounded O(window) decode, deduplicated, pack-aware offline")
+        try { vad.flush() } catch (e: Exception) { VachakLog.w(tagVad, "vad.flush failed (VAD state may leak into next segment)", e) }
+        VachakLog.d(tagVad, "Streaming session start t0=${t0Ns} segmentId reset")
+        VachakLog.d(tagVad, "SEGMENT_START id=0 startSample=${currentSegmentStartSample} (session start, awaiting speech)")
+        VachakLog.d(tagAsr, "Streaming mode determination: OfflineRecognizer (OfflineWhisper/OfflineNemoEncDecCtc offline, OfflineModelConfig) incompatible with OnlineRecognizer true streaming (requires OnlineTransducer/OnlineNeMoCtc streaming model with incremental state) — using $streamingModeLabel fallback: fixed ${windowSamples} samples (${windowSamples * 1000 / sampleRate}ms) overlapping windows, bounded O(window) decode, deduplicated, pack-aware offline")
     }
 
     /** Offload heavy ASR/VAD warm-up off the UI thread. Call from Dispatchers.IO after start(). */
@@ -251,9 +251,9 @@ class StreamingAsrSession(
         if (testTranscriber != null) return
         try {
             directAsr.warmUpIfNeeded()
-            Log.d(tagAsr, "StreamingAsrSession warmUpAsync ready mode=$streamingModeLabel")
+            VachakLog.d(tagAsr, "StreamingAsrSession warmUpAsync ready mode=$streamingModeLabel")
         } catch (e: Exception) {
-            Log.w(tagAsr, "warmUpAsync failed: ${e.message}")
+            VachakLog.w(tagAsr, "warmUpAsync failed: ${e.message}")
         }
         try {
             // Touch VAD once off UI to trigger SherpaAssets.prepare + Vad creation off main.
@@ -263,7 +263,7 @@ class StreamingAsrSession(
             }
         } catch (e: Exception) {
             // VAD warm-up is best-effort; real creation errors surface at first accept().
-            Log.w(tagVad, "warmUp VAD touch failed: ${e.message}")
+            VachakLog.w(tagVad, "warmUp VAD touch failed: ${e.message}")
         }
     }
 
@@ -291,7 +291,7 @@ class StreamingAsrSession(
             vad.accept(vadScratch)
         } catch (e: Exception) {
             vadFailures++
-            if (vadFailures <= 3) Log.e(tagVad, "VAD accept threw (RMS path continues) #$vadFailures", e)
+            if (vadFailures <= 3) VachakLog.e(tagVad, "VAD accept threw (RMS path continues) #$vadFailures", e)
         }
         totalSamplesSeen += chunk.size
 
@@ -326,15 +326,15 @@ class StreamingAsrSession(
         val lb = lastChunk
         if (lb != null && speechStartSample!! - lb.size >= currentSegmentStartSample) {
             currentSegmentSamples.add(lb)
-            Log.d(tagVad, "SEGMENT_START id=$segmentIdCounter startSample=${speechStartSample!! - lb.size} (with lookback) rms=$rms")
+            VachakLog.d(tagVad, "SEGMENT_START id=$segmentIdCounter startSample=${speechStartSample!! - lb.size} (with lookback) rms=$rms")
             currentSegmentStartSample = speechStartSample!! - lb.size
         } else {
-            Log.d(tagVad, "SEGMENT_START id=$segmentIdCounter startSample=$speechStartSample rms=$rms (no lookback due to overlap guard)")
+            VachakLog.d(tagVad, "SEGMENT_START id=$segmentIdCounter startSample=$speechStartSample rms=$rms (no lookback due to overlap guard)")
             currentSegmentStartSample = speechStartSample!!
         }
         currentSegmentSamples.add(chunk)
         silenceMs = 0
-        Log.d(tagVad, "SEGMENT_START id=$segmentIdCounter startSample=$currentSegmentStartSample")
+        VachakLog.d(tagVad, "SEGMENT_START id=$segmentIdCounter startSample=$currentSegmentStartSample")
         // Reset per-segment window streaming state for new segment
         accumulatedPreview = ""
         lastRawWindowText = ""
@@ -346,11 +346,11 @@ class StreamingAsrSession(
         var v: VadSegment? = null
         try {
             while (vad.popSegment()?.also { v = it } != null) {
-                Log.d(tagVad, "VAD internal pop segment samples=${v!!.samples.size} startSec=${v!!.startSec} endSec=${v!!.endSec} (internal, not used for committed — normalized)")
+                VachakLog.d(tagVad, "VAD internal pop segment samples=${v!!.samples.size} startSec=${v!!.startSec} endSec=${v!!.endSec} (internal, not used for committed — normalized)")
             }
         } catch (e: Exception) {
             vadFailures++
-            Log.e(tagVad, "VAD popSegment threw (drained part skipped)", e)
+            VachakLog.e(tagVad, "VAD popSegment threw (drained part skipped)", e)
         }
     }
 
@@ -381,7 +381,7 @@ class StreamingAsrSession(
             // failure, never VAD silence. Commit nothing, record why.
             if (lastDecodeError == null) {
                 lastDecodeError = e.message?.take(160)
-                Log.e(tagAsr, "$where decode threw", e)
+                VachakLog.e(tagAsr, "$where decode threw", e)
             }
             ""
         }
@@ -395,7 +395,7 @@ class StreamingAsrSession(
                 currentPartial = ""
                 accumulatedPreview = ""
                 lastRawWindowText = ""
-                Log.d(tagAsr, "SEGMENT_PARTIAL id=$segmentIdCounter text=\"\" (cleared, empty segment)")
+                VachakLog.d(tagAsr, "SEGMENT_PARTIAL id=$segmentIdCounter text=\"\" (cleared, empty segment)")
             }
             return ""
         }
@@ -413,7 +413,7 @@ class StreamingAsrSession(
         // toShortArray re-box).
         val windowShort = currentSegmentSamples.copyLast(windowSize)
 
-        Log.d(tagAsr, "ASR_WINDOW id=$segmentIdCounter startSample=$windowStartGlobal endSample=$windowEndGlobal newSamples=$windowSize mode=$streamingModeLabel")
+        VachakLog.d(tagAsr, "ASR_WINDOW id=$segmentIdCounter startSample=$windowStartGlobal endSample=$windowEndGlobal newSamples=$windowSize mode=$streamingModeLabel")
 
         val startNs = SystemClock.elapsedRealtimeNanos()
         val txtRaw = decode(windowShort, "ASR_PARTIAL id=$segmentIdCounter")
@@ -421,12 +421,12 @@ class StreamingAsrSession(
             // Keep the previous partial: a blank window is "no new words",
             // not "clear the screen".
             if (lastDecodeError != null) {
-                Log.e(tagAsr, "ASR_PARTIAL id=$segmentIdCounter decode threw")
+                VachakLog.e(tagAsr, "ASR_PARTIAL id=$segmentIdCounter decode threw")
             }
             return currentPartial
         }
         val latencyMs = (SystemClock.elapsedRealtimeNanos() - startNs) / 1_000_000
-        Log.d(tagAsr, "ASR_PARTIAL id=$segmentIdCounter latencyMs=$latencyMs text=\"$txtRaw\"")
+        VachakLog.d(tagAsr, "ASR_PARTIAL id=$segmentIdCounter latencyMs=$latencyMs text=\"$txtRaw\"")
 
         // Deduplicate overlapping hypotheses: full-segment window replaces,
         // tail window stitches its non-overlapping suffix on.
@@ -445,14 +445,14 @@ class StreamingAsrSession(
             currentPartial = nextPartial
             // Keep accumulatedPreview in sync so next tail window dedup is against the committed preview so far
             accumulatedPreview = nextPartial
-            Log.d(tagAsr, "SEGMENT_PARTIAL id=$segmentIdCounter text=\"$nextPartial\" (windowed)")
+            VachakLog.d(tagAsr, "SEGMENT_PARTIAL id=$segmentIdCounter text=\"$nextPartial\" (windowed)")
             if (firstPartialNs == null && nextPartial.isNotBlank()) {
                 firstPartialNs = SystemClock.elapsedRealtimeNanos()
                 val firstMs = (firstPartialNs!! - (t0Ns ?: firstPartialNs!!)) / 1_000_000
-                Log.d(tagLat, "first partial transcript ${firstMs}ms -> \"$nextPartial\"")
-                Log.d(tagAsr, "PARTIAL (${firstMs}ms): $nextPartial")
+                VachakLog.d(tagLat, "first partial transcript ${firstMs}ms -> \"$nextPartial\"")
+                VachakLog.d(tagAsr, "PARTIAL (${firstMs}ms): $nextPartial")
             } else if (nextPartial.isNotBlank()) {
-                Log.d(tagAsr, "PARTIAL update: $nextPartial")
+                VachakLog.d(tagAsr, "PARTIAL update: $nextPartial")
             }
         }
         lastRawWindowText = txtRaw
@@ -468,9 +468,9 @@ class StreamingAsrSession(
             // id, so explicit finalize calls on empty buffers can't punch gaps
             // in the ledger sequence.
             val log = VadSegmentLog(segmentIdCounter, currentSegmentStartSample, currentSegmentStartSample, 0, true)
-            Log.d(tagVad, "SEGMENT_FINAL id=${log.segmentId} startSample=${log.startSample} endSample=${log.endSample} durationMs=${log.durationMs} finalized=${log.finalized} text=\"\" (empty)")
-            Log.d(tagVad, "segmentId=${log.segmentId} startSample=${log.startSample} endSample=${log.endSample} durationMs=${log.durationMs} finalized=${log.finalized} (empty)")
-            Log.d(tagAsr, "ASR_FINAL id=${log.segmentId} latencyMs=0 text=\"\" (empty)")
+            VachakLog.d(tagVad, "SEGMENT_FINAL id=${log.segmentId} startSample=${log.startSample} endSample=${log.endSample} durationMs=${log.durationMs} finalized=${log.finalized} text=\"\" (empty)")
+            VachakLog.d(tagVad, "segmentId=${log.segmentId} startSample=${log.startSample} endSample=${log.endSample} durationMs=${log.durationMs} finalized=${log.finalized} (empty)")
+            VachakLog.d(tagAsr, "ASR_FINAL id=${log.segmentId} latencyMs=0 text=\"\" (empty)")
             return log
         }
         val startSample = currentSegmentStartSample
@@ -482,20 +482,20 @@ class StreamingAsrSession(
         val startNs = SystemClock.elapsedRealtimeNanos()
         val txt = decode(pcm, "ASR_FINAL id=$segmentIdCounter")
         val latencyMs = (SystemClock.elapsedRealtimeNanos() - startNs) / 1_000_000
-        Log.d(tagVad, "SEGMENT_FINAL id=$segmentIdCounter startSample=$startSample endSample=$endSample durationMs=$durationMs finalized=true text=\"$txt\"")
-        Log.d(tagAsr, "ASR_FINAL id=$segmentIdCounter latencyMs=$latencyMs text=\"$txt\"")
+        VachakLog.d(tagVad, "SEGMENT_FINAL id=$segmentIdCounter startSample=$startSample endSample=$endSample durationMs=$durationMs finalized=true text=\"$txt\"")
+        VachakLog.d(tagAsr, "ASR_FINAL id=$segmentIdCounter latencyMs=$latencyMs text=\"$txt\"")
         if (txt.isNotBlank()) {
             val record = SegmentRecord(segmentIdCounter, startSample, endSample, durationMs, txt)
             segmentLedger.add(record)
             committedText = segmentLedger.sortedBy { it.startSample }.joinToString(" ") { it.finalText }
             committedQueue.addLast(txt)
-            Log.d(tagAsr, "SEGMENT_COMMITTED id=${record.segmentId} committed=\"$committedText\"")
-            Log.d(tagAsr, "FINAL segmentId=$segmentIdCounter \"$txt\" -> committed=\"$committedText\"")
+            VachakLog.d(tagAsr, "SEGMENT_COMMITTED id=${record.segmentId} committed=\"$committedText\"")
+            VachakLog.d(tagAsr, "FINAL segmentId=$segmentIdCounter \"$txt\" -> committed=\"$committedText\"")
         } else {
-            Log.d(tagAsr, "FINAL segmentId=$segmentIdCounter empty after decode (silence)")
+            VachakLog.d(tagAsr, "FINAL segmentId=$segmentIdCounter empty after decode (silence)")
         }
         val log = VadSegmentLog(segmentIdCounter, startSample, endSample, durationMs, true)
-        Log.d(tagVad, "segmentId=${log.segmentId} startSample=${log.startSample} endSample=${log.endSample} durationMs=${log.durationMs} finalized=${log.finalized} text=\"$txt\"")
+        VachakLog.d(tagVad, "segmentId=${log.segmentId} startSample=${log.startSample} endSample=${log.endSample} durationMs=${log.durationMs} finalized=${log.finalized} text=\"$txt\"")
         return advanceAfterFinal(log)
     }
 
@@ -517,21 +517,21 @@ class StreamingAsrSession(
         if (currentSegmentSamples.isNotEmpty()) {
             finalizeCurrentSegment(isEndpoint = true)
         }
-        try { vad.flush() } catch (e: Exception) { Log.w(tagVad, "vad.flush failed (VAD state may leak into next segment)", e) }
+        try { vad.flush() } catch (e: Exception) { VachakLog.w(tagVad, "vad.flush failed (VAD state may leak into next segment)", e) }
         var seg: VadSegment? = null
         try {
             while (vad.popSegment()?.also { seg = it } != null) {
-                Log.d(tagVad, "finish drain VAD internal pop ${seg!!.samples.size} samples")
+                VachakLog.d(tagVad, "finish drain VAD internal pop ${seg!!.samples.size} samples")
             }
         } catch (e: Exception) {
             vadFailures++
-            Log.e(tagVad, "finish drain popSegment threw", e)
+            VachakLog.e(tagVad, "finish drain popSegment threw", e)
         }
         val finalNs = SystemClock.elapsedRealtimeNanos()
         val totalMs = (finalNs - (t0Ns ?: finalNs)) / 1_000_000
         val firstMs = firstPartialNs?.let { (it - (t0Ns ?: it)) / 1_000_000 } ?: -1
-        Log.d(tagLat, "final transcript ${totalMs}ms after t0, first partial was ${firstMs}ms committed=\"$committedText\" segments=${segmentLedger.size} mode=$streamingModeLabel")
-        Log.d(tagAsr, "FINAL committed=\"$committedText\" segments=${segmentLedger.size} mode=$streamingModeLabel")
+        VachakLog.d(tagLat, "final transcript ${totalMs}ms after t0, first partial was ${firstMs}ms committed=\"$committedText\" segments=${segmentLedger.size} mode=$streamingModeLabel")
+        VachakLog.d(tagAsr, "FINAL committed=\"$committedText\" segments=${segmentLedger.size} mode=$streamingModeLabel")
         return committedText
     }
 
@@ -588,7 +588,7 @@ class StreamingAsrSession(
         }
         val last = minOf(pcm.size, e + 3200)
         if (last - first <= 0 || (first == 0 && last == pcm.size)) return pcm
-        Log.d(tagAsr, "trimSilence ${pcm.size} -> ${last - first} samples (cut ${(pcm.size - (last - first)) * 1000 / sampleRate}ms silence)")
+        VachakLog.d(tagAsr, "trimSilence ${pcm.size} -> ${last - first} samples (cut ${(pcm.size - (last - first)) * 1000 / sampleRate}ms silence)")
         return pcm.copyOfRange(first, last)
     }
 

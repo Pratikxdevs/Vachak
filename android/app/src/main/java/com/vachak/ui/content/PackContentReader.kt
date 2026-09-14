@@ -1,5 +1,7 @@
 package com.vachak.ui.content
 
+import com.vachak.engine.VachakLog
+
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -626,7 +628,7 @@ object PackContentReader {
             }
             null
         } catch (t: Throwable) {
-            android.util.Log.e("Vachak-Pack", "loadChapterBundle($grade/$slug) failed", t)
+            VachakLog.e("Vachak-Pack", "loadChapterBundle($grade/$slug) failed", t)
             null
         }
     }
@@ -863,7 +865,7 @@ object PackContentReader {
             }
             out
         } catch (t: Throwable) {
-            android.util.Log.e("Vachak-Pack", "readGradeTitleLines($grade) failed", t)
+            VachakLog.e("Vachak-Pack", "readGradeTitleLines($grade) failed", t)
             emptyMap()
         }
     }

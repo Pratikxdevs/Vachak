@@ -1,5 +1,7 @@
 package com.vachak.ml.adapter
 
+import com.vachak.engine.VachakLog
+
 import ai.onnxruntime.OnnxTensor
 import ai.onnxruntime.OrtEnvironment
 import ai.onnxruntime.OrtSession
@@ -91,10 +93,10 @@ class OnnxIndicTrans2Adapter(
             com.vachak.ml.ModelStatus.loadingMt("ONNX Santali bundle")
             val dir = SherpaAssets.prepare(context, modelDir)
             val t0 = android.os.SystemClock.elapsedRealtimeNanos()
-            android.util.Log.d("Vachak-MT", "ONNX load from $dir")
+            VachakLog.d("Vachak-MT", "ONNX load from $dir")
             for (f in listOf("encoder_model.onnx", "decoder_model.onnx", "decoder_with_past_model.onnx", "tokenizer_src.json", "tokenizer_tgt.json")) {
                 if (!File(dir, f).exists()) {
-                    android.util.Log.e("Vachak-MT", "ONNX bundle missing $f in $dir")
+                    VachakLog.e("Vachak-MT", "ONNX bundle missing $f in $dir")
                     return EngineResult.Err(EngineError.MODEL_NOT_LOADED, "ONNX bundle missing $f")
                 }
             }
@@ -112,12 +114,12 @@ class OnnxIndicTrans2Adapter(
             decSession = env.createSession("$dir/decoder_model.onnx", opts)
             decPastSession = env.createSession("$dir/decoder_with_past_model.onnx", opts)
             ortEnv = env
-            android.util.Log.d("Vachak-MT", "ONNX graphs enc.in=${encSession!!.inputNames} dec.out0=${decSession!!.outputNames.firstOrNull()} past.outs=${decPastSession!!.outputNames.size}")
+            VachakLog.d("Vachak-MT", "ONNX graphs enc.in=${encSession!!.inputNames} dec.out0=${decSession!!.outputNames.firstOrNull()} past.outs=${decPastSession!!.outputNames.size}")
             val pastTensors = decPastSession!!.outputNames.size - 1 // minus logits
             decLayers = if (pastTensors > 0 && pastTensors % 4 == 0) {
                 pastTensors / 4
             } else {
-                android.util.Log.w("Vachak-MT", "unexpected past tensor count $pastTensors, keeping decLayers=$decLayers")
+                VachakLog.w("Vachak-MT", "unexpected past tensor count $pastTensors, keeping decLayers=$decLayers")
                 decLayers
             }
             loadBpe(File(dir, "tokenizer_src.json"), File(dir, "tokenizer_tgt.json"))
@@ -128,13 +130,13 @@ class OnnxIndicTrans2Adapter(
             com.vachak.ml.ModelStatus.setMt(
                 com.vachak.ml.ModelInfo(com.vachak.ml.ModelState.READY, "ONNX Santali INT8 ($dir)", ms)
             )
-            android.util.Log.d("Vachak-MT", "ONNX ready in ${ms}ms (enc+dec+past, threads=1)")
+            VachakLog.d("Vachak-MT", "ONNX ready in ${ms}ms (enc+dec+past, threads=1)")
             return EngineResult.Ok(Unit)
         } catch (e: Exception) {
             com.vachak.ml.ModelStatus.setMt(
                 com.vachak.ml.ModelInfo(com.vachak.ml.ModelState.ERROR, "MT load failed: ${e.message?.take(140)}")
             )
-            android.util.Log.e("Vachak-MT", "ONNX load failed", e)
+            VachakLog.e("Vachak-MT", "ONNX load failed", e)
             return EngineResult.Err(EngineError.MODEL_LOAD_FAILED, "ONNX load failed: ${e.message}")
         } finally {
             lock.unlock()
@@ -150,7 +152,7 @@ class OnnxIndicTrans2Adapter(
         if (lr is EngineResult.Err) return lr
         // Tier 0: GOLD curated pre-check for known INT8 failure modes (exact match).
         goldMap[text.trim()]?.let {
-            android.util.Log.d("Vachak-MT", "ONNX curated \"${text.take(30)}\" -> \"${it.take(30)}\"")
+            VachakLog.d("Vachak-MT", "ONNX curated \"${text.take(30)}\" -> \"${it.take(30)}\"")
             return EngineResult.Ok(it)
         }
         lock.lock()
@@ -159,10 +161,10 @@ class OnnxIndicTrans2Adapter(
             val env = ortEnv ?: return EngineResult.Err(EngineError.MODEL_NOT_LOADED, "ORT env missing")
             val pre = IndicProcessorPort.preprocessBatch(listOf(text), "hin_Deva", "sat_Olck")[0]
             var ids = encode(pre)
-            android.util.Log.d("Vachak-MT", "ONNX tokenize [${ids.take(6).joinToString(",")}${if (ids.size > 6) ",..." else ""}] len=${ids.size}")
+            VachakLog.d("Vachak-MT", "ONNX tokenize [${ids.take(6).joinToString(",")}${if (ids.size > 6) ",..." else ""}] len=${ids.size}")
             if (ids.size > maxSourcePositions) {
                 ids = ids.take(maxSourcePositions - 1) + eosId
-                android.util.Log.d("Vachak-MT", "ONNX truncate len->${ids.size} (max $maxSourcePositions)")
+                VachakLog.d("Vachak-MT", "ONNX truncate len->${ids.size} (max $maxSourcePositions)")
             }
             val n = ids.size
             val idBuf = LongBuffer.allocate(1 * n)
@@ -182,7 +184,7 @@ class OnnxIndicTrans2Adapter(
             for (i in 0 until n) System.arraycopy(hidden[0][i], 0, flatHidden, i * hiddenDim, hiddenDim)
             encOut.close()
             encInputs.values.forEach { try { it.close() } catch (_: Throwable) {} }
-            android.util.Log.d("Vachak-MT", "ONNX encode done shape=[1,$n,512]")
+            VachakLog.d("Vachak-MT", "ONNX encode done shape=[1,$n,512]")
 
             // Greedy decode: step 0 full decoder, steps 1..N with past KV.
             // Latency: encoder_attention_mask is constant per sentence — build
@@ -249,13 +251,13 @@ class OnnxIndicTrans2Adapter(
             decoded = IndicProcessorPort.postprocessBatch(listOf(decoded), "sat_Olck")[0]
             val ms = (android.os.SystemClock.elapsedRealtimeNanos() - t0) / 1_000_000
             if (!olChiki.containsMatchIn(decoded)) {
-                android.util.Log.w("Vachak-MT", "ONNX output lacks Ol Chiki (numerals/placeholders?) \"${decoded.take(40)}\"")
+                VachakLog.w("Vachak-MT", "ONNX output lacks Ol Chiki (numerals/placeholders?) \"${decoded.take(40)}\"")
             }
-            android.util.Log.d("Vachak-MT", "ONNX MT ${ms}ms \"${text.take(30)}\" -> \"${decoded.take(40)}\"")
+            VachakLog.d("Vachak-MT", "ONNX MT ${ms}ms \"${text.take(30)}\" -> \"${decoded.take(40)}\"")
             if (decoded.isBlank()) return EngineResult.Err(EngineError.MODEL_NOT_LOADED, "empty translation")
             return EngineResult.Ok(decoded)
         } catch (e: Exception) {
-            android.util.Log.e("Vachak-MT", "ONNX translate failed", e)
+            VachakLog.e("Vachak-MT", "ONNX translate failed", e)
             return EngineResult.Err(EngineError.MODEL_LOAD_FAILED, "ONNX translate failed: ${e.message}")
         } finally {
             lock.unlock()
@@ -407,7 +409,7 @@ class OnnxIndicTrans2Adapter(
                     }
                     walk(raw)
                     if (leaves.isEmpty()) {
-                        android.util.Log.w("Vachak-MT", "past $outName unexpected type")
+                        VachakLog.w("Vachak-MT", "past $outName unexpected type")
                         continue
                     }
                     // shapes are [1,8,S,64] where S grows for decoder self-attn
@@ -431,7 +433,7 @@ class OnnxIndicTrans2Adapter(
      * translates. Never throws. */
     internal fun loadGold(f: File): Map<String, String> {
         if (!f.exists()) {
-            android.util.Log.w("Vachak-MT", "gold.tsv missing at ${f.absolutePath} — curated pre-check disabled")
+            VachakLog.w("Vachak-MT", "gold.tsv missing at ${f.absolutePath} — curated pre-check disabled")
             return emptyMap()
         }
         return try {
@@ -442,16 +444,16 @@ class OnnxIndicTrans2Adapter(
                     if (line.isEmpty() || line.startsWith("#")) return@forEach
                     val tab = line.indexOf('\t')
                     if (tab <= 0) {
-                        android.util.Log.w("Vachak-MT", "gold.tsv skipping malformed line: ${line.take(40)}")
+                        VachakLog.w("Vachak-MT", "gold.tsv skipping malformed line: ${line.take(40)}")
                         return@forEach
                     }
                     map[line.substring(0, tab)] = line.substring(tab + 1)
                 }
             }
-            android.util.Log.d("Vachak-MT", "GOLD ready entries=${map.size} from ${f.absolutePath}")
+            VachakLog.d("Vachak-MT", "GOLD ready entries=${map.size} from ${f.absolutePath}")
             map
         } catch (e: Exception) {
-            android.util.Log.w("Vachak-MT", "gold.tsv unreadable — curated pre-check disabled: ${e.message}")
+            VachakLog.w("Vachak-MT", "gold.tsv unreadable — curated pre-check disabled: ${e.message}")
             emptyMap()
         }
     }
@@ -462,7 +464,7 @@ class OnnxIndicTrans2Adapter(
             Regex("\"src_dict_size\"\\s*:\\s*(\\d+)").find(t)?.let { srcDictSize = it.groupValues[1].toInt() }
             Regex("\"tgt_dict_size\"\\s*:\\s*(\\d+)").find(t)?.let { tgtDictSize = it.groupValues[1].toInt() }
         } catch (e: Exception) {
-            android.util.Log.w("Vachak-MT", "tokenizer_meta unreadable, keeping defaults src=$srcDictSize tgt=$tgtDictSize: ${e.message}")
+            VachakLog.w("Vachak-MT", "tokenizer_meta unreadable, keeping defaults src=$srcDictSize tgt=$tgtDictSize: ${e.message}")
         }
     }
 
@@ -473,7 +475,7 @@ class OnnxIndicTrans2Adapter(
                 maxSourcePositions = it.groupValues[1].toInt().coerceAtMost(258)
             }
         } catch (e: Exception) {
-            android.util.Log.w("Vachak-MT", "config.json unreadable, keeping maxSourcePositions=$maxSourcePositions: ${e.message}")
+            VachakLog.w("Vachak-MT", "config.json unreadable, keeping maxSourcePositions=$maxSourcePositions: ${e.message}")
         }
     }
 
@@ -485,7 +487,7 @@ class OnnxIndicTrans2Adapter(
         // First run parses + writes the cache; later runs memory-map it in a
         // fraction of the time. JSON stays the source of truth (size-stamped).
         if (tryLoadCodecCache(srcJson, tgtJson)) return
-        android.util.Log.d("Vachak-MT", "ONNX loading BPE codec (245k merges, may take seconds, once)")
+        VachakLog.d("Vachak-MT", "ONNX loading BPE codec (245k merges, may take seconds, once)")
         val t0 = android.os.SystemClock.elapsedRealtimeNanos()
         val vocab = HashMap<String, Int>(140000)
         val added = HashMap<String, Int>()
@@ -580,7 +582,7 @@ class OnnxIndicTrans2Adapter(
         mergeRank = ranks
         tgtIdToToken = rev
         val ms = (android.os.SystemClock.elapsedRealtimeNanos() - t0) / 1_000_000
-        android.util.Log.d("Vachak-MT", "ONNX BPE ready vocab=${vocab.size} merges=${ranks.size} tgtIds=${rev.size} in ${ms}ms")
+        VachakLog.d("Vachak-MT", "ONNX BPE ready vocab=${vocab.size} merges=${ranks.size} tgtIds=${rev.size} in ${ms}ms")
         writeCodecCache(srcJson, tgtJson, vocab, added, ranks, pairs, maxId)
     }
 
@@ -597,7 +599,7 @@ class OnnxIndicTrans2Adapter(
                 if (inp.readUTF() != "VCHKBPE1") return false
                 if (inp.readInt() != 1) return false
                 if (inp.readLong() != srcJson.length() || inp.readLong() != tgtJson.length()) {
-                    android.util.Log.d("Vachak-MT", "codec cache stale (asset sizes changed) — re-parsing JSON")
+                    VachakLog.d("Vachak-MT", "codec cache stale (asset sizes changed) — re-parsing JSON")
                     return false
                 }
                 val vocab = HashMap<String, Int>(140000)
@@ -619,10 +621,10 @@ class OnnxIndicTrans2Adapter(
                 tgtIdToToken = rev
             }
             val ms = (android.os.SystemClock.elapsedRealtimeNanos() - t0) / 1_000_000
-            android.util.Log.d("Vachak-MT", "ONNX BPE codec cache hit in ${ms}ms")
+            VachakLog.d("Vachak-MT", "ONNX BPE codec cache hit in ${ms}ms")
             return true
         } catch (e: Exception) {
-            android.util.Log.w("Vachak-MT", "codec cache unreadable, re-parsing JSON: ${e.message}")
+            VachakLog.w("Vachak-MT", "codec cache unreadable, re-parsing JSON: ${e.message}")
             try { cache.delete() } catch (_: Exception) { /* best-effort cleanup */ }
             return false
         }
@@ -650,9 +652,9 @@ class OnnxIndicTrans2Adapter(
                 out.writeInt(tgtPairs.size)
                 for ((id, tok) in tgtPairs) { out.writeInt(id); out.writeUTF(tok) }
             }
-            android.util.Log.d("Vachak-MT", "codec cache written")
+            VachakLog.d("Vachak-MT", "codec cache written")
         } catch (e: Exception) {
-            android.util.Log.w("Vachak-MT", "codec cache write failed (parse result still valid): ${e.message}")
+            VachakLog.w("Vachak-MT", "codec cache write failed (parse result still valid): ${e.message}")
         }
     }
 

@@ -1,6 +1,8 @@
 package com.vachak.ui.screens
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -16,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import com.vachak.engine.ActiveLanguage
 import com.vachak.engine.EngineProvider
 import com.vachak.engine.EngineResult
+import com.vachak.engine.VachakLog
 import com.vachak.ml.adapter.AdapterTranslationEngine
 import com.vachak.sync.PackManager
 import com.vachak.ui.components.VachakSection
@@ -78,20 +81,20 @@ fun DiagnosticsScreen(
                     val dbFile = context.getDatabasePath("vachak_content.db")
                     if (dbFile.exists()) dbFile.length() else 0L
                 } catch (e: Exception) {
-                    android.util.Log.w("Vachak-Diag", "db size unreadable: ${e.message}")
+                    VachakLog.w("Vachak-Diag", "db size unreadable: ${e.message}")
                     0L
                 }
                 // MEASURED bytes: installed APK file + extracted filesDir models + packs + db.
                 // (APK asset table doesn't expose sizes; packageCodePath + filesDir walk does.)
                 val freeBytes = PackManager.freeSpaceBytes(context)
                 val apkBytes = try { java.io.File(context.packageCodePath).length() } catch (e: Exception) {
-                    android.util.Log.w("Vachak-Diag", "apk size unreadable: ${e.message}")
+                    VachakLog.w("Vachak-Diag", "apk size unreadable: ${e.message}")
                     0L
                 }
                 val modelsBytes = try {
                     java.io.File(context.filesDir, "vachak_models").walkTopDown().filter { it.isFile }.sumOf { it.length() }
                 } catch (e: Exception) {
-                    android.util.Log.w("Vachak-Diag", "filesDir models scan failed: ${e.message}")
+                    VachakLog.w("Vachak-Diag", "filesDir models scan failed: ${e.message}")
                     0L
                 }
                 val totalMb = (packBytes + dbBytes + apkBytes + modelsBytes) / (1024 * 1024)
@@ -100,7 +103,7 @@ fun DiagnosticsScreen(
                     val packs = PackManager.packEntities(context)
                     packs.firstOrNull { it.isActive }?.manifestSha256 ?: packs.firstOrNull()?.manifestSha256
                 } catch (e: Exception) {
-                    android.util.Log.w("Vachak-Diag", "pack sha unreadable: ${e.message}")
+                    VachakLog.w("Vachak-Diag", "pack sha unreadable: ${e.message}")
                     null
                 }
                 withContext(Dispatchers.Main) {
@@ -110,7 +113,7 @@ fun DiagnosticsScreen(
                     packShaLine = sha?.let { "packSha256: ${it.take(16)}… • ${ActiveLanguage.label(activeLang)} • withinBudget=${totalMb <= 500}" }
                 }
             } catch (e: Exception) {
-                android.util.Log.w("Vachak-Diag", "live storage scan failed", e)
+                VachakLog.w("Vachak-Diag", "live storage scan failed", e)
                 withContext(Dispatchers.Main) { liveStorage = "Live storage unavailable — using estimate" }
             }
         }
@@ -175,7 +178,7 @@ fun DiagnosticsScreen(
                             val fp = if (java.io.File(dir, "model.onnx").exists() || java.io.File(dir, "model.int8.onnx").exists()) {
                                 com.vachak.ml.AsrModelFingerprint.read(dir)
                             } else {
-                                android.util.Log.w("Vachak-Diag", "fingerprint: filesDir ASR not extracted yet")
+                                VachakLog.w("Vachak-Diag", "fingerprint: filesDir ASR not extracted yet")
                                 null
                             }
                             withContext(Dispatchers.Main) {
@@ -224,5 +227,86 @@ fun DiagnosticsScreen(
             }
             Text("Report: docs/benchmarks/BENCHMARK_REPORT.md • Harness: benchmarks/run_benchmark.py", style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
+
+        LiveLogSection()
+    }
+}
+
+/**
+ * Live Log — every Vachak-* line from the whole APK (ASR/VAD/MT/TTS/sherpa
+ * adapters, pipeline, stop button, packs), newest last, no adb needed.
+ * Same lines logcat shows; the ring holds the last 300.
+ */
+@Composable
+private fun LiveLogSection() {
+    val lines by VachakLog.lines.collectAsState()
+    var tagFilter by remember { mutableStateOf("All") }
+    val tags = remember { listOf("All", "ASR", "VAD", "MT", "TTS", "Stop", "Latency", "Diag", "Pack") }
+    VachakSection(title = "Live Log (this device, no adb)", icon = Icons.Outlined.BugReport) {
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(end = 8.dp)) {
+            items(tags, key = { it }) { t ->
+                FilterChip(
+                    selected = tagFilter == t,
+                    onClick = { tagFilter = t },
+                    label = { Text(t, style = MaterialTheme.typography.labelSmall) }
+                )
+            }
+        }
+        val shown = remember(lines, tagFilter) {
+            derivedStateOf {
+                val f = if (tagFilter == "All") lines else lines.filter { it.contains("Vachak-$tagFilter") }
+                f.takeLast(60)
+            }
+        }.value
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "${shown.size} lines${if (tagFilter != "All") " • Vachak-$tagFilter" else ""} • newest at bottom",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontFamily = FontFamily.Monospace
+            )
+            TextButton(onClick = { VachakLog.clear() }, contentPadding = PaddingValues(horizontal = 8.dp)) {
+                Text("Clear", style = MaterialTheme.typography.labelSmall)
+            }
+        }
+        Surface(
+            shape = MaterialTheme.shapes.small,
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                if (shown.isEmpty()) {
+                    Text(
+                        if (lines.isEmpty()) "No lines yet — run Live once and they appear here."
+                        else "No Vachak-$tagFilter lines yet.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontFamily = FontFamily.Monospace
+                    )
+                } else {
+                    shown.forEach { line ->
+                        Text(
+                            line,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = when {
+                                line.startsWith("[", false) && (line.contains(" E/") || line.contains("E/Vachak")) -> MaterialTheme.colorScheme.error
+                                line.contains(" W/") -> VachakColors.Amber
+                                else -> MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                            fontFamily = FontFamily.Monospace,
+                            maxLines = 3,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
+        }
+        Text(
+            "adb mirror: logcat -s Vachak-ASR Vachak-VAD Vachak-MT Vachak-TTS Vachak-Latency Vachak-Stop Vachak-Diag",
+            style = MaterialTheme.typography.labelSmall,
+            fontFamily = FontFamily.Monospace,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }

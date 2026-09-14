@@ -1,7 +1,7 @@
 package com.vachak.ml
 
 import android.content.Context
-import android.util.Log
+import com.vachak.engine.VachakLog
 import java.io.File
 
 /**
@@ -58,7 +58,7 @@ object SherpaAssets {
         synchronized(lock) {
             if (prepared.contains(key) && File(outDir, "tokens.txt").exists()
                 && manifestVersionOk(outDir, subdir)) {
-                Log.d(TAG, "prepare cached hit: $key -> ${outDir.absolutePath}")
+                VachakLog.d(TAG, "prepare cached hit: $key -> ${outDir.absolutePath}")
                 return outDir.absolutePath
             }
         }
@@ -77,10 +77,10 @@ object SherpaAssets {
             // is the source of truth — mismatch means re-copy once, loudly.
             if (verifyManifest(context, subdir, outDir)) {
                 synchronized(lock) { prepared.add(key) }
-                Log.d(TAG, "prepare cached (marker+manifest OK): $key -> ${outDir.absolutePath}")
+                VachakLog.d(TAG, "prepare cached (marker+manifest OK): $key -> ${outDir.absolutePath}")
                 return outDir.absolutePath
             }
-            Log.w(TAG, "prepare manifest MISMATCH for $key — previous copy incomplete, re-copying")
+            VachakLog.w(TAG, "prepare manifest MISMATCH for $key — previous copy incomplete, re-copying")
         }
         copyTree(context, "$ASSET_ROOT/$subdir", outDir)
         writeManifest(context, subdir, outDir)
@@ -118,9 +118,9 @@ object SherpaAssets {
                 .sortedBy { it.key }
                 .joinToString("\n") { "${it.key}\t${it.value}" }
             File(outDir, MANIFEST).writeText("# vachak $subdir manifest v${assetVersion(subdir)} (name<TAB>bytes)\n$lines\n")
-            Log.d(TAG, "manifest written for $subdir (${lines.lines().size} files)")
+            VachakLog.d(TAG, "manifest written for $subdir (${lines.lines().size} files)")
         } catch (e: Exception) {
-            Log.w(TAG, "manifest write failed for $subdir: ${e.message}")
+            VachakLog.w(TAG, "manifest write failed for $subdir: ${e.message}")
         }
     }
 
@@ -130,12 +130,12 @@ object SherpaAssets {
             if (!mf.exists()) {
                 // Pre-manifest install (upgrade path): trust markers this once,
                 // then write the manifest so all future launches verify.
-                Log.d(TAG, "no manifest for $subdir (pre-manifest install) — trusting markers once")
+                VachakLog.d(TAG, "no manifest for $subdir (pre-manifest install) — trusting markers once")
                 writeManifest(context, subdir, outDir)
                 return true
             }
             if (!manifestVersionOk(outDir, subdir)) {
-                Log.w(TAG, "asset generation STALE for $subdir (want v${assetVersion(subdir)}) — re-copying once")
+                VachakLog.w(TAG, "asset generation STALE for $subdir (want v${assetVersion(subdir)}) — re-copying once")
                 return false
             }
             val expected = mf.readLines()
@@ -149,10 +149,10 @@ object SherpaAssets {
             val missing = (expected.keys - actual.keys).take(5)
             val wrongSize = expected.keys.intersect(actual.keys)
                 .filter { expected[it] != actual[it] }.take(5)
-            Log.w(TAG, "manifest mismatch $subdir missing=$missing wrongSize=$wrongSize")
+            VachakLog.w(TAG, "manifest mismatch $subdir missing=$missing wrongSize=$wrongSize")
             false
         } catch (e: Exception) {
-            Log.w(TAG, "manifest verify failed for $subdir (re-copying to be safe): ${e.message}")
+            VachakLog.w(TAG, "manifest verify failed for $subdir (re-copying to be safe): ${e.message}")
             false
         }
     }
@@ -164,8 +164,8 @@ object SherpaAssets {
                 context.assets.open(assetPath).use { input ->
                     File(outDir, assetPath.substringAfterLast('/')).outputStream().use { out -> input.copyTo(out) }
                 }
-            }.onSuccess { Log.d(TAG, "copied asset: $assetPath") }
-                .onFailure { Log.w(TAG, "asset copy failed: $assetPath (${it.message})") }
+            }.onSuccess { VachakLog.d(TAG, "copied asset: $assetPath") }
+                .onFailure { VachakLog.w(TAG, "asset copy failed: $assetPath (${it.message})") }
             return
         }
         for (name in entries) {
@@ -180,8 +180,8 @@ object SherpaAssets {
                     context.assets.open(childPath).use { input ->
                         childOut.outputStream().use { out -> input.copyTo(out) }
                     }
-                }.onSuccess { Log.d(TAG, "copied asset: $childPath") }
-                    .onFailure { Log.w(TAG, "asset copy failed: $childPath (${it.message})") }
+                }.onSuccess { VachakLog.d(TAG, "copied asset: $childPath") }
+                    .onFailure { VachakLog.w(TAG, "asset copy failed: $childPath (${it.message})") }
             }
         }
     }

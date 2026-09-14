@@ -2,7 +2,7 @@ package com.vachak.sync
 
 import android.content.Context
 import android.net.Uri
-import android.util.Log
+import com.vachak.engine.VachakLog
 import com.vachak.engine.EngineError
 import com.vachak.engine.EngineResult
 import com.vachak.engine.PackInfo
@@ -29,7 +29,7 @@ class PackInstaller(private val context: Context) {
      */
     fun install(uri: Uri): EngineResult<PackInfo> {
         return try {
-            Log.d(tag, "install start uri=$uri")
+            VachakLog.d(tag, "install start uri=$uri")
             val input = context.contentResolver.openInputStream(uri)
                 ?: return EngineResult.Err(EngineError.IO_ERROR, "cannot open uri")
             val tempFile = File(context.cacheDir, "pack_tmp_${System.currentTimeMillis()}.vachakpack")
@@ -40,7 +40,7 @@ class PackInstaller(private val context: Context) {
             tempFile.delete()
             result
         } catch (e: Exception) {
-            Log.e(tag, "install failed uri=$uri: ${e.message}", e)
+            VachakLog.e(tag, "install failed uri=$uri: ${e.message}", e)
             EngineResult.Err(EngineError.IO_ERROR, e.message ?: "install failed")
         }
     }
@@ -87,7 +87,7 @@ class PackInstaller(private val context: Context) {
                 val actual = sha256(data)
                 if (actual != expectedSha) {
                     zip.close()
-                    Log.e(tag, "sha256 mismatch for $path expected $expectedSha got $actual")
+                    VachakLog.e(tag, "sha256 mismatch for $path expected $expectedSha got $actual")
                     return EngineResult.Err(EngineError.IO_ERROR, "sha256 mismatch for $path")
                 }
             }
@@ -101,7 +101,7 @@ class PackInstaller(private val context: Context) {
                 val actual = sha256(data)
                 if (actual != expectedSha) {
                     zip.close()
-                    Log.e(tag, "sha256 mismatch for $path expected $expectedSha got $actual")
+                    VachakLog.e(tag, "sha256 mismatch for $path expected $expectedSha got $actual")
                     return EngineResult.Err(EngineError.IO_ERROR, "sha256 mismatch for $path")
                 }
             }
@@ -111,7 +111,7 @@ class PackInstaller(private val context: Context) {
             if (expectedPackSha.isNotBlank()) {
                 val actualPackSha = sha256File(file)
                 if (actualPackSha != expectedPackSha) {
-                    Log.w(tag, "packSha256 mismatch expected $expectedPackSha got $actualPackSha — continuing (recomputed is source of truth)")
+                    VachakLog.w(tag, "packSha256 mismatch expected $expectedPackSha got $actualPackSha — continuing (recomputed is source of truth)")
                     // Not fatal: packSha in manifest was before final copy; we log but don't fail — per-file sha is primary
                 }
             }
@@ -182,11 +182,11 @@ class PackInstaller(private val context: Context) {
             context.getSharedPreferences("vachak_packs", Context.MODE_PRIVATE)
                 .edit().putString("active_pack_id", packId).apply()
 
-            Log.d(tag, "install success packId=$packId path=${destDir.absolutePath} size=$totalBytes")
+            VachakLog.d(tag, "install success packId=$packId path=${destDir.absolutePath} size=$totalBytes")
             val info = PackInfo(id = packId, language = language, version = version, minAndroid = 28, sizeBytes = totalBytes)
             EngineResult.Ok(info)
         } catch (e: Exception) {
-            Log.e(tag, "installFromFile failed: ${e.message}", e)
+            VachakLog.e(tag, "installFromFile failed: ${e.message}", e)
             EngineResult.Err(EngineError.IO_ERROR, e.message ?: "install failed")
         }
     }
@@ -204,22 +204,22 @@ class PackInstaller(private val context: Context) {
                         PackDatabase.getInstance(context).packDao().getById(id) != null
                     } catch (_: Exception) { false }
                     if (already) continue
-                    android.util.Log.d(tag, "bundled pack missing, installing $name")
+                    VachakLog.d(tag, "bundled pack missing, installing $name")
                     val tmp = File(context.cacheDir, "bundled_$name")
                     context.assets.open("packs/$name").use { ins ->
                         tmp.outputStream().use { out -> ins.copyTo(out) }
                     }
                     when (val r = installFromFile(tmp)) {
                         is EngineResult.Ok -> {
-                            android.util.Log.d(tag, "bundled pack installed ${r.value.id}")
+                            VachakLog.d(tag, "bundled pack installed ${r.value.id}")
                             done.add(r.value.id)
                         }
                         is EngineResult.Err ->
-                            android.util.Log.e(tag, "bundled pack install failed $name: ${r.message}")
+                            VachakLog.e(tag, "bundled pack install failed $name: ${r.message}")
                     }
                     tmp.delete()
                 } catch (e: Exception) {
-                    android.util.Log.e(tag, "bundled pack $name threw", e)
+                    VachakLog.e(tag, "bundled pack $name threw", e)
                 }
             }
             done
@@ -269,7 +269,7 @@ class PackInstaller(private val context: Context) {
             }
             zip.close(); true
         } catch (e: Exception) {
-            Log.w(tag, "validatePackFile(${file.name}) failed: ${e.message}")
+            VachakLog.w(tag, "validatePackFile(${file.name}) failed: ${e.message}")
             false
         }
     }

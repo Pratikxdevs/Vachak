@@ -1,5 +1,7 @@
 package com.vachak.ml.adapter
 
+import com.vachak.engine.VachakLog
+
 import android.content.Context
 import android.util.JsonReader
 import java.text.Normalizer
@@ -74,10 +76,10 @@ class SpApproxTokenizer(private val context: Context) {
                 if (f.exists()) {
                     readKeys(f.inputStream().bufferedReader(), set)
                     loaded = set.isNotEmpty()
-                    android.util.Log.d("Vachak-MT", "SpApprox vocab from pack filesDir (${set.size})")
+                    VachakLog.d("Vachak-MT", "SpApprox vocab from pack filesDir (${set.size})")
                 }
             } catch (e: Exception) {
-                android.util.Log.w("Vachak-MT", "SpApprox pack read failed: ${e.message}")
+                VachakLog.w("Vachak-MT", "SpApprox pack read failed: ${e.message}")
             }
             if (!loaded) {
                 try {
@@ -85,9 +87,9 @@ class SpApproxTokenizer(private val context: Context) {
                         readKeys(inp.bufferedReader(), set)
                     }
                     loaded = set.isNotEmpty()
-                    android.util.Log.d("Vachak-MT", "SpApprox vocab from APK assets (${set.size})")
+                    VachakLog.d("Vachak-MT", "SpApprox vocab from APK assets (${set.size})")
                 } catch (e: Exception) {
-                    android.util.Log.e("Vachak-MT", "SpApprox vocab missing everywhere: ${e.message}")
+                    VachakLog.e("Vachak-MT", "SpApprox vocab missing everywhere: ${e.message}")
                 }
             }
             if (loaded) vocab = set

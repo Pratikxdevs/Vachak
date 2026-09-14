@@ -1,7 +1,7 @@
 package com.vachak.ml
 
 import android.content.Context
-import android.util.Log
+import com.vachak.engine.VachakLog
 import com.k2fsa.sherpa.onnx.OfflineTts
 import com.k2fsa.sherpa.onnx.OfflineTtsConfig
 import com.k2fsa.sherpa.onnx.OfflineTtsModelConfig
@@ -61,13 +61,13 @@ class SherpaOnnxTtsAdapter(
             // 219 = Chinese vits-zh-aishell3 dev-fixture backup (not shipped)
             val isShim = lineCount == 55
             if (isShim) {
-                Log.w(tag, "SHIM detected: tokens.txt lines=$lineCount (old 55-token placeholder) baseDir=$baseDir isFixture=true")
+                VachakLog.w(tag, "SHIM detected: tokens.txt lines=$lineCount (old 55-token placeholder) baseDir=$baseDir isFixture=true")
             } else {
-                Log.d(tag, "TTS tokens check: lines=$lineCount baseDir=$baseDir isFixture=false (fine-tuned VITS live)")
+                VachakLog.d(tag, "TTS tokens check: lines=$lineCount baseDir=$baseDir isFixture=false (fine-tuned VITS live)")
             }
             isShim
         } catch (e: Exception) {
-            Log.w(tag, "detectShim failed: ${e.message}")
+            VachakLog.w(tag, "detectShim failed: ${e.message}")
             false
         }
     }
@@ -83,38 +83,38 @@ class SherpaOnnxTtsAdapter(
             val modelFile = java.io.File(packFile, "model.onnx")
             val tokensFile = java.io.File(packFile, "tokens.txt")
             if (packFile.isDirectory && modelFile.exists() && tokensFile.exists()) {
-                Log.d(tag, "using pack TTS dir: $dir (explicit packDir model.onnx exists)")
+                VachakLog.d(tag, "using pack TTS dir: $dir (explicit packDir model.onnx exists)")
                 return packFile.absolutePath
             } else {
-                Log.w(tag, "packDir invalid or missing model.onnx/tokens.txt (packDir=$dir) — trying PackManager")
+                VachakLog.w(tag, "packDir invalid or missing model.onnx/tokens.txt (packDir=$dir) — trying PackManager")
             }
         }
         // Auto pack-aware via PackManager.getActivePack() / getActivePackFor("tts") — P5
         try {
             val packTts = com.vachak.sync.PackManager.getActivePackFor(context, "tts")
             if (packTts != null && java.io.File("$packTts/model.onnx").exists() && java.io.File("$packTts/tokens.txt").exists()) {
-                Log.d(tag, "using PackManager active TTS dir: $packTts")
+                VachakLog.d(tag, "using PackManager active TTS dir: $packTts")
                 return packTts
             }
             val activePack = com.vachak.sync.PackManager.getActivePack(context)
             if (activePack != null) {
                 val cand = java.io.File(activePack, "vachak_models/tts")
                 if (cand.isDirectory && java.io.File(cand, "model.onnx").exists()) {
-                    Log.d(tag, "using active pack vachak_models/tts: ${cand.absolutePath}")
+                    VachakLog.d(tag, "using active pack vachak_models/tts: ${cand.absolutePath}")
                     return cand.absolutePath
                 }
                 val direct = java.io.File(activePack, "tts")
                 if (direct.isDirectory && java.io.File(direct, "model.onnx").exists()) {
-                    Log.d(tag, "using active pack tts: ${direct.absolutePath}")
+                    VachakLog.d(tag, "using active pack tts: ${direct.absolutePath}")
                     return direct.absolutePath
                 }
             }
         } catch (e: Exception) {
-            Log.w(tag, "pack TTS resolution failed, falling back to bundled assets: ${e.message}")
+            VachakLog.w(tag, "pack TTS resolution failed, falling back to bundled assets: ${e.message}")
         }
         // Fallback to bundled assets (P2 default): recursive copy via SherpaAssets
         val assetDir = SherpaAssets.prepare(context, modelDir)
-        Log.d(tag, "using asset TTS dir: $assetDir (fallback from pack)")
+        VachakLog.d(tag, "using asset TTS dir: $assetDir (fallback from pack)")
         return assetDir
     }
 
@@ -146,15 +146,15 @@ class SherpaOnnxTtsAdapter(
                 ModelStatus.setTts(
                     ModelInfo(ModelState.READY, "placeholder voice (55-token shim) — text-only mode", degraded = true)
                 )
-                Log.w(tag, "warmUp: placeholder voice — native load skipped (synthesis disabled until trained VITS ships)")
+                VachakLog.w(tag, "warmUp: placeholder voice — native load skipped (synthesis disabled until trained VITS ships)")
                 return true
             }
             ensureLoaded()
             ModelStatus.setTts(ModelInfo(ModelState.READY, "Santali VITS sprint voice (38 Ol Chiki tokens, 110MB opset17)"))
-            Log.d(tag, "warmUp: fine-tuned VITS loaded OK")
+            VachakLog.d(tag, "warmUp: fine-tuned VITS loaded OK")
             return true
         } catch (t: Throwable) {
-            Log.w(tag, "warmUp failed: ${t.message}")
+            VachakLog.w(tag, "warmUp failed: ${t.message}")
             return false
         }
     }
@@ -165,7 +165,7 @@ class SherpaOnnxTtsAdapter(
         resolvedBaseDir = null
         cachedShim = null
         cachedShimDir = null
-        Log.d(tag, "reloadFromPack: cleared TTS for pack switch")
+        VachakLog.d(tag, "reloadFromPack: cleared TTS for pack switch")
     }
 
     @Synchronized
@@ -178,7 +178,7 @@ class SherpaOnnxTtsAdapter(
             // exotic ABIs, Robolectric JVM) settles status to ERROR instead of
             // stranding it at LOADING forever. Rethrown: callers decide.
             ModelStatus.setTts(ModelInfo(ModelState.ERROR, "TTS load failed: ${t.message?.take(140)}"))
-            Log.e(tag, "OfflineTts ensureLoaded failed", t)
+            VachakLog.e(tag, "OfflineTts ensureLoaded failed", t)
             throw t
         }
     }
@@ -189,7 +189,7 @@ class SherpaOnnxTtsAdapter(
         // Guard: model.onnx must exist; fail fast with clear log if not
         val modelPath = "$baseDir/model.onnx"
         if (!java.io.File(modelPath).exists()) {
-            Log.e(tag, "model.onnx not found at $modelPath (baseDir=$baseDir)")
+            VachakLog.e(tag, "model.onnx not found at $modelPath (baseDir=$baseDir)")
         }
         // Status: a 55-token placeholder is "ready" only as text-only mode —
         // synthesis stays disabled until a trained VITS ships (see app gate).
@@ -203,9 +203,9 @@ class SherpaOnnxTtsAdapter(
         val dataDirPath = "$baseDir/espeak-ng-data"
         val dataDir = if (java.io.File(dataDirPath).exists()) dataDirPath else ""
         if (dataDir.isEmpty()) {
-            Log.d(tag, "using Ol Chiki char tokens — espeak-ng-data not required (dataDir=\"\")")
+            VachakLog.d(tag, "using Ol Chiki char tokens — espeak-ng-data not required (dataDir=\"\")")
         } else {
-            Log.d(tag, "using espeak-ng-data at $dataDirPath")
+            VachakLog.d(tag, "using espeak-ng-data at $dataDirPath")
         }
         val vits = OfflineTtsVitsModelConfig(
             model = modelPath,
@@ -214,14 +214,14 @@ class SherpaOnnxTtsAdapter(
             dataDir = dataDir
         )
         val config = OfflineTtsConfig(model = OfflineTtsModelConfig(vits = vits, numThreads = 1))
-            Log.d(tag, "creating OfflineTts (dir=$baseDir, model=$modelPath, dataDir=\"$dataDir\", packDir=${packDir ?: "null"})")
+            VachakLog.d(tag, "creating OfflineTts (dir=$baseDir, model=$modelPath, dataDir=\"$dataDir\", packDir=${packDir ?: "null"})")
             // Models are extracted to the filesystem (filesDir) or are already in pack dir,
             // so pass null AssetManager (fs path) as fixed in P0.
             val t0 = android.os.SystemClock.elapsedRealtimeNanos()
             tts = OfflineTts(null, config)
             val ms = (android.os.SystemClock.elapsedRealtimeNanos() - t0) / 1_000_000
             ModelStatus.setTts(ModelInfo(ModelState.READY, voiceDetail, ms, degradedVoice))
-            Log.d(tag, "OfflineTts ready in ${ms}ms (baseDir=$baseDir, pack=${packDir != null})")
+            VachakLog.d(tag, "OfflineTts ready in ${ms}ms (baseDir=$baseDir, pack=${packDir != null})")
         return tts!!
     }
 
@@ -233,9 +233,9 @@ class SherpaOnnxTtsAdapter(
         val isSantali = norm in setOf("sat", "sat_olck", "sat-olck", "olck", "ol_ck", "sat_olchiki")
         val hasOlChiki = text.any { it.code in 0x1C50..0x1C7F }
         if (isSantali && !hasOlChiki) {
-            Log.w(tag, "synthesize called without Ol Chiki for Santali lang (text=\"$text\", lang=$lang) — proceeding anyway")
+            VachakLog.w(tag, "synthesize called without Ol Chiki for Santali lang (text=\"$text\", lang=$lang) — proceeding anyway")
         } else if (!isMundari && !hasOlChiki) {
-            Log.w(tag, "synthesize called without Ol Chiki (text=\"$text\", lang=$lang)")
+            VachakLog.w(tag, "synthesize called without Ol Chiki (text=\"$text\", lang=$lang)")
         }
         val baseDir = resolvedBaseDir ?: resolveBaseDir()
         resolvedBaseDir = baseDir
@@ -243,7 +243,7 @@ class SherpaOnnxTtsAdapter(
         // 55-token shim is refused one layer up (SherpaTtsAdapter returns
         // MODEL_NOT_LOADED — the native layer hard-aborts on that graph). The
         // 38-token sprint VITS (shipped 2026-09-13) synthesizes here normally.
-        Log.d(tag, "synthesize isFixture=$isShim for \"$text\" lang=$lang baseDir=$baseDir")
+        VachakLog.d(tag, "synthesize isFixture=$isShim for \"$text\" lang=$lang baseDir=$baseDir")
         // Sprint Santali VITS (38 Ol Chiki char tokens, 110MB opset17).
         // speed=1.2 keeps TTS slice <1s on 2GB device (verified: 0.42-0.80s avg).
         // Blocking generate() kept per product decision; long text is chunked
@@ -253,7 +253,7 @@ class SherpaOnnxTtsAdapter(
         val chunks = chunkForTts(text)
         if (chunks.size == 1) {
             val audio = engine.generate(text, speed = 1.2f, sid = 0)
-            Log.d(tag, "synthesized \"$text\" -> ${audio.samples.size} samples @ ${audio.sampleRate} Hz isFixture=$isShim")
+            VachakLog.d(tag, "synthesized \"$text\" -> ${audio.samples.size} samples @ ${audio.sampleRate} Hz isFixture=$isShim")
             return SynthAudio(
                 samples = audio.samples,
                 sampleRate = audio.sampleRate,
@@ -270,7 +270,7 @@ class SherpaOnnxTtsAdapter(
             for (s in a.samples) out.add(s)
         }
         val merged = FloatArray(out.size) { out[it] }
-        Log.d(tag, "synthesized chunked ${chunks.size} parts \"${text.take(40)}\" -> ${merged.size} samples @ $sr Hz isFixture=$isShim")
+        VachakLog.d(tag, "synthesized chunked ${chunks.size} parts \"${text.take(40)}\" -> ${merged.size} samples @ $sr Hz isFixture=$isShim")
         return SynthAudio(
             samples = merged,
             sampleRate = sr,

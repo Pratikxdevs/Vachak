@@ -1,5 +1,7 @@
 package com.vachak.ui.audio
 
+import com.vachak.engine.VachakLog
+
 import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioTrack
@@ -73,7 +75,7 @@ object TtsPlayer {
             }
             return true
         } catch (e: Exception) {
-            android.util.Log.e("Vachak-TTS", "TtsPlayer playback failed", e)
+            VachakLog.e("Vachak-TTS", "TtsPlayer playback failed", e)
             return false
         }
     }

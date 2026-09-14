@@ -1,7 +1,7 @@
 package com.vachak.ml.adapter
 
 import android.content.Context
-import android.util.Log
+import com.vachak.engine.VachakLog
 import com.vachak.engine.ActiveLanguage
 import com.vachak.engine.EngineError
 import com.vachak.engine.EngineResult
@@ -62,7 +62,7 @@ class SherpaTtsAdapter(
                     if (!created.warmUpIfNeeded()) {
                         throw IllegalStateException("TTS warm-up failed — see logcat Vachak-TTS")
                     }
-                    Log.d(tag, "loadModel packDir=$packDir -> OK"); EngineResult.Ok(Unit)
+                    VachakLog.d(tag, "loadModel packDir=$packDir -> OK"); EngineResult.Ok(Unit)
                 }.fold(
                     onSuccess = { it },
                     onFailure = { e -> EngineResult.Err(EngineError.MODEL_LOAD_FAILED, e.message ?: "tts load failed") }
@@ -82,7 +82,7 @@ class SherpaTtsAdapter(
         // garbage-or-silence in the native layer — refuse LOUDLY with the cause
         // instead of playing nothing. Mundari (Devanagari) + Hindi pass through.
         if (isSantaliTarget(language) && !hasOlChiki(text)) {
-            Log.w(tag, "refusing synth: Santali target but no Ol Chiki in \"${text.take(40)}\" (MT script miss?)")
+            VachakLog.w(tag, "refusing synth: Santali target but no Ol Chiki in \"${text.take(40)}\" (MT script miss?)")
             return EngineResult.Err(
                 EngineError.MODEL_DECODE_FAILED,
                 "Voice needs Ol Chiki text — got non-Ol-Chiki (translation shows above; voice can't speak it)"
@@ -93,7 +93,7 @@ class SherpaTtsAdapter(
             val sr = com.vachak.ml.VachakAudio.TTS_OUTPUT_HZ
             val minSamples = (0.22 * sr).toInt() // 4851 > 4800 at 24k but for 22.05k
             val n = maxOf(minSamples, (text.length * 220).coerceAtLeast(minSamples))
-            Log.d(tag, "synthesize mock \"$text\" ($language -> $normalizedLang) -> $n samples @ $sr Hz (useReal=false)")
+            VachakLog.d(tag, "synthesize mock \"$text\" ($language -> $normalizedLang) -> $n samples @ $sr Hz (useReal=false)")
             return EngineResult.Ok(ShortArray(n) { i -> (kotlin.math.sin(2 * Math.PI * 220 * i / sr) * 8000).toInt().toShort() })
         }
 
@@ -106,21 +106,21 @@ class SherpaTtsAdapter(
             // model passes through (isShim=false) for live synthesis.
             val shim = try { adapter.isShim() } catch (_: Exception) { false }
             if (shim) {
-                Log.w(tag, "shim voice model detected — refusing native load (would abort process); text stays source of truth")
+                VachakLog.w(tag, "shim voice model detected — refusing native load (would abort process); text stays source of truth")
                 val lang = ActiveLanguage.label(language)
                 return EngineResult.Err(EngineError.MODEL_NOT_LOADED, "Voice files outdated or missing — $lang text shown (update the app or reinstall the language pack)")
             }
             val audio = adapter.synthesize(text, normalizedLang)
             if (audio.sampleRate != com.vachak.ml.VachakAudio.TTS_OUTPUT_HZ) {
-                Log.w(tag, "model emitted ${audio.sampleRate}Hz but playback assumes ${com.vachak.ml.VachakAudio.TTS_OUTPUT_HZ}Hz — pitch/speed will be wrong; refusing silent corruption")
+                VachakLog.w(tag, "model emitted ${audio.sampleRate}Hz but playback assumes ${com.vachak.ml.VachakAudio.TTS_OUTPUT_HZ}Hz — pitch/speed will be wrong; refusing silent corruption")
                 return EngineResult.Err(EngineError.MODEL_LOAD_FAILED, "Voice sample-rate mismatch (${audio.sampleRate}Hz) — $text shown as text")
             }
-            Log.d(tag, "synthesize \"$text\" ($language -> $normalizedLang) -> ${audio.samples.size} samples @ ${audio.sampleRate} Hz via sherpa-onnx (packDir=${packDir ?: "bundled"})")
+            VachakLog.d(tag, "synthesize \"$text\" ($language -> $normalizedLang) -> ${audio.samples.size} samples @ ${audio.sampleRate} Hz via sherpa-onnx (packDir=${packDir ?: "bundled"})")
             // Anti-blip guard: sub-200ms output is NOT speech.
             val minAudible = (0.2 * audio.sampleRate).toInt()
             if (audio.samples.size < minAudible) {
                 val why = audio.warning ?: "model returned ${audio.samples.size} samples (<200ms)"
-                Log.w(tag, "synthesize inaudible ${audio.samples.size} samples @ ${audio.sampleRate}Hz — $why")
+                VachakLog.w(tag, "synthesize inaudible ${audio.samples.size} samples @ ${audio.sampleRate}Hz — $why")
                 throw IllegalStateException("TTS inaudible: $why")
             }
             ShortArray(audio.samples.size) {

@@ -1,5 +1,7 @@
 package com.vachak.ml
 
+import com.vachak.engine.VachakLog
+
 import android.os.SystemClock
 import java.util.concurrent.TimeUnit
 
@@ -88,7 +90,7 @@ object LastPipelineRun {
     fun publish(tracker: LatencyTracker) {
         sample = tracker.result()
         val s = sample!!
-        android.util.Log.d(
+        VachakLog.d(
             "Vachak-Latency",
             "RUN ${s.runId} stages=${s.stageMs()} totalMs=${s.endToEndMs()} " +
                 "stopToTranslateMs=${s.stopToTranslateMs()} " +

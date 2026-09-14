@@ -2,7 +2,7 @@ package com.vachak.ml
 
 import ai.onnxruntime.OrtEnvironment
 import ai.onnxruntime.OrtSession
-import android.util.Log
+import com.vachak.engine.VachakLog
 import java.io.File
 import java.io.FileInputStream
 import java.security.MessageDigest
@@ -39,7 +39,7 @@ object AsrModelFingerprint {
             .takeIf { it.exists() }
             ?: File(modelDir, "model.int8.onnx").takeIf { it.exists() }
             ?: run {
-                Log.w("Vachak-ASR", "fingerprint: no model.onnx in $modelDir")
+                VachakLog.w("Vachak-ASR", "fingerprint: no model.onnx in $modelDir")
                 return null
             }
         return try {
@@ -64,13 +64,13 @@ object AsrModelFingerprint {
                     }
                 }
             } catch (e: Exception) {
-                Log.w("Vachak-ASR", "fingerprint: ORT inspect failed (file still hashed): ${e.message}")
+                VachakLog.w("Vachak-ASR", "fingerprint: ORT inspect failed (file still hashed): ${e.message}")
             }
             Fingerprint(model.absolutePath, bytes, sha, inputs, meta).also {
-                Log.d("Vachak-ASR", "fingerprint: $it")
+                VachakLog.d("Vachak-ASR", "fingerprint: $it")
             }
         } catch (e: Exception) {
-            Log.w("Vachak-ASR", "fingerprint failed: ${e.message}")
+            VachakLog.w("Vachak-ASR", "fingerprint failed: ${e.message}")
             null
         }
     }

@@ -1,5 +1,7 @@
 package com.vachak.content.db
 
+import com.vachak.engine.VachakLog
+
 import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
@@ -43,9 +45,9 @@ abstract class AppDatabase : RoomDatabase() {
         private fun buildDatabase(context: Context): AppDatabase {
             val isDebuggable = (context.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0
             if (!isDebuggable) {
-                android.util.Log.w("Vachak-Content", "AppDatabase.allowMainThreadQueries() is DEBUG-only — prod path must use suspend wrappers (getAllSuspend etc).")
+                VachakLog.w("Vachak-Content", "AppDatabase.allowMainThreadQueries() is DEBUG-only — prod path must use suspend wrappers (getAllSuspend etc).")
             } else {
-                android.util.Log.d("Vachak-Content", "AppDatabase allowMainThreadQueries enabled for DEBUG/demo")
+                VachakLog.d("Vachak-Content", "AppDatabase allowMainThreadQueries enabled for DEBUG/demo")
             }
             return Room.databaseBuilder(context, AppDatabase::class.java, "vachak_content.db")
                 .addCallback(PrepopulateCallback(context))
@@ -149,7 +151,7 @@ private fun validateOlChiki(text: String, id: String) {
     // At least one Ol Chiki codepoint expected; log otherwise (no crash in prod)
     val hasOlChiki = text.any { c -> c in '\u1C50'..'\u1C7F' }
     if (!hasOlChiki) {
-        android.util.Log.w("Vachak-Content", "Lesson $id textSatOlChiki has no Ol Chiki codepoints: $text")
+        VachakLog.w("Vachak-Content", "Lesson $id textSatOlChiki has no Ol Chiki codepoints: $text")
     }
 }
 

@@ -5,7 +5,7 @@ import android.content.pm.PackageManager
 import android.media.AudioFormat
 import android.media.AudioManager
 import android.media.AudioTrack
-import android.util.Log
+import com.vachak.engine.VachakLog
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
@@ -168,7 +168,7 @@ fun LiveScreen(
         if (ActiveLanguage.normalize(globalLang) != LIVE_TARGET_LANG) {
             ActiveLanguage.set(LIVE_TARGET_LANG)
             (engine.translation as? com.vachak.ml.adapter.AdapterTranslationEngine)?.setActiveLanguage(LIVE_TARGET_LANG)
-            Log.d(TAG_MT, "Live pinned to Santali (Ol Chiki) — Hindi ⇄ Santali only")
+            VachakLog.d(TAG_MT, "Live pinned to Santali (Ol Chiki) — Hindi ⇄ Santali only")
         }
     }
     // Single pipeline: LiveViewModel owns mic/ASR/MT/TTS sequentially; this
@@ -211,13 +211,13 @@ fun LiveScreen(
         onResult = { isGranted ->
             hasMicPermission = isGranted
             micAskedOnce = true
-            Log.d(TAG_ASR, "permission result isGranted=$isGranted")
+            VachakLog.d(TAG_ASR, "permission result isGranted=$isGranted")
         }
     )
     // Auto-request mic permission on first entry (emulator needs explicit prompt)
     LaunchedEffect(Unit) {
         if (!hasMicPermission) {
-            Log.d(TAG_ASR, "Auto-requesting RECORD_AUDIO (initial hasMic=false)")
+            VachakLog.d(TAG_ASR, "Auto-requesting RECORD_AUDIO (initial hasMic=false)")
             permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
         }
     }
@@ -229,7 +229,7 @@ fun LiveScreen(
                 val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
                 if (granted != hasMicPermission) {
                     hasMicPermission = granted
-                    Log.d(TAG_ASR, "permission re-check onResume granted=$granted")
+                    VachakLog.d(TAG_ASR, "permission re-check onResume granted=$granted")
                 }
             }
         }
@@ -298,7 +298,7 @@ fun LiveScreen(
                                 Spacer(Modifier.weight(1f))
                                 if (permanentlyDenied && activity != null) {
                                     FilledTonalButton(onClick = {
-                                        Log.d(TAG_ASR, "opening app Settings for mic permission")
+                                        VachakLog.d(TAG_ASR, "opening app Settings for mic permission")
                                         val intent = android.content.Intent(
                                             android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
                                             android.net.Uri.fromParts("package", context.packageName, null)
@@ -359,10 +359,15 @@ fun LiveScreen(
                 asrReady = asrReady,
                 meterRms = vmMeterRms,
                 listeningSinceMs = vmState.listeningSinceMs,
-                onStart = guardedStart,
-                onStop = onVmStop,
-                onRequestPermission = onPermission
-            )
+            onStart = guardedStart,
+            onStop = onVmStop,
+            onRequestPermission = onPermission,
+            onDrainingTap = {
+                scope.launch(Dispatchers.Main) {
+                    snackbarHostState.showSnackbar("Still finishing the last run — one moment…")
+                }
+            }
+        )
             if (vmState.asrError != null) {
                 SectionCard(
                     title = "Couldn't hear that",
@@ -650,7 +655,8 @@ private fun MicCluster(
     listeningSinceMs: Long?,
     onStart: () -> Unit,
     onStop: () -> Unit,
-    onRequestPermission: () -> Unit
+    onRequestPermission: () -> Unit,
+    onDrainingTap: () -> Unit = {}
 ) {
     val haptic = LocalHapticFeedback.current
     val active = isListening || isStopping
@@ -658,17 +664,21 @@ private fun MicCluster(
     fun tapMic() {
         if (!isButtonEnabled) return
         // Draining taps are ignored in the VM guard too — belt and braces
-        // so a second tap can never queue another pipeline run.
-        if (isStopping) return
+        // so a second tap can never queue another pipeline run. But the tap
+        // is NARRATED here (was: silent return that read as a dead button).
+        if (isStopping) {
+            onDrainingTap()
+            return
+        }
         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
         if (!hasMicPermission) {
-            Log.d(TAG_ASR, "mic permission missing, requesting")
+            VachakLog.d(TAG_ASR, "mic permission missing, requesting")
             onRequestPermission()
         } else if (active) {
-            Log.d(TAG_ASR, "Stop tapped isListening=$isListening isStopping=$isStopping")
+            VachakLog.d(TAG_ASR, "Stop tapped isListening=$isListening isStopping=$isStopping")
             onStop()
         } else {
-            Log.d(TAG_ASR, "Start tapped hasPermission=$hasMicPermission")
+            VachakLog.d(TAG_ASR, "Start tapped hasPermission=$hasMicPermission")
             onStart()
         }
     }

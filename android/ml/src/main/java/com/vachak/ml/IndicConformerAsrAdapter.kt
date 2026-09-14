@@ -1,7 +1,7 @@
 package com.vachak.ml
 
 import android.content.Context
-import android.util.Log
+import com.vachak.engine.VachakLog
 import com.k2fsa.sherpa.onnx.OfflineModelConfig
 import com.k2fsa.sherpa.onnx.OfflineNemoEncDecCtcModelConfig
 import com.k2fsa.sherpa.onnx.OfflineRecognizer
@@ -74,7 +74,7 @@ class IndicConformerAsrAdapter(
                         tokens = tokensPath
                     )
                 )
-                Log.d(tag, "creating SHARED OfflineRecognizer (NEMO CTC, model=$modelPath, threads=$threads)")
+                VachakLog.d(tag, "creating SHARED OfflineRecognizer (NEMO CTC, model=$modelPath, threads=$threads)")
                 val created = OfflineRecognizer(null, config)
                 sharedRecognizer = created
                 sharedModelPath = modelPath
@@ -109,7 +109,7 @@ class IndicConformerAsrAdapter(
             // (never a fake OK, never a swallowed throw). Under Robolectric there
             // are no native sherpa libs, so this is the expected clean failure.
             ModelStatus.setAsr(ModelInfo(ModelState.ERROR, "ASR warm-up failed: ${t.message?.take(140)}"))
-            Log.w(tag, "warmUp failed: ${t.message}")
+            VachakLog.w(tag, "warmUp failed: ${t.message}")
             false
         }
     }
@@ -121,11 +121,11 @@ class IndicConformerAsrAdapter(
         val modelPath = "$baseDir/model.onnx"
         val tokensPath = "$baseDir/tokens.txt"
         if (!java.io.File(modelPath).exists()) {
-            Log.e(tag, "ASR model.onnx not found at $modelPath")
+            VachakLog.e(tag, "ASR model.onnx not found at $modelPath")
             throw IllegalStateException("ASR model.onnx missing at $modelPath")
         }
         if (!java.io.File(tokensPath).exists()) {
-            Log.e(tag, "ASR tokens.txt not found at $tokensPath")
+            VachakLog.e(tag, "ASR tokens.txt not found at $tokensPath")
             throw IllegalStateException("ASR tokens.txt missing at $tokensPath")
         }
         val t0 = android.os.SystemClock.elapsedRealtimeNanos()
@@ -142,7 +142,7 @@ class IndicConformerAsrAdapter(
         recognizer = shared(modelPath, tokensPath, threads, tag)
         val ms = (android.os.SystemClock.elapsedRealtimeNanos() - t0) / 1_000_000
         ModelStatus.setAsr(ModelInfo(ModelState.READY, "Conformer live — ready for capture", ms))
-        Log.d(tag, "OfflineRecognizer ready in ${ms}ms (baseDir=$baseDir, shared=${isSharedWarm()})")
+        VachakLog.d(tag, "OfflineRecognizer ready in ${ms}ms (baseDir=$baseDir, shared=${isSharedWarm()})")
         loaded = true
     }
 
@@ -160,7 +160,7 @@ class IndicConformerAsrAdapter(
     override fun transcribe(samples: FloatArray, sampleRate: Int): AsrResult {
         ensureLoaded()
         val startNs = android.os.SystemClock.elapsedRealtimeNanos()
-        Log.d(tag, "decode ${samples.size} samples @ $sampleRate Hz (~${samples.size / 160} frames)")
+        VachakLog.d(tag, "decode ${samples.size} samples @ $sampleRate Hz (~${samples.size / 160} frames)")
         // Serialized on the shared lock: the process-wide recognizer is not
         // thread-safe, and partial + final decodes must never overlap.
         val result = withSharedLock {
@@ -171,8 +171,8 @@ class IndicConformerAsrAdapter(
         }
         val text = result.text.trim()
         val latencyMs = (android.os.SystemClock.elapsedRealtimeNanos() - startNs) / 1_000_000f
-        Log.d(tag, "transcribed ${samples.size} samples @ $sampleRate Hz -> \"$text\" (${latencyMs}ms, tokens=${result.tokens.size})")
-        if (latencyMs > 1000) Log.w("Vachak-Latency", "ASR latency ${latencyMs}ms exceeds 1000ms budget")
+        VachakLog.d(tag, "transcribed ${samples.size} samples @ $sampleRate Hz -> \"$text\" (${latencyMs}ms, tokens=${result.tokens.size})")
+        if (latencyMs > 1000) VachakLog.w("Vachak-Latency", "ASR latency ${latencyMs}ms exceeds 1000ms budget")
         return AsrResult(text = text, confidence = 0.0f, isFixture = false)
     }
 }

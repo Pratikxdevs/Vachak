@@ -2,7 +2,7 @@ package com.vachak.ml
 
 import android.content.Context
 import android.media.AudioRecord
-import android.util.Log
+import com.vachak.engine.VachakLog
 import com.k2fsa.sherpa.onnx.SileroVadModelConfig
 import com.k2fsa.sherpa.onnx.Vad
 import com.k2fsa.sherpa.onnx.VadModelConfig
@@ -59,11 +59,11 @@ class SherpaOnnxVadAnalyzer(
             sampleRate = sampleRate,
             numThreads = 1
         )
-        Log.d(tag, "creating Vad (dir=$baseDir)")
+        VachakLog.d(tag, "creating Vad (dir=$baseDir)")
         // Models are extracted to the filesystem (filesDir), so pass null AssetManager.
         vad = Vad(null, cfg)
-        Log.d(tag, "Vad ready")
-        Log.d("Vachak-VAD", "Silero VAD ready dir=$baseDir sr=$sampleRate threads=1")
+        VachakLog.d(tag, "Vad ready")
+        VachakLog.d("Vachak-VAD", "Silero VAD ready dir=$baseDir sr=$sampleRate threads=1")
         return vad!!
     }
 

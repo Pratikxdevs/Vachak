@@ -1,5 +1,7 @@
 package com.vachak.ml.adapter
 
+import com.vachak.engine.VachakLog
+
 import com.vachak.engine.ASREngine
 import com.vachak.engine.EngineError
 import com.vachak.engine.EngineResult
@@ -65,7 +67,7 @@ class SherpaVadDetector(
                 val startMs = (seg.startSec * 1000).toInt()
                 val endMs = (seg.endSec * 1000).toInt()
                 segments += SpeechSegment(startMs, endMs)
-                android.util.Log.d("Vachak-VAD", "VAD segment $startMs..$endMs ms")
+                VachakLog.d("Vachak-VAD", "VAD segment $startMs..$endMs ms")
             }
             offset = end
         }
@@ -74,11 +76,11 @@ class SherpaVadDetector(
             val startMs = (seg.startSec * 1000).toInt()
             val endMs = (seg.endSec * 1000).toInt()
             segments += SpeechSegment(startMs, endMs)
-            android.util.Log.d("Vachak-VAD", "VAD flush segment $startMs..$endMs ms")
+            VachakLog.d("Vachak-VAD", "VAD flush segment $startMs..$endMs ms")
         }
         if (segments.isEmpty()) {
             // No speech detected — return empty so caller skips decode (saves RAM/latency)
-            android.util.Log.d("Vachak-VAD", "no speech segments for ${pcm16.size} samples")
+            VachakLog.d("Vachak-VAD", "no speech segments for ${pcm16.size} samples")
             return emptyList()
         }
         return segments

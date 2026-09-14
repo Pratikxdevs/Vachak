@@ -1,6 +1,6 @@
 package com.vachak.engine
 
-import android.util.Log
+import com.vachak.engine.VachakLog
 
 /**
  * Local, offline latency probe for the sequential SIH voice pipeline (ASR -> MT -> TTS).
@@ -33,5 +33,5 @@ class LatencyTracker {
         appendLine("within <3s budget: ${totalMs < LatencyBudget.TOTAL_MS}")
     }
 
-    fun log() = Log.d("Vachak-Latency", report())
+    fun log() = VachakLog.d("Vachak-Latency", report())
 }

@@ -1,5 +1,7 @@
 package com.vachak.ui.screens
 
+import com.vachak.engine.VachakLog
+
 import android.content.Context
 import android.media.AudioAttributes
 import android.media.AudioFormat
@@ -20,7 +22,9 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -33,6 +37,13 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
+
+/** Stop watchdog: a stop that hasn't cleared isStopping in 45s is wedged — force-reset, never stay dead. */
+private const val STOP_WATCHDOG_MS = 45_000L
+/** Tail-decode bound: the stop window covers only the uncommitted remainder. */
+private const val TAIL_DECODE_TIMEOUT_MS = 20_000L
+/** Synth bound: text is source of truth — a hung synth degrades to text, never wedges. */
+private const val SYNTH_TIMEOUT_MS = 60_000L
 
 /**
  * LiveViewModel — owns LiveScreen pipeline via StateFlow UiState.
@@ -91,8 +102,12 @@ class LiveViewModel @Inject constructor(
     // Expose direct for collect without extra stateIn double-wrap
     val uiStateDirect: StateFlow<LiveUiState> = _uiState.asStateFlow()
 
-    // Sequential pipeline: limitedParallelism(1) + Mutex ensures ASR->MT->TTS never parallel (RAM limit)
-    private val pipelineDispatcher = Dispatchers.IO.limitedParallelism(1)
+    // Sequential pipeline: limitedParallelism(2) + Mutex. The MUTEX (not the
+    // dispatcher) serializes ASR->MT->TTS — every native model call runs under
+    // pipelineMutex, so at most one model is resident (RAM rule holds). Two
+    // lanes exist so ONE hung native thread can't park the pipeline forever:
+    // timeouts/watchdog always have a thread to fire on.
+    private val pipelineDispatcher = Dispatchers.IO.limitedParallelism(2)
     private val pipelineMutex = Mutex()
 
     private var streamingSession: StreamingAsrSession? = null
@@ -111,6 +126,8 @@ class LiveViewModel @Inject constructor(
     private var laneGen = 0
     /** Stop-tap nanos (Main thread) — benchmark T0 for stop→translate. */
     private var stopTapNs: Long = 0L
+    /** Stop-tap wall ms — feeds the stop watchdog (below). */
+    private var stopStartedMs: Long = 0L
     /**
      * Guards [streamingSession]: the capture lane pushes (milliseconds) while
      * the decode lane runs multi-second forward passes. Capture ticks may wait
@@ -141,7 +158,19 @@ class LiveViewModel @Inject constructor(
                 withContext(pipelineDispatcher) {
                     pipelineMutex.withLock {
                         val activeLang = ActiveLanguage.current
-                        val res = engineProvider.translation.translate(trimmed, LanguagePair("hi", activeLang))
+                        // Bounded: an unbounded preview MT held this mutex forever
+                        // and wedged Stop behind it (the dead-stop-button bug).
+                        val res = try {
+                            withTimeout(15_000) {
+                                engineProvider.translation.translate(trimmed, LanguagePair("hi", activeLang))
+                            }
+                        } catch (e: TimeoutCancellationException) {
+                            VachakLog.w("Vachak-MT", "preview MT timed out after 15s (mutex released)")
+                            withContext(Dispatchers.Main) {
+                                _uiState.value = _uiState.value.copy(livePreviewLoading = false)
+                            }
+                            return@withLock
+                        }
                         withContext(Dispatchers.Main) {
                             if (trimmed != manualHindiFlow.value.trim()) {
                                 _uiState.value = _uiState.value.copy(livePreviewLoading = false)
@@ -167,14 +196,14 @@ class LiveViewModel @Inject constructor(
     // make a double-tap / double-owner start a no-op instead of a mic fight.
     fun onStart() {
         if (audioCapturer.isRecording()) {
-            android.util.Log.d("Vachak-ASR", "LiveViewModel.onStart ignored — already capturing")
+            VachakLog.d("Vachak-ASR", "LiveViewModel.onStart ignored — already capturing")
             return
         }
         val t0 = SystemClock.elapsedRealtimeNanos()
         t0Ns = t0
         _uiState.value = _uiState.value.copy(isListening = true, isStopping = false, isSynthesizing = false, partialText = "", liveHindi = "", committedText = "", santaliText = null, livePreview = null, livePreviewError = null, error = null, asrError = null, ttsMessage = null, latencyMs = null, translateMs = null, listeningSinceMs = System.currentTimeMillis())
         _isCapturing.value = true
-        android.util.Log.d("Vachak-ASR", "LiveViewModel.onStart t0=$t0")
+        VachakLog.d("Vachak-ASR", "LiveViewModel.onStart t0=$t0")
         viewModelScope.launch(pipelineDispatcher) {
             val session = StreamingAsrSession(context)
             session.start(t0)
@@ -184,7 +213,7 @@ class LiveViewModel @Inject constructor(
             // startRecording() NEVER throws — it fails silently. Detect it here or
             // UI shows "listening" forever with zero samples (emulator mic busy).
             if (!audioCapturer.isRecording()) {
-                android.util.Log.e("Vachak-ASR", "LiveViewModel: AudioCapturer failed to start (mic busy/denied?)")
+                VachakLog.e("Vachak-ASR", "LiveViewModel: AudioCapturer failed to start (mic busy/denied?)")
                 withContext(Dispatchers.Main) {
                     _uiState.value = _uiState.value.copy(
                         isListening = false,
@@ -203,7 +232,7 @@ class LiveViewModel @Inject constructor(
             startCaptureLane()
             startDecodeLane()
             startMeterLoop()
-            try { session.warmUpAsync() } catch (e: Throwable) { android.util.Log.w("Vachak-ASR", "LiveViewModel warmUp threw (first decode will cold-load)", e) }
+            try { session.warmUpAsync() } catch (e: Throwable) { VachakLog.w("Vachak-ASR", "LiveViewModel warmUp threw (first decode will cold-load)", e) }
         }
     }
 
@@ -234,7 +263,7 @@ class LiveViewModel @Inject constructor(
                     // Stop cancels this loop: CancellationException is control
                     // flow, never an [ASR:LIVE] error (was screenshotted as one).
                     if (e is kotlinx.coroutines.CancellationException) throw e
-                    android.util.Log.e("Vachak-ASR", "VM capture snapshot failed", e)
+                    VachakLog.e("Vachak-ASR", "VM capture snapshot failed", e)
                     continue
                 }
                 if (chunk.isEmpty()) continue
@@ -247,7 +276,7 @@ class LiveViewModel @Inject constructor(
                     if (fresh.isNotEmpty()) publishLiveHindi(fresh)
                 } catch (e: Exception) {
                     if (e is kotlinx.coroutines.CancellationException) throw e
-                    android.util.Log.e("Vachak-ASR", "VM capture push failed (loop survives)", e)
+                    VachakLog.e("Vachak-ASR", "VM capture push failed (loop survives)", e)
                 }
             }
         }
@@ -310,7 +339,7 @@ class LiveViewModel @Inject constructor(
                     }
                 } catch (e: Exception) {
                     if (e is kotlinx.coroutines.CancellationException) throw e
-                    android.util.Log.e("Vachak-ASR", "VM decode lane failed (lane survives)", e)
+                    VachakLog.e("Vachak-ASR", "VM decode lane failed (lane survives)", e)
                     if (!errShown) {
                         errShown = true
                         _uiState.value = _uiState.value.copy(asrError = "[ASR:LIVE] ${e.message?.take(80)} — still listening…")
@@ -354,13 +383,20 @@ class LiveViewModel @Inject constructor(
     }
 
     fun onStop(onCommitted: ((String) -> Unit)? = null) {
-        // P2: re-entrancy guard — Stop/Cancel taps while draining are ignored
-        // instead of queueing a second pipeline run behind the first (the old
-        // code's comment claimed this, but no guard existed).
+        // Stop watchdog: a previous stop that never cleared isStopping (hung
+        // native decode/synth, or a mutex held by a hung lane) used to make
+        // the mic button look dead — taps hit the guard and vanished silently.
+        // <45s: still draining, ignore. ≥45s: force-reset, then run this stop.
+        val nowMs = SystemClock.elapsedRealtime()
         if (_uiState.value.isStopping) {
-            android.util.Log.d("Vachak-ASR", "LiveViewModel.onStop ignored — already stopping")
-            return
+            if (nowMs - stopStartedMs < STOP_WATCHDOG_MS) {
+                VachakLog.d("Vachak-Stop", "onStop ignored — draining ${(nowMs - stopStartedMs) / 1000}s")
+                return
+            }
+            VachakLog.e("Vachak-Stop", "WATCHDOG fired — prev stop wedged ${(nowMs - stopStartedMs) / 1000}s, force-reset")
+            forceResetPipeline("watchdog")
         }
+        stopStartedMs = nowMs
         // Snapshot BEFORE clearing: the stop-clear wipes partialText, which
         // used to starve the fallback below (recoverable partials -> VAD-silence).
         val preStopPartial = _uiState.value.partialText.trim()
@@ -399,7 +435,7 @@ class LiveViewModel @Inject constructor(
                 val pcmFinal = try {
                     withContext(Dispatchers.IO) { audioCapturer.stopAndGetShortArray() }
                 } catch (e: Exception) {
-                    android.util.Log.e("Vachak-ASR", "LiveViewModel stopAndGetShortArray failed", e)
+                    VachakLog.e("Vachak-ASR", "LiveViewModel stopAndGetShortArray failed", e)
                     ShortArray(0)
                 }
                 val session = streamingSession
@@ -410,22 +446,30 @@ class LiveViewModel @Inject constructor(
                     try {
                         if (pcmFinal.size > lastPushedSample) {
                             val tail = pcmFinal.copyOfRange(lastPushedSample, pcmFinal.size)
-                            android.util.Log.d("Vachak-ASR", "LiveViewModel pushing tail ${tail.size} samples (already pushed $lastPushedSample)")
+                            VachakLog.d("Vachak-ASR", "LiveViewModel pushing tail ${tail.size} samples (already pushed $lastPushedSample)")
                             synchronized(sessionLock) { session.pushAudio(tail) }
                             lastPushedSample = pcmFinal.size
                         }
                     } catch (e: Exception) {
-                        android.util.Log.e("Vachak-ASR", "LiveViewModel session push failed", e)
+                        VachakLog.e("Vachak-ASR", "LiveViewModel session push failed", e)
                     }
                     // ONE bounded tail decode (the lane already committed 3s
                     // chunks live; this covers only the uncommitted remainder,
                     // so Stop costs ~1 decode, never a full-history re-decode).
-                    // No lane joins. A throwing decoder yields "" and the live
-                    // text fallback below still translates what was heard.
+                    // Bounded + off the pipeline lanes: a hung native decode
+                    // parks an IO thread (pool grows) instead of wedging the
+                    // stop — the live-text fallback below still translates
+                    // what was heard. No lane joins. A throwing decoder yields
+                    // "" and the fallback covers it too.
                     try {
-                        synchronized(sessionLock) { session.finalizeCurrentSegment(true) }
+                        withContext(Dispatchers.IO) {
+                            withTimeout(TAIL_DECODE_TIMEOUT_MS) {
+                                synchronized(sessionLock) { session.finalizeCurrentSegment(true) }
+                            }
+                        }
+                        VachakLog.d("Vachak-Stop", "stop: tail decoded")
                     } catch (e: Exception) {
-                        android.util.Log.e("Vachak-ASR", "LiveViewModel tail finalize failed (live-text fallback)", e)
+                        VachakLog.w("Vachak-Stop", "stop: tail decode skipped (${e.message?.take(60)}), live-text fallback")
                     }
                     val fresh = synchronized(sessionLock) { session.drainNewCommits() }
                     if (fresh.isNotEmpty()) publishLiveHindi(fresh)
@@ -434,13 +478,13 @@ class LiveViewModel @Inject constructor(
                     // the tail decode just committed).
                     finalCommitted = _uiState.value.liveHindi.trim()
                     if (finalCommitted.isBlank() && preStopPartial.isNotBlank()) {
-                        android.util.Log.w("Vachak-ASR", "LiveViewModel tail empty, partial fallback \"$preStopPartial\"")
+                        VachakLog.w("Vachak-ASR", "LiveViewModel tail empty, partial fallback \"$preStopPartial\"")
                         finalCommitted = preStopPartial
                     }
                     if (finalCommitted.isBlank()) {
                         finalCommitted = session.committedText.trim()
                     }
-                    android.util.Log.d("Vachak-ASR", "LiveViewModel stop committed=\"$finalCommitted\" pcmFinal=${pcmFinal.size}")
+                    VachakLog.d("Vachak-ASR", "LiveViewModel stop committed=\"$finalCommitted\" pcmFinal=${pcmFinal.size}")
                 } else {
                     val res = engineProvider.asr.transcribe(pcmFinal, 16000)
                     when (res) {
@@ -460,7 +504,7 @@ class LiveViewModel @Inject constructor(
                     // Graceful empty: nothing decodable was heard — reset
                     // silently (no error card, no conversation item, no hang).
                     // Next tap just works.
-                    android.util.Log.d("Vachak-ASR", "LiveViewModel stop empty (silent reset) pcmFinal=${pcmFinal.size} ${session?.signalReport()}")
+                    VachakLog.d("Vachak-ASR", "LiveViewModel stop empty (silent reset) pcmFinal=${pcmFinal.size} ${session?.signalReport()}")
                     withContext(Dispatchers.Main) {
                         _uiState.value = _uiState.value.copy(
                             isListening = false, isStopping = false, isTranslating = false,
@@ -479,7 +523,7 @@ class LiveViewModel @Inject constructor(
                         engineProvider.translation.translate(finalCommitted, LanguagePair("hi", activeLang))
                     }
                 } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
-                    android.util.Log.e("Vachak-MT", "MT timed out after 30s", e)
+                    VachakLog.e("Vachak-MT", "MT timed out after 30s", e)
                     EngineResult.Err(com.vachak.engine.EngineError.TIMEOUT, "Translation timed out (30s) — tap retry")
                 }
                 val translated: String?
@@ -502,6 +546,7 @@ class LiveViewModel @Inject constructor(
                     is EngineResult.Ok -> {
                         translated = mt.value
                         tracker.markTranslate(translated)
+                        VachakLog.d("Vachak-Stop", "stop: MT ok lang=$activeLang")
                         // Wire result into the shared conversation store so the
                         // LiveScreen list shows it no matter which owner ran the mic.
                         // Phase 4: text is visible BUT voice is still
@@ -511,7 +556,7 @@ class LiveViewModel @Inject constructor(
                             // (ASR+MT headline — TTS starts after, measured apart).
                             tracker.markTranslateShown()
                             val shownMs = (tracker.result().stopToTranslateMs() ?: 0f).toLong()
-                            android.util.Log.d("Vachak-Latency", "TRANSLATE SHOWN stop→text ${shownMs}ms (${if (shownMs < 3000) "< 3s ✓" else "≥ 3s ⚠"})")
+                            VachakLog.d("Vachak-Latency", "TRANSLATE SHOWN stop→text ${shownMs}ms (${if (shownMs < 3000) "< 3s ✓" else "≥ 3s ⚠"})")
                             _uiState.value = _uiState.value.copy(committedText = finalCommitted, santaliText = translated, error = null, isSynthesizing = true, translateMs = shownMs)
                             val i = LiveConversationStore.items.indexOfFirst { it.id == itemId }
                             if (i != -1) {
@@ -530,9 +575,12 @@ class LiveViewModel @Inject constructor(
                         val pcmRes = if (autoPlay) {
                             // Phase 4: a throwing TTS must surface as a message,
                             // never wedge isTranslating/isSynthesizing forever.
-                            runCatching { engineProvider.tts.synthesize(translated, activeLang) }
+                            // Bounded: a hung synth degrades to text on screen.
+                            runCatching {
+                                withTimeout(SYNTH_TIMEOUT_MS) { engineProvider.tts.synthesize(translated, activeLang) }
+                            }
                                 .getOrElse { e ->
-                                    android.util.Log.e("Vachak-TTS", "voice synth threw", e)
+                                    VachakLog.e("Vachak-TTS", "voice synth threw", e)
                                     EngineResult.Err(com.vachak.engine.EngineError.MODEL_DECODE_FAILED, "TTS failed: ${e.message?.take(120)}")
                                 }
                         } else {
@@ -643,7 +691,7 @@ class LiveViewModel @Inject constructor(
                 // final): wiping it here made good transcripts flash and
                 // vanish at the exact moment the user looks for them.
                 _uiState.value = _uiState.value.copy(latencyMs = totalMs, isTranslating = false, isStopping = false, isSynthesizing = false, listeningSinceMs = null, partialText = outFinal)
-                android.util.Log.d("Vachak-Latency", "VOICE END total ${totalMs}ms (${if (totalMs < 3000) "< 3s ✓" else "≥ 3s ⚠"})")
+                VachakLog.d("Vachak-Latency", "VOICE END total ${totalMs}ms (${if (totalMs < 3000) "< 3s ✓" else "≥ 3s ⚠"})")
                 onCommitted?.invoke(outFinal)
                 streamingSession = null
                 _isCapturing.value = false
@@ -695,7 +743,7 @@ class LiveViewModel @Inject constructor(
                         engineProvider.translation.translate(trimmed, LanguagePair("hi", activeLang))
                     }
                 } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
-                    android.util.Log.e("Vachak-MT", "typed MT timed out after 30s", e)
+                    VachakLog.e("Vachak-MT", "typed MT timed out after 30s", e)
                     EngineResult.Err(com.vachak.engine.EngineError.TIMEOUT, "Translation timed out (30s) — tap retry")
                 }
                 when (mt) {
@@ -717,9 +765,12 @@ class LiveViewModel @Inject constructor(
                         } catch (_: Exception) { true }
                         val pcmRes = if (typedAutoPlay) {
                             // Phase 4: throwing TTS surfaces, never wedges.
-                            runCatching { engineProvider.tts.synthesize(mt.value, activeLang) }
+                            // Bounded like the voice path (hung synth → text).
+                            runCatching {
+                                withTimeout(SYNTH_TIMEOUT_MS) { engineProvider.tts.synthesize(mt.value, activeLang) }
+                            }
                                 .getOrElse { e ->
-                                    android.util.Log.e("Vachak-TTS", "typed synth threw", e)
+                                    VachakLog.e("Vachak-TTS", "typed synth threw", e)
                                     EngineResult.Err(com.vachak.engine.EngineError.MODEL_DECODE_FAILED, "TTS failed: ${e.message?.take(120)}")
                                 }
                         } else {
@@ -753,7 +804,7 @@ class LiveViewModel @Inject constructor(
                         }
                     }
                     is EngineResult.Err -> {
-                        android.util.Log.e("Vachak-MT", "typed MT failed ${mt.code}: ${mt.message}")
+                        VachakLog.e("Vachak-MT", "typed MT failed ${mt.code}: ${mt.message}")
                         withContext(Dispatchers.Main) {
                             val idx = LiveConversationStore.items.indexOfFirst { it.id == itemId }
                             if (idx != -1) {
@@ -863,7 +914,15 @@ class LiveViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO) {
             // P1: serialize native generate() with the pipeline (OfflineTts is
             // not thread-safe); playback itself stays outside the lock.
-            val pcmRes = pipelineMutex.withLock { engineProvider.tts.synthesize(text, lang) }
+            // Bounded: a hung Play synth must not hold the mutex forever.
+            val pcmRes = try {
+                withTimeout(SYNTH_TIMEOUT_MS) {
+                    pipelineMutex.withLock { engineProvider.tts.synthesize(text, lang) }
+                }
+            } catch (e: TimeoutCancellationException) {
+                VachakLog.w("Vachak-TTS", "play synth timed out after 60s")
+                EngineResult.Err(com.vachak.engine.EngineError.TIMEOUT, "TTS timed out — tap Play again")
+            }
             when (pcmRes) {
                 is EngineResult.Ok -> {
                     playPcmLocal(pcmRes.value, VachakAudio.TTS_OUTPUT_HZ)
@@ -893,7 +952,14 @@ class LiveViewModel @Inject constructor(
             }
             val lang = ActiveLanguage.current
             val probe = if (ActiveLanguage.isOlChiki(lang)) "ᱡᱚᱦᱟᱨ" else "जोहार"
-            val res = pipelineMutex.withLock { engineProvider.tts.synthesize(probe, lang) }
+            val res = try {
+                withTimeout(SYNTH_TIMEOUT_MS) {
+                    pipelineMutex.withLock { engineProvider.tts.synthesize(probe, lang) }
+                }
+            } catch (e: TimeoutCancellationException) {
+                VachakLog.w("Vachak-TTS", "testVoice synth timed out after 60s")
+                EngineResult.Err(com.vachak.engine.EngineError.TIMEOUT, "Test voice timed out")
+            }
             when (res) {
                 is EngineResult.Ok -> {
                     playPcmLocal(res.value, VachakAudio.TTS_OUTPUT_HZ)
@@ -903,10 +969,10 @@ class LiveViewModel @Inject constructor(
                             ttsMessage = "Test voice OK • ${res.value.size} samples (~${"%.1f".format(secs)}s) @${VachakAudio.TTS_OUTPUT_HZ}Hz — proof the chain speaks"
                         )
                     }
-                    android.util.Log.d("Vachak-TTS", "testVoice OK ${res.value.size} samples lang=$lang")
+                    VachakLog.d("Vachak-TTS", "testVoice OK ${res.value.size} samples lang=$lang")
                 }
                 is EngineResult.Err -> {
-                    android.util.Log.e("Vachak-TTS", "testVoice FAILED [${res.code}]: ${res.message}")
+                    VachakLog.e("Vachak-TTS", "testVoice FAILED [${res.code}]: ${res.message}")
                     withContext(Dispatchers.Main) {
                         _uiState.value = _uiState.value.copy(ttsMessage = "Test voice FAILED: ${res.message}")
                     }
@@ -920,26 +986,38 @@ class LiveViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(asrError = null, error = null, livePreviewError = null, ttsMessage = null)
     }
 
+    /**
+     * Un-wedge: drop lanes/sessions/flags WITHOUT touching the conversation.
+     * Zombie lanes are generation-fenced; the capturer is released
+     * (startRecording re-inits cleanly). Called by the stop watchdog,
+     * navigation-away, and anywhere stale flags could strand the mic button.
+     */
+    private fun forceResetPipeline(reason: String) {
+        VachakLog.e("Vachak-Stop", "forceResetPipeline($reason)")
+        stopLoops()
+        streamingSession = null
+        t0Ns = null
+        try { audioCapturer.release() } catch (_: Exception) {}
+        _isCapturing.value = false
+        _uiState.value = _uiState.value.copy(
+            isListening = false, isStopping = false, isTranslating = false,
+            isSynthesizing = false, listeningSinceMs = null
+        )
+    }
+
     fun forceReleaseMic() {
         try {
-            stopLoops()
-            _isCapturing.value = false
-            _uiState.value = _uiState.value.copy(isListening = false, isStopping = false, isSynthesizing = false, listeningSinceMs = null)
-            // P2: drop stale session state so a tab-switch mid-stop can never
-            // resurrect a finished session on the next press.
-            streamingSession = null
-            t0Ns = null
-            audioCapturer.release()
-            android.util.Log.d("Vachak-ASR", "LiveViewModel.forceReleaseMic() done")
+            forceResetPipeline("release")
+            VachakLog.d("Vachak-Stop", "forceReleaseMic done")
         } catch (e: Exception) {
-            android.util.Log.e("Vachak-ASR", "LiveViewModel.forceReleaseMic failed", e)
+            VachakLog.e("Vachak-Stop", "forceReleaseMic failed", e)
         }
     }
 
     override fun onCleared() {
         super.onCleared()
         try {
-            android.util.Log.d("Vachak-ASR", "LiveViewModel.onCleared -> close capturer")
+            VachakLog.d("Vachak-ASR", "LiveViewModel.onCleared -> close capturer")
             audioCapturer.close()
         } catch (_: Exception) {}
     }
@@ -992,7 +1070,7 @@ class LiveViewModel @Inject constructor(
                 track.release()
             }
         } catch (e: Exception) {
-            android.util.Log.e("Vachak-TTS", "LiveViewModel playback failed", e)
+            VachakLog.e("Vachak-TTS", "LiveViewModel playback failed", e)
             withContext(Dispatchers.Main) {
                 _uiState.value = _uiState.value.copy(ttsMessage = "Audio playback failed on this device — text shown")
             }

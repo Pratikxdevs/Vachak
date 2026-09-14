@@ -1,5 +1,7 @@
 package com.vachak.ml
 
+import com.vachak.engine.VachakLog
+
 import android.annotation.SuppressLint
 import android.media.AudioFormat
 import android.media.AudioRecord
@@ -122,7 +124,7 @@ class AudioCapturer {
         try {
             osMuted = am.isMicrophoneMute
         } catch (e: Exception) {
-            android.util.Log.w("Vachak-ASR", "mic audit: isMicrophoneMute unreadable: ${e.message}")
+            VachakLog.w("Vachak-ASR", "mic audit: isMicrophoneMute unreadable: ${e.message}")
         }
         var unmutedByUs = false
         if (osMuted) {
@@ -130,9 +132,9 @@ class AudioCapturer {
                 am.isMicrophoneMute = false
                 osMuted = am.isMicrophoneMute
                 unmutedByUs = !osMuted
-                android.util.Log.w("Vachak-ASR", "mic audit: OS mic was muted; unmute attempt -> muted=$osMuted")
+                VachakLog.w("Vachak-ASR", "mic audit: OS mic was muted; unmute attempt -> muted=$osMuted")
             } catch (e: Exception) {
-                android.util.Log.w("Vachak-ASR", "mic audit: unmute failed (needs MODIFY_AUDIO_SETTINGS): ${e.message}")
+                VachakLog.w("Vachak-ASR", "mic audit: unmute failed (needs MODIFY_AUDIO_SETTINGS): ${e.message}")
             }
         }
         var others: List<String> = emptyList()
@@ -143,7 +145,7 @@ class AudioCapturer {
             try {
                 others = am.activeRecordingConfigurations.map { "src=${it.audioSource}" }
             } catch (t: Throwable) {
-                android.util.Log.w("Vachak-ASR", "mic audit: active recorders unreadable: ${t.message}")
+                VachakLog.w("Vachak-ASR", "mic audit: active recorders unreadable: ${t.message}")
             }
         }
         var inCall = false
@@ -151,20 +153,20 @@ class AudioCapturer {
             inCall = am.mode == android.media.AudioManager.MODE_IN_CALL ||
                 am.mode == android.media.AudioManager.MODE_IN_COMMUNICATION
         } catch (e: Exception) {
-            android.util.Log.w("Vachak-ASR", "mic audit: audio mode unreadable: ${e.message}")
+            VachakLog.w("Vachak-ASR", "mic audit: audio mode unreadable: ${e.message}")
         }
         var btSco = false
         try {
             btSco = am.isBluetoothScoOn
         } catch (e: Exception) {
-            android.util.Log.w("Vachak-ASR", "mic audit: BT SCO state unreadable: ${e.message}")
+            VachakLog.w("Vachak-ASR", "mic audit: BT SCO state unreadable: ${e.message}")
         }
         var inputs: List<String> = emptyList()
         try {
             inputs = am.getDevices(android.media.AudioManager.GET_DEVICES_INPUTS)
                 .map { "${it.type}:${it.productName}" }
         } catch (t: Throwable) {
-            android.util.Log.w("Vachak-ASR", "mic audit: input devices unreadable: ${t.message}")
+            VachakLog.w("Vachak-ASR", "mic audit: input devices unreadable: ${t.message}")
         }
         // App-op check: permission can report GRANTED while the app-op is set to
         // IGNORE (privacy-guard apps, OEM managers) — AudioRecord then opens yet
@@ -187,7 +189,7 @@ class AudioCapturer {
                 else -> "mode=$mode"
             }
             } catch (t: Throwable) {
-                android.util.Log.w("Vachak-ASR", "mic audit: app-op unreadable: ${t.message}")
+                VachakLog.w("Vachak-ASR", "mic audit: app-op unreadable: ${t.message}")
             }
         }
         // Hardware visibility: framework-level microphone list + feature flag.
@@ -196,20 +198,20 @@ class AudioCapturer {
         try {
             micList = am.microphones.map { "${it.type}:${it.address}" }
         } catch (t: Throwable) {
-            android.util.Log.w("Vachak-ASR", "mic audit: microphone list unreadable: ${t.message}")
+            VachakLog.w("Vachak-ASR", "mic audit: microphone list unreadable: ${t.message}")
         }
         var hasMicFeature = true
         try {
             hasMicFeature = context.packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_MICROPHONE)
         } catch (t: Throwable) {
-            android.util.Log.w("Vachak-ASR", "mic audit: mic feature flag unreadable: ${t.message}")
+            VachakLog.w("Vachak-ASR", "mic audit: mic feature flag unreadable: ${t.message}")
         }
         val result = MicAuditResult(osMuted, unmutedByUs, others, inCall, btSco, inputs, appOpMode, micList, hasMicFeature)
         lastMicAudit = result
         if (result.suspicious()) {
-            android.util.Log.w("Vachak-ASR", "mic audit SUSPICIOUS: $result")
+            VachakLog.w("Vachak-ASR", "mic audit SUSPICIOUS: $result")
         } else {
-            android.util.Log.d("Vachak-ASR", "mic audit clean: $result")
+            VachakLog.d("Vachak-ASR", "mic audit clean: $result")
         }
         return result
     }
@@ -229,14 +231,14 @@ class AudioCapturer {
         try {
             auditMic(context)
         } catch (e: Exception) {
-            android.util.Log.w("Vachak-ASR", "mic audit threw, capturing anyway: ${e.message}")
+            VachakLog.w("Vachak-ASR", "mic audit threw, capturing anyway: ${e.message}")
         }
         startRecording()
     }
 
     @SuppressLint("MissingPermission")
     fun startRecording() {        if (isRecording) {
-            android.util.Log.d("Vachak-ASR", "startRecording ignored, already recording")
+            VachakLog.d("Vachak-ASR", "startRecording ignored, already recording")
             return
         }
         synchronized(bufferLock) {
@@ -251,9 +253,9 @@ class AudioCapturer {
             AudioFormat.CHANNEL_IN_MONO,
             AudioFormat.ENCODING_PCM_16BIT
         )
-        android.util.Log.d("Vachak-ASR", "startRecording minBufferSize=$minBufferSize sampleRate=$sampleRate")
+        VachakLog.d("Vachak-ASR", "startRecording minBufferSize=$minBufferSize sampleRate=$sampleRate")
         if (minBufferSize <= 0) {
-            android.util.Log.e("Vachak-ASR", "getMinBufferSize failed: $minBufferSize")
+            VachakLog.e("Vachak-ASR", "getMinBufferSize failed: $minBufferSize")
             return
         }
 
@@ -285,10 +287,10 @@ class AudioCapturer {
         val orderedSources = orderedByProbeCache(sources)
         for (src in orderedSources) {
             val candidate = try {
-                android.util.Log.d("Vachak-ASR", "Trying AudioSource $src (emulator=$isEmulator)")
+                VachakLog.d("Vachak-ASR", "Trying AudioSource $src (emulator=$isEmulator)")
                 AudioRecord(src, sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, minBufferSize)
             } catch (e: Exception) {
-                android.util.Log.w("Vachak-ASR", "AudioRecord $src failed", e); null
+                VachakLog.w("Vachak-ASR", "AudioRecord $src failed", e); null
             }
             if (candidate == null || candidate.state != AudioRecord.STATE_INITIALIZED) {
                 try { candidate?.release() } catch (_: Exception) { /* best-effort cleanup */ }
@@ -297,12 +299,12 @@ class AudioCapturer {
             try {
                 candidate.startRecording()
             } catch (e: Exception) {
-                android.util.Log.w("Vachak-ASR", "AudioRecord $src startRecording failed", e)
+                VachakLog.w("Vachak-ASR", "AudioRecord $src startRecording failed", e)
                 try { candidate.release() } catch (_: Exception) { /* best-effort cleanup */ }
                 continue
             }
             val probeRms = probeSignal(candidate)
-            android.util.Log.d("Vachak-ASR", "AudioSource $src probe rms=$probeRms (${VachakAudio.rmsToDb(probeRms)})")
+            VachakLog.d("Vachak-ASR", "AudioSource $src probe rms=$probeRms (${VachakAudio.rmsToDb(probeRms)})")
             if (probeRms >= VachakAudio.DIGITAL_SILENCE_RMS) {
                 try { silentRecord?.release() } catch (_: Exception) { /* best-effort cleanup */ }
                 silentRecord = null
@@ -311,13 +313,13 @@ class AudioCapturer {
                 silentStart = false
                 if (cachedSource != src) {
                     cachedSource = src
-                    android.util.Log.d("Vachak-ASR", "probe cache STORE src=$src")
+                    VachakLog.d("Vachak-ASR", "probe cache STORE src=$src")
                 } else {
-                    android.util.Log.d("Vachak-ASR", "probe cache HIT src=$src (skipped ${orderedSources.size - 1} probes)")
+                    VachakLog.d("Vachak-ASR", "probe cache HIT src=$src (skipped ${orderedSources.size - 1} probes)")
                 }
                 break
             }
-            android.util.Log.w("Vachak-ASR", "AudioSource $src streams digital silence — trying next source")
+            VachakLog.w("Vachak-ASR", "AudioSource $src streams digital silence — trying next source")
             if (probeRms > silentRms) {
                 try { silentRecord?.release() } catch (_: Exception) { /* best-effort cleanup */ }
                 silentRecord = candidate
@@ -332,17 +334,17 @@ class AudioCapturer {
             // Every source silent (or failed): keep the loudest so capture still
             // runs, but flag it — the stop path reports MIC instead of VAD.
             if (silentRecord != null) {
-                android.util.Log.e("Vachak-ASR", "ALL sources digital silence (best=$silentSrc rms=$silentRms) — keeping it, flagging silentStart")
+                VachakLog.e("Vachak-ASR", "ALL sources digital silence (best=$silentSrc rms=$silentRms) — keeping it, flagging silentStart")
                 record = silentRecord
                 audioSourceUsed = silentSrc
                 silentStart = true
             } else {
-                android.util.Log.e("Vachak-ASR", "AudioRecord creation failed all sources")
+                VachakLog.e("Vachak-ASR", "AudioRecord creation failed all sources")
                 return
             }
         }
         if (record.state != AudioRecord.STATE_INITIALIZED) {
-            android.util.Log.e("Vachak-ASR", "AudioRecord not initialized state=${record.state}")
+            VachakLog.e("Vachak-ASR", "AudioRecord not initialized state=${record.state}")
             try { record.release() } catch (_: Exception) { /* best-effort cleanup */ }
             return
         }
@@ -352,15 +354,15 @@ class AudioCapturer {
         // are we really on" in logcat without any extra permission.
         try {
             val routed = record.routedDevice
-            android.util.Log.d("Vachak-ASR", "AudioRecord routed: type=${routed?.type} name=${routed?.productName}")
+            VachakLog.d("Vachak-ASR", "AudioRecord routed: type=${routed?.type} name=${routed?.productName}")
         } catch (t: Throwable) {
-            android.util.Log.w("Vachak-ASR", "routed device unreadable: ${t.message}")
+            VachakLog.w("Vachak-ASR", "routed device unreadable: ${t.message}")
         }
-        android.util.Log.d("Vachak-ASR", "AudioRecord started src=$audioSourceUsed silentStart=$silentStart, isRecording=true")
+        VachakLog.d("Vachak-ASR", "AudioRecord started src=$audioSourceUsed silentStart=$silentStart, isRecording=true")
 
         recordingJob = coroutineScope.launch {
             val readBuffer = ShortArray(1024)
-            android.util.Log.d("Vachak-ASR", "recordingJob started")
+            VachakLog.d("Vachak-ASR", "recordingJob started")
             while (isActive && isRecording) {
                 val readResult = record.read(readBuffer, 0, readBuffer.size)
                 if (readResult > 0) {
@@ -375,7 +377,7 @@ class AudioCapturer {
                     if (chunkRms > peakRms) peakRms = chunkRms
                     synchronized(bufferLock) {
                         if (bufferSize >= maxBufferSize) {
-                            android.util.Log.w("Vachak-ASR", "AudioCapturer capped at 14s maxBufferSize=$maxBufferSize samples, dropping $readResult samples (2GB RAM limit, sequential ASR→MT→TTS)")
+                            VachakLog.w("Vachak-ASR", "AudioCapturer capped at 14s maxBufferSize=$maxBufferSize samples, dropping $readResult samples (2GB RAM limit, sequential ASR→MT→TTS)")
                         } else {
                             if (bufferSize + readResult > shortBuffer.size) {
                                 val desired = bufferSize + readResult
@@ -384,7 +386,7 @@ class AudioCapturer {
                                 val newSize = minOf(maxBufferSize, maxOf(doubled, desired))
                                 if (newSize > shortBuffer.size) {
                                     if (newSize == maxBufferSize && desired > maxBufferSize) {
-                                        android.util.Log.w("Vachak-ASR", "AudioCapturer capped at 14s ($maxBufferSize samples, ${maxBufferSize / sampleRate}s), truncating to max (2GB limit)")
+                                        VachakLog.w("Vachak-ASR", "AudioCapturer capped at 14s ($maxBufferSize samples, ${maxBufferSize / sampleRate}s), truncating to max (2GB limit)")
                                     }
                                     val newBuffer = ShortArray(newSize)
                                     System.arraycopy(shortBuffer, 0, newBuffer, 0, bufferSize)
@@ -395,23 +397,23 @@ class AudioCapturer {
                             System.arraycopy(readBuffer, 0, shortBuffer, bufferSize, toCopy)
                             bufferSize += toCopy
                             if (toCopy < readResult) {
-                                android.util.Log.w("Vachak-ASR", "AudioCapturer capped: copied $toCopy/${readResult} samples, bufferSize=$bufferSize/$maxBufferSize (14s limit)")
+                                VachakLog.w("Vachak-ASR", "AudioCapturer capped: copied $toCopy/${readResult} samples, bufferSize=$bufferSize/$maxBufferSize (14s limit)")
                             } else {
                                 // no truncation
                             }
                         }
                     }
                     if (bufferSize % 16000 < 1024) {
-                        android.util.Log.d("Vachak-VAD", "captured samples=$bufferSize")
+                        VachakLog.d("Vachak-VAD", "captured samples=$bufferSize")
                     }
                 } else if (readResult == 0) {
                     kotlinx.coroutines.delay(10)
                 } else if (readResult < 0) {
-                    android.util.Log.e("Vachak-ASR", "AudioRecord read error $readResult, stopping")
+                    VachakLog.e("Vachak-ASR", "AudioRecord read error $readResult, stopping")
                     break
                 }
             }
-            android.util.Log.d("Vachak-ASR", "recordingJob ended isActive=$isActive isRecording=$isRecording bufferSize=$bufferSize")
+            VachakLog.d("Vachak-ASR", "recordingJob ended isActive=$isActive isRecording=$isRecording bufferSize=$bufferSize")
         }
     }
 
@@ -442,7 +444,7 @@ class AudioCapturer {
             val n = try {
                 record.read(tmp, 0, minOf(tmp.size, want - got), AudioRecord.READ_BLOCKING)
             } catch (e: Exception) {
-                android.util.Log.w("Vachak-ASR", "probe read failed: ${e.message}")
+                VachakLog.w("Vachak-ASR", "probe read failed: ${e.message}")
                 break
             }
             if (n <= 0) break
@@ -466,27 +468,27 @@ class AudioCapturer {
     }
 
     suspend fun stopAndGetFloatArray(): FloatArray = withContext(Dispatchers.IO) {
-        android.util.Log.d("Vachak-ASR", "stopAndGetFloatArray isRecording=$isRecording bufferSize=$bufferSize")
+        VachakLog.d("Vachak-ASR", "stopAndGetFloatArray isRecording=$isRecording bufferSize=$bufferSize")
         isRecording = false
         val rec = audioRecord
         try {
             if (rec?.recordingState == AudioRecord.RECORDSTATE_RECORDING) {
                 rec.stop()
-                android.util.Log.d("Vachak-ASR", "AudioRecord.stop() called to unblock read")
+                VachakLog.d("Vachak-ASR", "AudioRecord.stop() called to unblock read")
             }
         } catch (e: Exception) {
-            android.util.Log.e("Vachak-ASR", "stop failed", e)
+            VachakLog.e("Vachak-ASR", "stop failed", e)
         }
         try {
             kotlinx.coroutines.withTimeout(1500) { recordingJob?.cancelAndJoin() }
         } catch (e: Exception) {
-            android.util.Log.w("Vachak-ASR", "recordingJob cancel timeout: ${e.message}")
+            VachakLog.w("Vachak-ASR", "recordingJob cancel timeout: ${e.message}")
             recordingJob?.cancel()
         }
         recordingJob = null
         rec?.apply { try { release() } catch (_: Exception) {} }
         audioRecord = null
-        android.util.Log.d("Vachak-ASR", "stopAndGetFloatArray returning ${bufferSize} samples")
+        VachakLog.d("Vachak-ASR", "stopAndGetFloatArray returning ${bufferSize} samples")
         val floatArray = synchronized(bufferLock) {
             val arr = FloatArray(bufferSize)
             for (i in 0 until bufferSize) { arr[i] = shortBuffer[i] / 32768.0f }
@@ -497,31 +499,31 @@ class AudioCapturer {
 
     /** For Vachak's SherpaAsrAdapter which expects ShortArray PCM16 (VAD-gated) — converts FloatArray back or returns raw Short copy */
     suspend fun stopAndGetShortArray(): ShortArray = withContext(Dispatchers.IO) {
-        android.util.Log.d("Vachak-ASR", "stopAndGetShortArray isRecording=$isRecording bufferSize=$bufferSize")
+        VachakLog.d("Vachak-ASR", "stopAndGetShortArray isRecording=$isRecording bufferSize=$bufferSize")
         isRecording = false
         val rec = audioRecord
         try {
             if (rec?.recordingState == AudioRecord.RECORDSTATE_RECORDING) {
                 rec.stop()
-                android.util.Log.d("Vachak-ASR", "AudioRecord.stop() called to unblock read, state=${rec.recordingState}")
+                VachakLog.d("Vachak-ASR", "AudioRecord.stop() called to unblock read, state=${rec.recordingState}")
             } else {
                 try { rec?.stop() } catch (_: Exception) {}
             }
         } catch (e: Exception) {
-            android.util.Log.e("Vachak-ASR", "stop failed", e)
+            VachakLog.e("Vachak-ASR", "stop failed", e)
         }
         try {
             kotlinx.coroutines.withTimeout(1500) { recordingJob?.cancelAndJoin() }
-            android.util.Log.d("Vachak-ASR", "recordingJob cancelled cleanly")
+            VachakLog.d("Vachak-ASR", "recordingJob cancelled cleanly")
         } catch (e: Exception) {
-            android.util.Log.w("Vachak-ASR", "recordingJob cancel timeout: ${e.message}")
+            VachakLog.w("Vachak-ASR", "recordingJob cancel timeout: ${e.message}")
             recordingJob?.cancel()
             kotlinx.coroutines.delay(50)
         }
         recordingJob = null
         rec?.apply { try { release() } catch (_: Exception) {} }
         audioRecord = null
-        android.util.Log.d("Vachak-ASR", "stopAndGetShortArray returning ${bufferSize} samples")
+        VachakLog.d("Vachak-ASR", "stopAndGetShortArray returning ${bufferSize} samples")
         return@withContext synchronized(bufferLock) { shortBuffer.copyOf(bufferSize) }
     }
 
@@ -538,7 +540,7 @@ class AudioCapturer {
             // which cancelled the scope, so the later startRecording()'s
             // recordingJob NEVER ran (no "recordingJob started" line) and
             // 9s of mic captured 0 samples. Scope dies only in close().
-            android.util.Log.d("Vachak-ASR", "release() done (scope kept alive)")
+            VachakLog.d("Vachak-ASR", "release() done (scope kept alive)")
         } catch (_: Exception) {}
     }
 

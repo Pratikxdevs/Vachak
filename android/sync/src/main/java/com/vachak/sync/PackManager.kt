@@ -1,5 +1,7 @@
 package com.vachak.sync
 
+import com.vachak.engine.VachakLog
+
 import android.content.Context
 import android.content.SharedPreferences
 import com.vachak.engine.EngineResult
@@ -33,10 +35,10 @@ object PackManager {
                     db.packDao().getById(id)?.path
                 }
         } catch (e: Exception) {
-            android.util.Log.w("Vachak-Pack", "pack DB unreadable, prefs fallback: ${e.message}")
+            VachakLog.w("Vachak-Pack", "pack DB unreadable, prefs fallback: ${e.message}")
             prefs(context).getString(KEY_ACTIVE, null)?.let { id ->
                 try { PackDatabase.getInstance(context).packDao().getById(id)?.path } catch (e2: Exception) {
-                    android.util.Log.w("Vachak-Pack", "prefs pack fallback also failed: ${e2.message}")
+                    VachakLog.w("Vachak-Pack", "prefs pack fallback also failed: ${e2.message}")
                     null
                 }
             }
@@ -68,7 +70,7 @@ object PackManager {
             prefs(context).edit().putString(KEY_ACTIVE, packId).apply()
             true
         } catch (e: Exception) {
-            android.util.Log.e("Vachak-Pack", "setActivePack($packId) failed", e)
+            VachakLog.e("Vachak-Pack", "setActivePack($packId) failed", e)
             false
         }
     }
@@ -81,7 +83,7 @@ object PackManager {
                 PackInfo(id = e.id, language = e.language, version = e.version, minAndroid = 28, sizeBytes = e.sizeBytes)
             }
         } catch (e: Exception) {
-            android.util.Log.w("Vachak-Pack", "pack DB list failed, scanning filesDir: ${e.message}")
+            VachakLog.w("Vachak-Pack", "pack DB list failed, scanning filesDir: ${e.message}")
             val packsDir = File(context.filesDir, "packs")
             packsDir.listFiles()?.mapNotNull { f ->
                 if (!f.isDirectory) null else PackInfo(f.name, "sat_Olck", f.name.substringAfterLast("-v", "0.1.0"), 28, 0L)
@@ -93,7 +95,7 @@ object PackManager {
 
     suspend fun packEntitiesIO(context: Context): List<com.vachak.sync.db.PackEntity> = withContext(Dispatchers.IO) {
         try { PackDatabase.getInstance(context).packDao().getAllIO() } catch (e: Exception) {
-            android.util.Log.w("Vachak-Pack", "pack entities unreadable: ${e.message}")
+            VachakLog.w("Vachak-Pack", "pack entities unreadable: ${e.message}")
             emptyList()
         }
     }
@@ -103,7 +105,7 @@ object PackManager {
 
     fun freeSpaceBytes(context: Context): Long {
         return try { context.filesDir.freeSpace } catch (e: Exception) {
-            android.util.Log.w("Vachak-Pack", "freeSpace unreadable: ${e.message}")
+            VachakLog.w("Vachak-Pack", "freeSpace unreadable: ${e.message}")
             -1L
         }
     }
@@ -113,7 +115,7 @@ object PackManager {
             val packsDir = File(context.filesDir, "packs")
             packsDir.walkTopDown().filter { it.isFile }.sumOf { it.length() }
         } catch (e: Exception) {
-            android.util.Log.w("Vachak-Pack", "pack storage scan failed: ${e.message}")
+            VachakLog.w("Vachak-Pack", "pack storage scan failed: ${e.message}")
             0L
         }
     }

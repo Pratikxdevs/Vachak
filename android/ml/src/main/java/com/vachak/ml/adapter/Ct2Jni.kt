@@ -1,5 +1,7 @@
 package com.vachak.ml.adapter
 
+import com.vachak.engine.VachakLog
+
 /**
  * JNI bridge for CTranslate2 arm64-v8a CPU-only.
  * Exposes: init / translate / shutdown. Loaded once, singleton retained.
@@ -22,20 +24,20 @@ object Ct2Jni {
             try { System.loadLibrary("spdlogd") } catch (_: Throwable) {}
             try { System.loadLibrary("spdlog") } catch (_: Throwable) {}
             try { System.loadLibrary("ctranslate2") } catch (e: Throwable) {
-                android.util.Log.w("Vachak-Native", "libctranslate2 preload failed: ${e.message}")
+                VachakLog.w("Vachak-Native", "libctranslate2 preload failed: ${e.message}")
             }
             System.loadLibrary("vachak_ct2_jni")
             loaded = true
-            android.util.Log.d("Vachak-Native", "libvachak_ct2_jni.so loaded (with deps)")
+            VachakLog.d("Vachak-Native", "libvachak_ct2_jni.so loaded (with deps)")
         } catch (e: UnsatisfiedLinkError) {
             loaded = false
             loadError = e.message
-            android.util.Log.e("Vachak-Native", "libvachak_ct2_jni not available: ${e.message} (host x86_64 fallback or missing pack)", e)
+            VachakLog.e("Vachak-Native", "libvachak_ct2_jni not available: ${e.message} (host x86_64 fallback or missing pack)", e)
             throw e
         } catch (e: Exception) {
             loaded = false
             loadError = e.message
-            android.util.Log.e("Vachak-Native", "libvachak_ct2_jni load failed: ${e.message}", e)
+            VachakLog.e("Vachak-Native", "libvachak_ct2_jni load failed: ${e.message}", e)
             throw UnsatisfiedLinkError(e.message)
         }
     }
@@ -57,7 +59,7 @@ object Ct2Jni {
             val h = nativeInit(modelPath)
             // nativeInit returns 0 on failure and may have thrown Java exception
             if (h == 0L) {
-                android.util.Log.e("Vachak-Native", "nativeInit returned 0 for $modelPath - model missing or load failed")
+                VachakLog.e("Vachak-Native", "nativeInit returned 0 for $modelPath - model missing or load failed")
                 throw RuntimeException("CT2 init failed for $modelPath")
             }
             handle = h

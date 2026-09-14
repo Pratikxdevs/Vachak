@@ -1,5 +1,7 @@
 package com.vachak.engine
 
+import com.vachak.engine.VachakLog
+
 import android.content.Context
 import com.vachak.engine.mock.*
 import com.vachak.ml.adapter.AdapterTranslationEngine
@@ -58,7 +60,7 @@ data class EngineProvider(
                     if (lang.isNotBlank()) ActiveLanguage.set(lang)
                 }
             } catch (e: Exception) {
-                android.util.Log.w("Vachak-Pack", "active-pack language sync failed, keeping default ${ActiveLanguage.current}: ${e.message}")
+                VachakLog.w("Vachak-Pack", "active-pack language sync failed, keeping default ${ActiveLanguage.current}: ${e.message}")
             }
             val adapterEngine = AdapterTranslationEngine(context, ActiveLanguage.current)
             return EngineProvider(

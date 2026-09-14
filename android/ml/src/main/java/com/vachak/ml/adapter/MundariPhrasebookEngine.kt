@@ -1,5 +1,7 @@
 package com.vachak.ml.adapter
 
+import com.vachak.engine.VachakLog
+
 import android.content.Context
 import com.vachak.engine.EngineError
 import com.vachak.engine.EngineResult
@@ -57,7 +59,7 @@ class MundariPhrasebookEngine(
             ensureLoaded()
             EngineResult.Ok(Unit)
         } catch (e: Exception) {
-            android.util.Log.e("Vachak-MT", "phrasebook load failed", e)
+            VachakLog.e("Vachak-MT", "phrasebook load failed", e)
             EngineResult.Err(EngineError.MODEL_LOAD_FAILED, "phrasebook load failed: ${e.message}")
         }
     }
@@ -117,13 +119,13 @@ class MundariPhrasebookEngine(
             }
             if (bestIdx != -1 && best >= retrievalThreshold) {
                 val out = rows[bestIdx].second
-                android.util.Log.d("Vachak-MT", "phrasebook retrieval f1=${"%.2f".format(best)} \"${text.take(40)}\" -> \"${out.take(40)}\"")
+                VachakLog.d("Vachak-MT", "phrasebook retrieval f1=${"%.2f".format(best)} \"${text.take(40)}\" -> \"${out.take(40)}\"")
                 return EngineResult.Ok(out)
             }
-            android.util.Log.d("Vachak-MT", "phrasebook miss bestF1=${"%.2f".format(best)} for \"${text.take(40)}\"")
+            VachakLog.d("Vachak-MT", "phrasebook miss bestF1=${"%.2f".format(best)} for \"${text.take(40)}\"")
         }
         val ms = (android.os.SystemClock.elapsedRealtimeNanos() - t0) / 1_000_000
-        android.util.Log.d("Vachak-MT", "phrasebook MISS ${ms}ms \"${text.take(40)}\" (17k table, no cover)")
+        VachakLog.d("Vachak-MT", "phrasebook MISS ${ms}ms \"${text.take(40)}\" (17k table, no cover)")
         return EngineResult.Err(
             EngineError.INVALID_INPUT,
             "Mundari phrasebook has no entry for this sentence — try shorter classroom Hindi (merged model pending)"
@@ -132,14 +134,14 @@ class MundariPhrasebookEngine(
 
     private fun logMs(t0: Long, tier: String, inp: String, out: String) {
         val ms = (android.os.SystemClock.elapsedRealtimeNanos() - t0) / 1_000_000
-        android.util.Log.d("Vachak-MT", "phrasebook $tier ${ms}ms \"${inp.take(40)}\" -> \"${out.take(40)}\"")
+        VachakLog.d("Vachak-MT", "phrasebook $tier ${ms}ms \"${inp.take(40)}\" -> \"${out.take(40)}\"")
     }
 
     private fun ensureLoaded() {
         if (loaded) return
         synchronized(lock) {
             if (loaded) return
-            android.util.Log.d("Vachak-MT", "loading Mundari phrasebook asset $assetPath")
+            VachakLog.d("Vachak-MT", "loading Mundari phrasebook asset $assetPath")
             val ex = LinkedHashMap<String, String>()
             val norm = LinkedHashMap<String, String>()
             val rws = ArrayList<Pair<String, String>>()
@@ -162,7 +164,7 @@ class MundariPhrasebookEngine(
             exact = ex
             normalized = norm
             loaded = true
-            android.util.Log.d("Vachak-MT", "phrasebook ready rows=${rws.size} exact=${ex.size}")
+            VachakLog.d("Vachak-MT", "phrasebook ready rows=${rws.size} exact=${ex.size}")
         }
     }
 

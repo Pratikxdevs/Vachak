@@ -1,7 +1,7 @@
 package com.vachak.ml.adapter.mlinternal
 
 import android.content.Context
-import android.util.Log
+import com.vachak.engine.VachakLog
 import com.vachak.engine.ASREngine
 import com.vachak.engine.EngineError
 import com.vachak.engine.EngineResult
@@ -35,10 +35,10 @@ class SherpaAsrAdapter(
         val t0 = android.os.SystemClock.elapsedRealtimeNanos()
         val engine = real ?: IndicConformerAsrAdapter(context)
         val segments = vad.detect(pcm16, sampleRateHz)
-        Log.d("Vachak-VAD", "VAD segments=${segments.size} for ${pcm16.size} samples @ $sampleRateHz Hz: $segments")
-        Log.d("Vachak-ASR", "VAD gated ${segments.size} segments from ${pcm16.size} samples")
+        VachakLog.d("Vachak-VAD", "VAD segments=${segments.size} for ${pcm16.size} samples @ $sampleRateHz Hz: $segments")
+        VachakLog.d("Vachak-ASR", "VAD gated ${segments.size} segments from ${pcm16.size} samples")
         if (segments.isEmpty()) {
-            Log.d("Vachak-ASR", "transcribed 0 segments (silence) -> \"\"")
+            VachakLog.d("Vachak-ASR", "transcribed 0 segments (silence) -> \"\"")
             return EngineResult.Ok("")
         }
 
@@ -48,15 +48,15 @@ class SherpaAsrAdapter(
             if (e <= s) return@mapNotNull null
             val floatSeg = FloatArray(e - s) { pcm16[s + it] / 32768.0f }
             val asrResult = engine.transcribe(floatSeg, sampleRateHz)
-            Log.d("Vachak-ASR", "segment [${seg.startMs},${seg.endMs}] ${floatSeg.size} floats -> \"${asrResult.text}\" isFixture=${asrResult.isFixture}")
+            VachakLog.d("Vachak-ASR", "segment [${seg.startMs},${seg.endMs}] ${floatSeg.size} floats -> \"${asrResult.text}\" isFixture=${asrResult.isFixture}")
             asrResult.text
         }.filter { it.isNotBlank() }
 
         val result = texts.joinToString(" ").trim()
         val latencyMs = (android.os.SystemClock.elapsedRealtimeNanos() - t0) / 1_000_000f
-        Log.d("Vachak-ASR", "transcribed ${pcm16.size} samples @ $sampleRateHz Hz -> \"$result\" (${latencyMs}ms, ${segments.size} segments)")
-        Log.d("Vachak-Latency", "ASR total ${latencyMs}ms for ${pcm16.size} samples, withinBudget=${latencyMs <= 1000}")
-        if (latencyMs > 1000) Log.w("Vachak-Latency", "ASR latency ${latencyMs}ms exceeds 1000ms budget")
+        VachakLog.d("Vachak-ASR", "transcribed ${pcm16.size} samples @ $sampleRateHz Hz -> \"$result\" (${latencyMs}ms, ${segments.size} segments)")
+        VachakLog.d("Vachak-Latency", "ASR total ${latencyMs}ms for ${pcm16.size} samples, withinBudget=${latencyMs <= 1000}")
+        if (latencyMs > 1000) VachakLog.w("Vachak-Latency", "ASR latency ${latencyMs}ms exceeds 1000ms budget")
         return EngineResult.Ok(result)
     }
 }

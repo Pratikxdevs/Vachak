@@ -1,5 +1,7 @@
 package com.vachak.ml.adapter
 
+import com.vachak.engine.VachakLog
+
 import android.content.Context
 import com.vachak.engine.ActiveLanguage
 import com.vachak.engine.EngineError
@@ -65,39 +67,39 @@ class AdapterTranslationEngine(
         val filesAdapter = java.io.File(context.filesDir, adapterPath)
         val safetensorsFiles = java.io.File(filesAdapter, "adapter_model.safetensors")
         if (safetensorsFiles.exists()) {
-            android.util.Log.d("Vachak-MT", "Adapter $adapterPath already in filesDir ${filesAdapter.absolutePath} (${safetensorsFiles.length()/1024/1024}M)")
+            VachakLog.d("Vachak-MT", "Adapter $adapterPath already in filesDir ${filesAdapter.absolutePath} (${safetensorsFiles.length()/1024/1024}M)")
             return filesAdapter.absolutePath
         }
         // Check assets/modelpacks/* (bundled in APK via android/ml/src/main/assets/modelpacks/)
         try {
             val assetList = context.assets.list(adapterPath) ?: emptyArray()
             if (assetList.contains("adapter_model.safetensors")) {
-                android.util.Log.d("Vachak-MT", "Extracting adapter $adapterPath from assets to ${filesAdapter.absolutePath}")
+                VachakLog.d("Vachak-MT", "Extracting adapter $adapterPath from assets to ${filesAdapter.absolutePath}")
                 filesAdapter.mkdirs()
                 for (name in assetList) {
                     try {
                         context.assets.open("$adapterPath/$name").use { inp ->
                             java.io.File(filesAdapter, name).outputStream().use { out -> inp.copyTo(out) }
                         }
-                        android.util.Log.d("Vachak-MT", "Extracted adapter asset $adapterPath/$name")
+                        VachakLog.d("Vachak-MT", "Extracted adapter asset $adapterPath/$name")
                     } catch (e: Exception) {
-                        android.util.Log.e("Vachak-MT", "Failed to extract $adapterPath/$name", e)
+                        VachakLog.e("Vachak-MT", "Failed to extract $adapterPath/$name", e)
                     }
                 }
                 if (safetensorsFiles.exists()) return filesAdapter.absolutePath
             } else {
-                android.util.Log.w("Vachak-MT", "Adapter $adapterPath not in assets (list=${assetList.joinToString()})")
+                VachakLog.w("Vachak-MT", "Adapter $adapterPath not in assets (list=${assetList.joinToString()})")
             }
         } catch (e: Exception) {
-            android.util.Log.w("Vachak-MT", "Adapter assets check failed $adapterPath: ${e.message}")
+            VachakLog.w("Vachak-MT", "Adapter assets check failed $adapterPath: ${e.message}")
         }
         // Check host project root (for Robolectric/host tests)
         val hostAdapter = java.io.File(adapterPath)
         if (java.io.File(hostAdapter, "adapter_model.safetensors").exists()) {
-            android.util.Log.d("Vachak-MT", "Adapter $adapterPath found at host ${hostAdapter.absolutePath}")
+            VachakLog.d("Vachak-MT", "Adapter $adapterPath found at host ${hostAdapter.absolutePath}")
             return hostAdapter.absolutePath
         }
-        android.util.Log.w("Vachak-MT", "Adapter $adapterPath not found in filesDir/assets/host - will use base CT2 + refMap fallback")
+        VachakLog.w("Vachak-MT", "Adapter $adapterPath not found in filesDir/assets/host - will use base CT2 + refMap fallback")
         return null
     }
 
@@ -106,7 +108,7 @@ class AdapterTranslationEngine(
         // Gate FIRST: never route an unsupported target into a language adapter
         // (an hi→eng request must not come back as Mundari).
         if (!supports(pair)) {
-            android.util.Log.e("Vachak-MT", "translate unsupported ${pair.source}->${pair.target}")
+            VachakLog.e("Vachak-MT", "translate unsupported ${pair.source}->${pair.target}")
             return EngineResult.Err(EngineError.UNSUPPORTED_LANGUAGE, "unsupported ${pair.source}->${pair.target}")
         }
         val globalLang = ActiveLanguage.current
@@ -121,11 +123,11 @@ class AdapterTranslationEngine(
             else adapterMap[tgt] ?: adapterMap[activeLang] ?: "modelpacks/mundari_adapter"
         val extracted = ensureAdapterExtracted(adapterPath)
         val adapterPresent = extracted != null
-        android.util.Log.d("Vachak-MT", "AdapterEngine translate [$tgt] active=$activeLang adapter=$adapterPath extracted=$extracted present=$adapterPresent text=\"${text.take(40)}\"")
+        VachakLog.d("Vachak-MT", "AdapterEngine translate [$tgt] active=$activeLang adapter=$adapterPath extracted=$extracted present=$adapterPresent text=\"${text.take(40)}\"")
         if (adapterPresent) {
-            android.util.Log.d("Vachak-MT", "Adapter $adapterPath connected (${java.io.File(extracted, "adapter_model.safetensors").length()/1024/1024}M)")
+            VachakLog.d("Vachak-MT", "Adapter $adapterPath connected (${java.io.File(extracted, "adapter_model.safetensors").length()/1024/1024}M)")
         } else {
-            android.util.Log.w("Vachak-MT", "Adapter $adapterPath NOT connected - check modelpacks assets")
+            VachakLog.w("Vachak-MT", "Adapter $adapterPath NOT connected - check modelpacks assets")
         }
         // Route by TARGET language (both adapters first-class):
         // - Santali (sat_Olck): proven ONNX INT8 bundle (in-APK, verified on-device).
@@ -138,8 +140,8 @@ class AdapterTranslationEngine(
             translateMundari(text, pair)
         }
         when (r) {
-            is EngineResult.Ok -> android.util.Log.d("Vachak-MT", "AdapterEngine OK [$tgt] ${r.value.take(60)}")
-            is EngineResult.Err -> android.util.Log.e("Vachak-MT", "AdapterEngine Err [$tgt] ${r.code}: ${r.message}")
+            is EngineResult.Ok -> VachakLog.d("Vachak-MT", "AdapterEngine OK [$tgt] ${r.value.take(60)}")
+            is EngineResult.Err -> VachakLog.e("Vachak-MT", "AdapterEngine Err [$tgt] ${r.code}: ${r.message}")
         }
         return r
     }
@@ -154,7 +156,7 @@ class AdapterTranslationEngine(
         if (isMergedReady()) {
             val mr = base.translate(text, LanguagePair(pair.source, "unr_Deva"))
             if (mr is EngineResult.Ok && mr.value.isNotBlank()) return mr
-            android.util.Log.w("Vachak-MT", "merged CT2 failed, falling back to phrasebook")
+            VachakLog.w("Vachak-MT", "merged CT2 failed, falling back to phrasebook")
         }
         return mundariBook.translate(text, LanguagePair(pair.source, "unr_Deva"))
     }
