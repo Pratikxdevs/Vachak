@@ -110,8 +110,8 @@ fun FilterPill(
 }
 
 // ── Continue Learning hero ──────────────────────────────────────────
-// Pine feature card: the ONE thing that pops. Progress sits in a recessed
-// pine well; CTA is marigold. Count chip is tabular so digits never jitter.
+// Spec §10: Soft Lavender #F7F2FF — almost white with a lavender tint.
+// NEVER a saturated purple background. Black pill CTA (§14).
 @Composable
 fun ContinueLearningCard(
     title: String,
@@ -124,19 +124,19 @@ fun ContinueLearningCard(
     modifier: Modifier = Modifier
 ) {
     Surface(
-        modifier = modifier.fillMaxWidth().raisedShadow(RoundedCornerShape(24.dp)),
+        modifier = modifier.fillMaxWidth().cardShadow(RoundedCornerShape(24.dp)),
         shape = RoundedCornerShape(24.dp),
-        color = VachakColors.DeepLavender,
+        color = VachakColors.SoftLavender,
         tonalElevation = 0.dp
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text("CONTINUE LEARNING", style = MaterialTheme.typography.labelSmall, color = VachakColors.Lavender200, letterSpacing = 1.2.sp, fontWeight = FontWeight.SemiBold)
-                Surface(shape = RoundedCornerShape(50), color = Color.White.copy(alpha = 0.14f)) {
+                Text("CONTINUE LEARNING", style = MaterialTheme.typography.labelSmall, color = VachakColors.Lavender600, letterSpacing = 1.2.sp, fontWeight = FontWeight.SemiBold)
+                Surface(shape = RoundedCornerShape(50), color = Color.White) {
                     Text(
                         countText,
                         style = MaterialTheme.typography.labelSmall,
-                        color = Color.White,
+                        color = VachakColors.DeepLavender,
                         fontWeight = FontWeight.SemiBold,
                         fontFamily = FontFamily.Monospace,
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
@@ -145,46 +145,40 @@ fun ContinueLearningCard(
             }
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Top) {
                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(title, style = MaterialTheme.typography.titleLarge, color = Color.White, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(gradeLabel, style = MaterialTheme.typography.bodySmall, color = VachakColors.Lavender200)
-                    Text(description, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.82f), lineHeight = 18.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    Text(title, style = MaterialTheme.typography.titleLarge, color = VachakColors.TextPrimary, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(gradeLabel, style = MaterialTheme.typography.bodySmall, color = VachakColors.TextSecondary)
+                    Text(description, style = MaterialTheme.typography.bodySmall, color = VachakColors.TextSecondary, lineHeight = 18.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 }
-                // Ol Chiki mark — glass tile, the card's character detail.
+                // Ol Chiki mark — soft white tile (§12: translucent/white rounded container).
                 Surface(
                     modifier = Modifier.size(72.dp),
                     shape = RoundedCornerShape(18.dp),
-                    color = Color.White.copy(alpha = 0.14f),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.4f))
+                    color = Color.White,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, VachakColors.Lavender200)
                 ) {
                     Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                        Text("ᱚ", style = MaterialTheme.typography.headlineMedium, color = Color.White, fontWeight = FontWeight.Bold)
+                        Text("ᱚ", style = MaterialTheme.typography.headlineMedium, color = VachakColors.DeepLavender, fontWeight = FontWeight.Bold)
                     }
                 }
             }
-            // Recessed progress well: darker pine bed, lighter bar.
-            Surface(
-                shape = RoundedCornerShape(14.dp),
-                color = VachakColors.ForestDark,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Icon(Icons.AutoMirrored.Outlined.MenuBook, null, tint = VachakColors.Lavender200, modifier = Modifier.size(16.dp))
-                        Text(progressLabel, style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.9f))
-                    }
-                    LinearProgressIndicator(
-                        progress = { progress.coerceIn(0f, 1f) },
-                        modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(50)),
-                        color = VachakColors.Accent,
-                        trackColor = Color.White.copy(alpha = 0.22f)
-                    )
+            // Progress (§13): thin lavender bar on a subtle track.
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Icon(Icons.AutoMirrored.Outlined.MenuBook, null, tint = VachakColors.Lavender600, modifier = Modifier.size(16.dp))
+                    Text(progressLabel, style = MaterialTheme.typography.labelMedium, color = VachakColors.TextSecondary)
                 }
+                LinearProgressIndicator(
+                    progress = { progress.coerceIn(0f, 1f) },
+                    modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(50)),
+                    color = VachakColors.Lavender600,
+                    trackColor = Color.White
+                )
             }
             Button(
                 onClick = onContinue,
-                modifier = Modifier.fillMaxWidth().height(48.dp),
+                modifier = Modifier.fillMaxWidth().height(56.dp),
                 shape = RoundedCornerShape(50),
-                colors = ButtonDefaults.buttonColors(containerColor = VachakColors.Accent, contentColor = Color.White),
+                colors = ButtonDefaults.buttonColors(containerColor = VachakColors.PrimaryDark, contentColor = Color.White),
                 contentPadding = PaddingValues(horizontal = 20.dp)
             ) {
                 Text("Continue Lesson", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, maxLines = 1)
@@ -196,6 +190,7 @@ fun ContinueLearningCard(
 }
 
 // ── Secondary lesson row ────────────────────────────────────────────
+// Spec §16: lightweight surface, very light lavender background — not a card.
 @Composable
 fun SecondaryLessonRow(
     title: String,
@@ -206,9 +201,9 @@ fun SecondaryLessonRow(
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(20.dp),
-        color = VachakLayer.Card.color(),
-        border = androidx.compose.foundation.BorderStroke(1.dp, VachakColors.Border),
-        modifier = modifier.fillMaxWidth().cardShadow()
+        color = VachakColors.SoftLavender,
+        tonalElevation = 0.dp,
+        modifier = modifier.fillMaxWidth()
     ) {
         Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             Surface(shape = RoundedCornerShape(12.dp), color = VachakColors.Lavender100, modifier = Modifier.size(44.dp)) {

@@ -92,7 +92,9 @@ fun AdaptiveScaffold(
                         ) {
                             NavDest.tabs.forEach { dest ->
                                 val selected = dest == tabHighlight
-                                val bg = if (selected) VachakColors.DeepLavender else Color.Transparent
+                                // Spec §22: selected = lavender filled pill, white
+                                // icon + label; others muted.
+                                val bg = if (selected) VachakColors.Lavender600 else Color.Transparent
                                 val tint = if (selected) Color.White else VachakColors.TextSecondary
                                 val labelColor = if (selected) Color.White else VachakColors.TextSecondary
                                 Box(
