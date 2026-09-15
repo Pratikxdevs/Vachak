@@ -33,6 +33,7 @@ import com.vachak.ui.content.PackContentReader
 import com.vachak.ui.navigation.loadPackSummary
 import com.vachak.ui.theme.VachakColors
 import com.vachak.ui.theme.cardShadow
+import com.vachak.ui.theme.tabletHPad
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -191,7 +192,7 @@ private fun ChapterContent(
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
+        contentPadding = PaddingValues(horizontal = tabletHPad(), vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         item {

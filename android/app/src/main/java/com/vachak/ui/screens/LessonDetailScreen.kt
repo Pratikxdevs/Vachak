@@ -26,6 +26,7 @@ import com.vachak.engine.Outcome
 import com.vachak.engine.QuizEngine
 import com.vachak.ui.theme.VachakColors
 import com.vachak.ui.theme.cardShadow
+import com.vachak.ui.theme.tabletHPad
 import com.vachak.ui.components.BreadcrumbTrail
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -165,7 +166,7 @@ fun LessonDetailScreen(
         when (tab) {
             DetailTab.Teach -> LazyColumn(
                 modifier = Modifier.weight(1f).fillMaxWidth(),
-                contentPadding = PaddingValues(20.dp),
+                contentPadding = PaddingValues(tabletHPad(20.dp)),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 if (loading) {

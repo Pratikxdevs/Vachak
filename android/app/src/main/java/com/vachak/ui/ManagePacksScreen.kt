@@ -61,6 +61,7 @@ import com.vachak.ui.components.InsetWell
 import com.vachak.ui.components.StatusRow
 import com.vachak.ui.theme.VachakColors
 import com.vachak.ui.theme.cardShadow
+import com.vachak.ui.theme.tabletHPad
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -155,7 +156,7 @@ fun ManagePacksScreen(onBack: () -> Unit = {}, modifier: Modifier = Modifier) {
         }
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
+            contentPadding = PaddingValues(horizontal = tabletHPad(20.dp), vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             // Budget card — measured bytes, tabular numbers.

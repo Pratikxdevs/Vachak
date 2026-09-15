@@ -23,6 +23,7 @@ import com.vachak.ml.adapter.AdapterTranslationEngine
 import com.vachak.sync.PackManager
 import com.vachak.ui.components.VachakSection
 import com.vachak.ui.components.BreadcrumbTrail
+import com.vachak.ui.theme.tabletHPad
 import com.vachak.ui.theme.VachakColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -120,7 +121,7 @@ fun DiagnosticsScreen(
         }
     }
 
-    Column(modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    Column(modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(tabletHPad(16.dp)), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         BreadcrumbTrail(listOf("More", "Diagnostics"))
         Text("Diagnostics", style = MaterialTheme.typography.headlineSmall)
         Text(

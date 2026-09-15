@@ -81,6 +81,7 @@ import com.vachak.ui.navigation.PackGrade
 import com.vachak.ui.navigation.loadPackSummary
 import com.vachak.ui.theme.VachakColors
 import com.vachak.ui.theme.cardShadow
+import com.vachak.ui.theme.tabletHPad
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -208,7 +209,7 @@ fun CurriculumScreen(
         }
     }
     val isTablet = remember(configuration.screenWidthDp) { configuration.screenWidthDp >= 840 }
-    val hPad = if (isTablet) 32.dp else 24.dp
+    val hPad = tabletHPad(24.dp)
     // Saved voice notes live in the process store (same source SavedPane reads).
     val voiceCount = LiveConversationStore.items.size
     Box(modifier = modifier.fillMaxSize().background(VachakColors.Background)) {

@@ -81,6 +81,7 @@ import com.vachak.ui.components.StatusRow
 import com.vachak.ui.components.SteppedLoading
 import com.vachak.ui.theme.VachakColors
 import com.vachak.ui.theme.cardShadow
+import com.vachak.ui.theme.tabletHPad
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -228,7 +229,7 @@ fun HomeScreen(
     // Use LocalConfiguration instead of nested BoxWithConstraints to avoid double-measure at 120Hz
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
     val isTablet = remember(configuration.screenWidthDp) { configuration.screenWidthDp >= 840 }
-    val hPad = if (isTablet) 32.dp else 20.dp
+    val hPad = tabletHPad(20.dp)
     val titleSize = if (isTablet) 40.sp else 30.sp
     val todayLine = remember {
         SimpleDateFormat("EEEE, d MMM", Locale.getDefault()).format(Date()) +

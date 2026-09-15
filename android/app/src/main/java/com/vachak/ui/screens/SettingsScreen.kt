@@ -66,6 +66,7 @@ import com.vachak.ui.components.SettingsRow
 import com.vachak.ui.components.SettingsSectionHeader
 import com.vachak.ui.theme.VachakColors
 import com.vachak.ui.theme.overlayShadow
+import com.vachak.ui.theme.tabletHPad
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -118,7 +119,7 @@ fun SettingsScreen(
 
     val configuration = LocalConfiguration.current
     val isTablet = remember(configuration.screenWidthDp) { configuration.screenWidthDp >= 840 }
-    val hPad = if (isTablet) 32.dp else 20.dp
+    val hPad = tabletHPad(20.dp)
     Box(modifier = modifier.fillMaxSize().background(VachakColors.Background)) {
         LazyColumn(
             modifier = Modifier.fillMaxSize().statusBarsPadding(),

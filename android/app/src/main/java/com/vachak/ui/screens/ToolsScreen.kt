@@ -77,6 +77,7 @@ import com.vachak.ui.components.GuidedEmpty
 import com.vachak.ui.components.InsetWell
 import com.vachak.ui.theme.VachakColors
 import com.vachak.ui.theme.cardShadow
+import com.vachak.ui.theme.tabletHPad
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -276,13 +277,13 @@ internal fun WorksheetPane(engine: EngineProvider, lesson: Lesson?, allLessons: 
                 }
             }
         }
-        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = tabletHPad(), vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             listOf("Lesson", "Pack chapter").forEach { s ->
                 FilterChip(selected = source == s, onClick = { source = s }, label = { Text(s) }, modifier = Modifier.weight(1f))
             }
         }
         if (source == "Pack chapter") {
-            PackWorksheetStudio(modifier = Modifier.weight(1f).padding(horizontal = 24.dp))
+            PackWorksheetStudio(modifier = Modifier.weight(1f).padding(horizontal = tabletHPad()))
         } else if (lesson == null) {
             Box(modifier = Modifier.weight(1f).fillMaxSize(), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -291,7 +292,7 @@ internal fun WorksheetPane(engine: EngineProvider, lesson: Lesson?, allLessons: 
                 }
             }
         } else {
-            Column(modifier = Modifier.weight(1f).padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Column(modifier = Modifier.weight(1f).padding(tabletHPad()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 if (library.size > 1) {
                     ExposedDropdownMenuBox(expanded = pickerOpen, onExpandedChange = { pickerOpen = it }) {
                         OutlinedTextField(
@@ -439,7 +440,7 @@ internal fun SavedPane(onBack: () -> Unit, onOpenWorksheets: () -> Unit = {}, on
         }
         LazyColumn(
             modifier = Modifier.weight(1f).fillMaxWidth(),
-            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
+            contentPadding = PaddingValues(horizontal = tabletHPad(20.dp), vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             item {
@@ -550,13 +551,13 @@ internal fun FlashcardPane(engine: EngineProvider, lesson: Lesson?, allLessons: 
                 }
             }
         }
-        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = tabletHPad(), vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             listOf("Lesson", "Pack chapter").forEach { s ->
                 FilterChip(selected = source == s, onClick = { source = s }, label = { Text(s) }, modifier = Modifier.weight(1f))
             }
         }
         if (source == "Pack chapter") {
-            PackDeckStudio(modifier = Modifier.weight(1f).padding(horizontal = 24.dp))
+            PackDeckStudio(modifier = Modifier.weight(1f).padding(horizontal = tabletHPad()))
             return
         }
         if (cards.isEmpty()) {
@@ -585,7 +586,7 @@ internal fun FlashcardPane(engine: EngineProvider, lesson: Lesson?, allLessons: 
             }
         }
         if (library.size > 1) {
-            ExposedDropdownMenuBox(expanded = pickerOpen, onExpandedChange = { pickerOpen = it }, modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp)) {
+            ExposedDropdownMenuBox(expanded = pickerOpen, onExpandedChange = { pickerOpen = it }, modifier = Modifier.fillMaxWidth().padding(horizontal = tabletHPad())) {
                 OutlinedTextField(
                     value = activeLesson?.let { "Grade ${it.grade} • ${it.title}" } ?: "",
                     onValueChange = {},
@@ -605,7 +606,7 @@ internal fun FlashcardPane(engine: EngineProvider, lesson: Lesson?, allLessons: 
                 }
             }
         }
-        Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(tabletHPad()), verticalArrangement = Arrangement.spacedBy(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Surface(
                 modifier = Modifier.fillMaxWidth().heightIn(min = 320.dp).cardShadow(RoundedCornerShape(24.dp)),
                 shape = RoundedCornerShape(24.dp),

@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import com.vachak.ui.content.PackContentReader
 import com.vachak.ui.theme.VachakColors
 import com.vachak.ui.theme.cardShadow
+import com.vachak.ui.theme.tabletHPad
 
 /**
  * Shared renderers for installed-pack worksheets and decks.
@@ -33,7 +34,7 @@ import com.vachak.ui.theme.cardShadow
 fun PackWorksheetView(questions: List<PackQuestionAlias>) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
+        contentPadding = PaddingValues(horizontal = tabletHPad(), vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         // Index-suffixed keys (same duplicate-prompt hazard as the chapter
@@ -98,7 +99,7 @@ fun PackDeckView(grade: Int, cards: List<PackCardAlias>) {
             art?.let { old -> runCatching { if (!old.isRecycled) old.recycle() } }
         }
     }
-    Column(modifier = Modifier.fillMaxSize().verticalScroll(androidx.compose.foundation.rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(modifier = Modifier.fillMaxSize().verticalScroll(androidx.compose.foundation.rememberScrollState()).padding(tabletHPad()), verticalArrangement = Arrangement.spacedBy(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Surface(
                 modifier = Modifier.fillMaxWidth().heightIn(min = 320.dp, max = 520.dp).cardShadow(RoundedCornerShape(24.dp)),
                 shape = RoundedCornerShape(24.dp),

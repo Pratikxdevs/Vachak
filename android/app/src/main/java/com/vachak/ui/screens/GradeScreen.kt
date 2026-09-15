@@ -30,6 +30,7 @@ import com.vachak.ui.navigation.PackGrade
 import com.vachak.ui.navigation.loadPackSummary
 import com.vachak.ui.theme.VachakColors
 import com.vachak.ui.theme.cardShadow
+import com.vachak.ui.theme.tabletHPad
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -116,7 +117,7 @@ fun GradeScreen(
         when {
             chapters.isNotEmpty() -> LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
+                contentPadding = PaddingValues(horizontal = tabletHPad(), vertical = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(20.dp)
             ) {
                 item {

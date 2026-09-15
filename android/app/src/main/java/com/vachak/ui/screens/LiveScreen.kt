@@ -107,6 +107,7 @@ import com.vachak.ui.theme.cardShadow
 import com.vachak.ui.theme.color
 import com.vachak.ui.theme.overlayShadow
 import com.vachak.ui.theme.raisedShadow
+import com.vachak.ui.theme.tabletHPad
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
@@ -437,7 +438,7 @@ fun LiveScreen(
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.weight(1f).fillMaxWidth(),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
+                    contentPadding = PaddingValues(horizontal = tabletHPad(12.dp), vertical = 10.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     if (hasConversation) {
@@ -555,7 +556,7 @@ fun LiveScreen(
                 enabled = !vmState.isListening,
                 focusRequester = inputFocus,
                 onFocusChange = {},
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp).navigationBarsPadding()
+                modifier = Modifier.padding(horizontal = tabletHPad(12.dp), vertical = 8.dp).navigationBarsPadding()
             )
         }
 

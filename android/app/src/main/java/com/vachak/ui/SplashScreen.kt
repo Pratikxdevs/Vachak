@@ -71,8 +71,10 @@ fun VideoSplash(onDone: () -> Unit) {
     ) {
         // 9:16 stage, centered: fills height on tall phones, fills width on
         // wider screens — the video is never stretched or cropped.
+        // Stage backdrop is WHITE (the video's own field color), so the
+        // letterbox gaps on taller screens vanish instead of reading as bars.
         BoxWithConstraints(
-            modifier = Modifier.fillMaxSize().background(Color.Black),
+            modifier = Modifier.fillMaxSize().background(Color.White),
             contentAlignment = Alignment.Center
         ) {
             val useWidth = maxWidth / maxHeight < 9f / 16f
