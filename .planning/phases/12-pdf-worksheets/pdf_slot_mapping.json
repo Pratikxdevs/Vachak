@@ -1,0 +1,201 @@
+{
+ "pool": [
+  {
+   "basename": "Class_4__Ticking_Clocks_and_Turning_Calendar__Santhali_.pdf",
+   "pages": 9,
+   "sha256": "3d3cb7284e7b0cc7da9fa781a4ed1922d6a11fb1d8650cdd0c22b1ff7f0a4ddb",
+   "size": 3366543,
+   "source": "santali_organized/Class-4/Mathematics/Class_4__Ticking_Clocks_and_Turning_Calendar__Santhali_.pdf"
+  },
+  {
+   "basename": "Class_1__Chapter_13_So_Many_Toys__Data_Handling___Santhali_.pdf",
+   "pages": 2,
+   "sha256": "73cff358eb1f3be4c3d177fb5f62a9a131925bc084f7d05381acc75283d5ff2e",
+   "size": 3393506,
+   "source": "santali_organized/Class-1/Mathematics/Class_1__Chapter_13_So_Many_Toys__Data_Handling___Santhali_.pdf"
+  },
+  {
+   "basename": "Class_2__Playing_with_Lines__Santhali_.pdf",
+   "pages": 6,
+   "sha256": "d737369e1a9ae1d3f9dfc4ab1fb74c018dab94933b20b081ee3e1303d3b8ec76",
+   "size": 3487372,
+   "source": "santali_organized/Class-2/Mathematics/Class_2__Playing_with_Lines__Santhali_.pdf"
+  },
+  {
+   "basename": "Class_4__Elephants_Tigers__and_Leopards__Santhali_.pdf",
+   "pages": 15,
+   "sha256": "8b837f886d8088a41561c23bd0059f24ae43d089c2640737aae23ca377826d14",
+   "size": 4222093,
+   "source": "santali_organized/Class-4/Mathematics/Class_4__Elephants_Tigers__and_Leopards__Santhali_.pdf"
+  },
+  {
+   "basename": "Class_1__Chapter_11_How_Many_Times___Multiplication___Santhali_.pdf",
+   "pages": 4,
+   "sha256": "127cf2cdbe32877c59c8bba6940ca8ae1f68c42c74f95a8372c7b2c6bd1317df",
+   "size": 5217134,
+   "source": "santali_organized/Class-1/Mathematics/Class_1__Chapter_11_How_Many_Times___Multiplication___Santhali_.pdf"
+  }
+ ],
+ "slots": [
+  {
+   "grade": 2,
+   "pool_file": "Class_2__Playing_with_Lines__Santhali_.pdf",
+   "reason": "same-grade",
+   "sha256": "d737369e1a9ae1d3f9dfc4ab1fb74c018dab94933b20b081ee3e1303d3b8ec76",
+   "slug": "playing-with-lines",
+   "subject": "Mathematics"
+  },
+  {
+   "grade": 2,
+   "pool_file": "Class_1__Chapter_13_So_Many_Toys__Data_Handling___Santhali_.pdf",
+   "reason": "smallest-fill",
+   "sha256": "73cff358eb1f3be4c3d177fb5f62a9a131925bc084f7d05381acc75283d5ff2e",
+   "slug": "grouping-and-sharing",
+   "subject": "Mathematics"
+  },
+  {
+   "grade": 2,
+   "pool_file": "Class_4__Elephants_Tigers__and_Leopards__Santhali_.pdf",
+   "reason": "smallest-fill",
+   "sha256": "8b837f886d8088a41561c23bd0059f24ae43d089c2640737aae23ca377826d14",
+   "slug": "shapes-around-us",
+   "subject": "Mathematics"
+  },
+  {
+   "grade": 2,
+   "pool_file": "Class_1__Chapter_11_How_Many_Times___Multiplication___Santhali_.pdf",
+   "reason": "smallest-fill",
+   "sha256": "127cf2cdbe32877c59c8bba6940ca8ae1f68c42c74f95a8372c7b2c6bd1317df",
+   "slug": "shadow-story",
+   "subject": "Mathematics"
+  },
+  {
+   "grade": 2,
+   "pool_file": "Class_4__Ticking_Clocks_and_Turning_Calendar__Santhali_.pdf",
+   "reason": "smallest-fill",
+   "sha256": "3d3cb7284e7b0cc7da9fa781a4ed1922d6a11fb1d8650cdd0c22b1ff7f0a4ddb",
+   "slug": "decoration-for-festival",
+   "subject": "Mathematics"
+  },
+  {
+   "grade": 4,
+   "pool_file": "Class_4__Ticking_Clocks_and_Turning_Calendar__Santhali_.pdf",
+   "reason": "same-grade",
+   "sha256": "3d3cb7284e7b0cc7da9fa781a4ed1922d6a11fb1d8650cdd0c22b1ff7f0a4ddb",
+   "slug": "ticking-clocks-and-turning-calendar",
+   "subject": "Mathematics"
+  },
+  {
+   "grade": 4,
+   "pool_file": "Class_4__Ticking_Clocks_and_Turning_Calendar__Santhali_.pdf",
+   "reason": "same-grade",
+   "sha256": "3d3cb7284e7b0cc7da9fa781a4ed1922d6a11fb1d8650cdd0c22b1ff7f0a4ddb",
+   "slug": "elephants-tigers-and-leopards",
+   "subject": "Environmental Studies"
+  },
+  {
+   "grade": 4,
+   "pool_file": "Class_4__Elephants_Tigers__and_Leopards__Santhali_.pdf",
+   "reason": "smallest-fill",
+   "sha256": "8b837f886d8088a41561c23bd0059f24ae43d089c2640737aae23ca377826d14",
+   "slug": "equal-groups",
+   "subject": "Mathematics"
+  },
+  {
+   "grade": 4,
+   "pool_file": "Class_1__Chapter_11_How_Many_Times___Multiplication___Santhali_.pdf",
+   "reason": "smallest-fill",
+   "sha256": "127cf2cdbe32877c59c8bba6940ca8ae1f68c42c74f95a8372c7b2c6bd1317df",
+   "slug": "measuring-length",
+   "subject": "Mathematics"
+  },
+  {
+   "grade": 4,
+   "pool_file": "Class_4__Ticking_Clocks_and_Turning_Calendar__Santhali_.pdf",
+   "reason": "smallest-fill",
+   "sha256": "3d3cb7284e7b0cc7da9fa781a4ed1922d6a11fb1d8650cdd0c22b1ff7f0a4ddb",
+   "slug": "the-transport-museum",
+   "subject": "Mathematics"
+  },
+  {
+   "grade": 4,
+   "pool_file": "Class_1__Chapter_13_So_Many_Toys__Data_Handling___Santhali_.pdf",
+   "reason": "smallest-fill",
+   "sha256": "73cff358eb1f3be4c3d177fb5f62a9a131925bc084f7d05381acc75283d5ff2e",
+   "slug": "the-cleanest-village",
+   "subject": "Environmental Studies"
+  },
+  {
+   "grade": 5,
+   "pool_file": "Class_2__Playing_with_Lines__Santhali_.pdf",
+   "reason": "smallest-fill",
+   "sha256": "d737369e1a9ae1d3f9dfc4ab1fb74c018dab94933b20b081ee3e1303d3b8ec76",
+   "slug": "music-around-me",
+   "subject": "Arts"
+  },
+  {
+   "grade": 5,
+   "pool_file": "Class_4__Elephants_Tigers__and_Leopards__Santhali_.pdf",
+   "reason": "smallest-fill",
+   "sha256": "8b837f886d8088a41561c23bd0059f24ae43d089c2640737aae23ca377826d14",
+   "slug": "objects-on-the-move",
+   "subject": "Arts"
+  },
+  {
+   "grade": 5,
+   "pool_file": "Class_1__Chapter_11_How_Many_Times___Multiplication___Santhali_.pdf",
+   "reason": "smallest-fill",
+   "sha256": "127cf2cdbe32877c59c8bba6940ca8ae1f68c42c74f95a8372c7b2c6bd1317df",
+   "slug": "little-steps-g4",
+   "subject": "Physical Education & Well Being"
+  },
+  {
+   "grade": 5,
+   "pool_file": "Class_4__Ticking_Clocks_and_Turning_Calendar__Santhali_.pdf",
+   "reason": "smallest-fill",
+   "sha256": "3d3cb7284e7b0cc7da9fa781a4ed1922d6a11fb1d8650cdd0c22b1ff7f0a4ddb",
+   "slug": "strike-the-shuttlecock",
+   "subject": "Physical Education & Well Being"
+  },
+  {
+   "grade": 5,
+   "pool_file": "Class_1__Chapter_13_So_Many_Toys__Data_Handling___Santhali_.pdf",
+   "reason": "smallest-fill",
+   "sha256": "73cff358eb1f3be4c3d177fb5f62a9a131925bc084f7d05381acc75283d5ff2e",
+   "slug": "yoga-sadhana",
+   "subject": "Physical Education & Well Being"
+  },
+  {
+   "grade": 5,
+   "pool_file": "Class_2__Playing_with_Lines__Santhali_.pdf",
+   "reason": "smallest-fill",
+   "sha256": "d737369e1a9ae1d3f9dfc4ab1fb74c018dab94933b20b081ee3e1303d3b8ec76",
+   "slug": "revision-practice",
+   "subject": "Mathematics"
+  },
+  {
+   "grade": 1,
+   "pool_file": "Class_1__Chapter_13_So_Many_Toys__Data_Handling___Santhali_.pdf",
+   "reason": "same-grade",
+   "sha256": "73cff358eb1f3be4c3d177fb5f62a9a131925bc084f7d05381acc75283d5ff2e",
+   "slug": "fun-with-numbers-21-99",
+   "subject": "Mathematics"
+  },
+  {
+   "grade": 3,
+   "pool_file": "Class_1__Chapter_11_How_Many_Times___Multiplication___Santhali_.pdf",
+   "reason": "same-subject",
+   "sha256": "127cf2cdbe32877c59c8bba6940ca8ae1f68c42c74f95a8372c7b2c6bd1317df",
+   "slug": "whats-in-a-name",
+   "subject": "Mathematics"
+  }
+ ],
+ "swaps": [
+  {
+   "date": "2026-09-16",
+   "grade": 2,
+   "in": "fun-at-fair (authored santali_organized/2, DRAFT)",
+   "out": "fun-at-the-fair (pool placeholder)"
+  }
+ ]
+}

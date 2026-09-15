@@ -120,11 +120,13 @@ fun ChapterWorksheetScreen(
     val ui = loadBundle(grade, slug)
     val bundle = (ui as? BundleUi.Ready)?.bundle
     val chapterTitle = bundle?.let { shortTitle(it) } ?: slug
+    // Phase 12: pool-PDF slots show a PDF badge; JSON slots keep item counts.
+    val pdfBacked = bundle?.worksheetPdf != null
     Column(modifier = modifier.fillMaxSize().background(VachakColors.Background)) {
         StudySubHeader(
             title = "Worksheet",
             subtitle = "Grade $grade • $chapterTitle",
-            count = bundle?.questions?.takeIf { it.isNotEmpty() }?.let { "${it.size} items" },
+            count = if (pdfBacked) "PDF" else bundle?.questions?.takeIf { it.isNotEmpty() }?.let { "${it.size} items" },
             trail = listOf("Learn", "Grade $grade"),
             onBack = onBack
         )
@@ -132,18 +134,24 @@ fun ChapterWorksheetScreen(
             is BundleUi.Loading -> LoadingNote("Opening worksheet…")
             is BundleUi.Failed -> CenterNote("Couldn't open worksheet", (ui as BundleUi.Failed).reason)
             is BundleUi.Ready -> {
-                val qs = bundle!!.questions
-                if (qs.isEmpty()) {
-                    CenterNote(
-                        title = "No worksheet here yet",
-                        body = (bundle.notices.firstOrNull { it.contains("worksheet", ignoreCase = true) }
-                            ?: "This chapter has no worksheet items.") +
-                                "\nInstall the latest content pack if you expected items here.",
-                        actionLabel = "Open Packs",
-                        onAction = onOpenPacks
-                    )
+                val b = bundle!!
+                val pdf = b.worksheetPdf
+                if (pdf != null) {
+                    com.vachak.ui.pdf.PdfViewer(pdf)
                 } else {
-                    PackWorksheetView(qs)
+                    val qs = b.questions
+                    if (qs.isEmpty()) {
+                        CenterNote(
+                            title = "No worksheet here yet",
+                            body = (b.notices.firstOrNull { it.contains("worksheet", ignoreCase = true) }
+                                ?: "This chapter has no worksheet items.") +
+                                    "\nInstall the latest content pack if you expected items here.",
+                            actionLabel = "Open Packs",
+                            onAction = onOpenPacks
+                        )
+                    } else {
+                        PackWorksheetView(qs, grade, slug)
+                    }
                 }
             }
         }

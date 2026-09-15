@@ -160,3 +160,43 @@ Plans:
   2. Live PTT Hindi->Santali/Mundari Ol Chiki via merged LoRA CT2 223M + VITS 22050Hz <3s sequential, mic closes
   3. Debug UI live latency/budget + log viewer, 2GB <3s captured, SME DRAFT watermark
 **Plans**: 3 plans
+
+### Phase 12: PDF Worksheets — Ship santali_organized PDFs (30 slots)
+**Goal**: Real worksheets for 5 grades x 6 chapters = 30 slots from two sources — authored `/1` + `/3` chapter bundles (JSON + webp, DRAFT-verbatim via build-time converter) wired explicitly for Grades 1/3, plus 20 pool slots by reference from 3–5 unique smallest PDFs (<=25 MB); everything opens in-app; decks intact except the 9 supplied G1/G3 ones
+**Depends on**: Phase 4, Phase 5
+**Requirements**: WS-01, WS-02, WS-03, WS-04, WS-05, WS-06 (phase-local IDs, see .planning/phases/12-pdf-worksheets/12-CONTEXT.md)
+**Success Criteria**:
+  1. All 30 chapter slots (incl. reserved filling-and-lifting + G1/G3/G5 6th-slots) resolve to shipped content and open in-app offline with proper hi/Ol Chiki titles, never null/blank
+  2. Unique pool bytes <=25 MB + authored ≈2 MB in sat_Olck-v0.3.0.vachakpack; DRAFT preserved, AUTO_EXTRACTED for pool-derived, provenance recorded; no INTERNET, no new deps
+  3. Non-explicit decks byte-identical (only 9 supplied DRAFT decks change); JSON worksheet path preserved as fallback
+**Plans**: 2 plans (converter+pool content/pack, reader+thumbnails+viewer)
+
+### Phase 13: Chapter-page cleanup (2 options + live counts)
+**Goal**: Chapter page shows ONLY Worksheets + Flashcards (no gallery/Read/questions); worksheet "needs review" badge + answer-key sermon removed; grade rows show live pack counts in demo order
+**Depends on**: Phase 12
+**Requirements**: CU-01, CU-02, CU-03 (phase-local IDs, see .planning/phases/13-chapter-cleanup/13-01-PLAN.md)
+**Success Criteria**:
+  1. Chapter page renders header + 2 cards, nothing else; routes unchanged
+  2. Worksheets open with zero review chrome; decks/screens/manifest/ml untouched
+  3. Grade rows reflect live installed/bundled pack data, pack order preserved
+**Plans**: 1 plan (executed 2026-09-16, compile + unit tests green)
+
+### Phase 14: Pack truth — richest source wins (answers off, single-pack APK)
+**Goal**: Kill stale-pack shadowing (identical v0.2.0 decks can never surface over v0.3.0); worksheets show questions only (no answers, no review chrome); deck faces fit; single-pack APK under the 750 MB user cap
+**Depends on**: Phase 12, Phase 13
+**Requirements**: PT-01, PT-02, PT-03, PT-04 (phase-local IDs, see .planning/phases/14-pack-truth/14-01-PLAN.md)
+**Success Criteria**:
+  1. Richest-source rule in bundle + counts (score = questions + cards + 1000×pdf)
+  2. Zero answers/review chrome on worksheets; scroll-fit decks, flip unchanged
+  3. Clean APK 646.4 MB with only v0.3.0 (18.9 MB), < 750 MB
+**Plans**: 1 plan (executed 2026-09-16, clean build measured)
+
+### Phase 15: Content viewer — direct-asset PDFs + full-size images
+**Goal**: Pool PDFs open in-app via 3 independent paths (installed → bundled → direct assets); worksheet images fully visible; text-only sheets open
+**Depends on**: Phase 14
+**Requirements**: CV-01, CV-02, CV-03 (phase-local IDs, see .planning/phases/15-content-viewer/15-01-PLAN.md)
+**Success Criteria**:
+  1. Every pool slot opens its PDF readably with zero packs installed
+  2. Worksheet images border-to-border; text-only worksheets open
+  3. Clean APK 663.8 MB < 750 MB
+**Plans**: 1 plan (executed 2026-09-16, clean build measured)

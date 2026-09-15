@@ -72,6 +72,9 @@ fun GradeScreen(
     }
     // (Santali Deva line, Hindi line) per chapter slug — real source text.
     var titleLines by remember(grade) { mutableStateOf<Map<String, Pair<String?, String?>>>(emptyMap()) }
+    // Live worksheet/deck counts per chapter slug — real pack data, refreshed
+    // on every open (never the stale build-time summary alone).
+    var liveCounts by remember(grade) { mutableStateOf<Map<String, PackContentReader.ChapterCounts>>(emptyMap()) }
 
     LaunchedEffect(grade) {
         val found = withContext(Dispatchers.IO) {
@@ -79,13 +82,18 @@ fun GradeScreen(
         }
         if (found != null) {
             pack = found
-            // One background pass for every chapter's title lines.
+            // One background pass for every chapter's title lines + live counts.
             val lines = withContext(Dispatchers.IO) {
                 runCatching {
                     PackContentReader.readGradeTitleLines(ctx, grade, found.chapterTitles.map { it.slug })
                 }.getOrDefault(emptyMap())
             }
             titleLines = lines
+            liveCounts = withContext(Dispatchers.IO) {
+                runCatching {
+                    PackContentReader.readGradeCounts(ctx, grade, found.chapterTitles.map { it.slug })
+                }.getOrDefault(emptyMap())
+            }
         } else {
             packMissing = true
         }
@@ -124,12 +132,14 @@ fun GradeScreen(
                     HomeSectionHeader(title = "Chapters (${chapters.size})", actionLabel = null, onAction = null)
                 }
                 items(chapters.withIndex().toList(), key = { (_, ch) -> ch.slug }) { (idx, ch) ->
+                    val live = liveCounts[ch.slug]
                     ChapterRow(
                         number = (idx + 1).toString().padStart(2, '0'),
                         packTitle = ch.title,
                         subject = ch.subject,
-                        worksheets = ch.worksheets,
-                        flashcards = ch.flashcards,
+                        worksheets = live?.questions ?: ch.worksheets,
+                        flashcards = live?.cards ?: ch.flashcards,
+                        pdfBacked = live?.hasPdf == true,
                         satLine = titleLines[ch.slug]?.first,
                         hiLine = titleLines[ch.slug]?.second,
                         lang = lang,
@@ -260,6 +270,7 @@ private fun ChapterRow(
     subject: String,
     worksheets: Int,
     flashcards: Int,
+    pdfBacked: Boolean = false,
     satLine: String?,
     hiLine: String?,
     lang: Int,
@@ -279,7 +290,8 @@ private fun ChapterRow(
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(title, style = MaterialTheme.typography.bodyMedium, color = VachakColors.TextPrimary, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                 Text(
-                    "$subject • $worksheets worksheets • $flashcards flashcards",
+                    if (pdfBacked) "PDF worksheet • $flashcards flashcards"
+                    else "$subject • $worksheets worksheets • $flashcards flashcards",
                     style = MaterialTheme.typography.bodySmall, color = VachakColors.TextSecondary, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                 )
                 if (fallbackNote != null) {

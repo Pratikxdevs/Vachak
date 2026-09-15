@@ -1,0 +1,50 @@
+[
+ {
+  "cards": 30,
+  "chapter_sha256": "02e4b00fb110c9d829c277db002f88de90c0178f0068c7cbf92caab5b1be71bf",
+  "flashcards_sha256": "84acdcd3a5fc7514bffc8fa34a6e97271a3b802a0c3b1b431823edf8ac118370",
+  "grade": 3,
+  "pages": 8,
+  "questions": 10,
+  "slug": "celebrating-festivals",
+  "source_dir": "/cz/Vachak/santali_organized/3/celebrating-festivals",
+  "status": "DRAFT",
+  "worksheets_sha256": "e16247051f41f72746cf35feffee028b68bc5f08d9246226fc84f5ce38b5c230"
+ },
+ {
+  "cards": 30,
+  "chapter_sha256": "3054647a69a923a142e550eac3d2a390a613d0934af966c6069c6c687e6fa4fa",
+  "flashcards_sha256": "75b83bff5e9724972b61b81730bc8e241ac229ba9aff38eac6a503a8865ef61a",
+  "grade": 3,
+  "pages": 8,
+  "questions": 10,
+  "slug": "double-century",
+  "source_dir": "/cz/Vachak/santali_organized/3/double-century",
+  "status": "DRAFT",
+  "worksheets_sha256": "b7a4c7d1e680ed14f4d22b6f429fb250a70c0056f0a3fdfff6f399004353d399"
+ },
+ {
+  "cards": 30,
+  "chapter_sha256": "c392abde9b6c9ff1b09e6fb530db094f1c531c6bfaaae897162b7e920b69176d",
+  "flashcards_sha256": "825395f5f3f44186f56f4d66c7e365b8395ff0c93f0799e4c56082d86a48c69c",
+  "grade": 3,
+  "pages": 0,
+  "questions": 10,
+  "slug": "fair-share",
+  "source_dir": "/cz/Vachak/santali_organized/3/fair-share",
+  "status": "DRAFT",
+  "worksheets_sha256": "c00f274f0efe24e2e3aa3fa2b351b8de188815ce83ca33bb39228628b5b96b93"
+ },
+ {
+  "cards": 30,
+  "chapter_sha256": "b59f5bf0c301dd9d0bbc0e115cf75a31978edf444e4a84380580b6ec6b03d505",
+  "flashcards_sha256": "7f0f0c6ef50950caa1a56eef6ca4a0f8d9126380b24b7e01b130715299439626",
+  "grade": 3,
+  "pages": 0,
+  "questions": 10,
+  "slug": "family-and-friends",
+  "source_dir": "/cz/Vachak/santali_organized/3/family-and-friends",
+  "status": "DRAFT",
+  "worksheets_sha256": "493ec9007052fe4f7175ad0ef68f11ff14f6edbbe5f7b0da358b515bd105954e"
+ }
+]

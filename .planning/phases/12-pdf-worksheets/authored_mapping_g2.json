@@ -1,0 +1,14 @@
+[
+ {
+  "cards": 30,
+  "chapter_sha256": "b6a6008e80558b98329c480dd6e6b3f2717bd1a28a79aaf0a9c7891d2a633998",
+  "flashcards_sha256": "d5917c9d6812e0daacb80fda8cf3be5e3c4bb6c2d020702a3d477a56ad455a4c",
+  "grade": 2,
+  "pages": 8,
+  "questions": 10,
+  "slug": "fun-at-fair",
+  "source_dir": "/cz/Vachak/santali_organized/2/fun-at-fair",
+  "status": "DRAFT",
+  "worksheets_sha256": "143b8ac0eff4e863a60de510ebe8580f02ee57d16a49fbfad6d19bb98793b06b"
+ }
+]

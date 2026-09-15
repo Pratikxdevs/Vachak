@@ -51,6 +51,13 @@ def collect() -> list[tuple[str, str]]:
                 real = os.path.join(dp, fn)
                 arc = os.path.join("curriculum", "class", g, os.path.relpath(real, gdir))
                 items.append((arc, real))
+    # Phase 12: shared smallest-PDF pool (referenced by pool slots).
+    pool_dir = os.path.join(CLASS_DIR, "pdf_pool")
+    if os.path.isdir(pool_dir):
+        for fn in sorted(os.listdir(pool_dir)):
+            real = os.path.join(pool_dir, fn)
+            if os.path.isfile(real):
+                items.append((os.path.join("curriculum", "class", "pdf_pool", fn), real))
     if not os.path.exists(SUMMARY_ASSET):
         raise SystemExit("missing pack_summary.json — run scripts/build_pack_summary.py first")
     items.append(("curriculum/pack_summary.json", SUMMARY_ASSET))
@@ -73,12 +80,34 @@ def main() -> int:
                         "sha256": sha256_file(real), "size": size})
 
     # Per-grade rollup from manifests (chapter counts only — no translations).
+    # Phase 12 fallback: converted tree without builder manifests — derive
+    # from demo_set.json (the wired listing) + chapter dir count.
     grades = []
     for g in ("1", "2", "3", "4", "5"):
-        m = json.load(open(os.path.join(CLASS_DIR, g, "manifest.json"), encoding="utf-8"))
-        grades.append({"grade": int(g), "books": m.get("books", 0),
-                       "chapters": len(m.get("chapters", {})),
-                       "status": m.get("status", "AUTO_EXTRACTED")})
+        m_path = os.path.join(CLASS_DIR, g, "manifest.json")
+        if os.path.isfile(m_path):
+            m = json.load(open(m_path, encoding="utf-8"))
+            grades.append({"grade": int(g), "books": m.get("books", 0),
+                           "chapters": len(m.get("chapters", {})),
+                           "status": m.get("status", "AUTO_EXTRACTED")})
+            continue
+        demo_path = os.path.join(CLASS_DIR, g, "demo_set.json")
+        demo = json.load(open(demo_path, encoding="utf-8")) if os.path.isfile(demo_path) else []
+        ch_root = os.path.join(CLASS_DIR, g, "chapters")
+        n_dirs = len([d for d in os.listdir(ch_root)
+                      if os.path.isdir(os.path.join(ch_root, d))]) if os.path.isdir(ch_root) else 0
+        statuses = set()
+        for dp, _, fns in os.walk(os.path.join(CLASS_DIR, g)):
+            if "chapter.json" in fns and os.path.basename(dp) != g:
+                try:
+                    statuses.add(json.load(
+                        open(os.path.join(dp, "chapter.json"), encoding="utf-8")
+                    ).get("status", "?"))
+                except (OSError, ValueError):
+                    statuses.add("UNREADABLE")
+        grades.append({"grade": int(g), "books": len(demo) or n_dirs,
+                       "chapters": len(demo) or n_dirs,
+                       "status": "+".join(sorted(statuses)) or "UNKNOWN"})
 
     manifest = {
         "packName": f"{args.lang}-v{args.version}.vachakpack",
@@ -107,7 +136,38 @@ def main() -> int:
 
     print(f"[pack] {out} ({os.path.getsize(out)/1048576:.1f} MB zip, "
           f"{total/1048576:.1f} MB content, {len(entries)} files)")
+
+    # Phase 15: mirror the pool PDFs + slot mapping into APK assets so the
+    # reader has a direct-asset fallback independent of the zip-pack path.
+    export_pdf_assets()
     return 0
+
+
+def export_pdf_assets() -> None:
+    """Copy curriculum/class/pdf_pool/*.pdf + slot mapping to APK assets."""
+    import shutil
+    pool_dir = os.path.join(CLASS_DIR, "pdf_pool")
+    out_dir = os.path.join(
+        ROOT, "android", "app", "src", "main", "assets", "pdf_pool")
+    os.makedirs(out_dir, exist_ok=True)
+    n = 0
+    if os.path.isdir(pool_dir):
+        for fn in sorted(os.listdir(pool_dir)):
+            real = os.path.join(pool_dir, fn)
+            if os.path.isfile(real):
+                shutil.copyfile(real, os.path.join(out_dir, fn))
+                n += 1
+    map_src = os.path.join(
+        ROOT, ".planning", "phases", "12-pdf-worksheets", "pdf_slot_mapping.json")
+    if os.path.isfile(map_src):
+        doc = json.load(open(map_src, encoding="utf-8"))
+        mapping = {f"{s['grade']}/{s['slug']}":
+                   {"file": s["pool_file"], "sha256": s["sha256"]}
+                   for s in doc.get("slots", [])}
+        with open(os.path.join(out_dir, "mapping.json"), "w", encoding="utf-8") as f:
+            json.dump(mapping, f, ensure_ascii=False, indent=1, sort_keys=True)
+            f.write("\n")
+    print(f"[pack] assets/pdf_pool/ refreshed ({n} PDFs)")
 
 
 if __name__ == "__main__":

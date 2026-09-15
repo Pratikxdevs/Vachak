@@ -42,7 +42,10 @@ object PackContentReader {
     data class Assign(val type: String, val confidence: Double, val text: String, val page: Int, val textHi: String = "")
     data class PackQuestion(
         val id: String, val type: String, val prompt: String,
-        val answer: String?, val renderCount: Int, val needsReview: List<String>
+        val answer: String?, val renderCount: Int, val needsReview: List<String>,
+        /** Phase 12 additive: optional Hindi prompt + page-art ref (null when absent). */
+        val promptHi: String? = null,
+        val imageRef: String? = null
     )
     data class PackCard(
         val id: String, val frontDeva: String, val target: String?,
@@ -132,7 +135,9 @@ object PackContentReader {
                 renderCount = o.optInt("render_count", 0),
                 needsReview = o.optJSONArray("needs_review")?.let { nr ->
                     List(nr.length()) { k -> nr.optString(k, "") }.filter { it.isNotBlank() }
-                }.orEmpty()
+                }.orEmpty(),
+                promptHi = o.optString("prompt_hi", "").ifBlank { null },
+                imageRef = o.optString("image_ref", "").ifBlank { null }
             )
         }
     }
@@ -153,6 +158,175 @@ object PackContentReader {
                 }.orEmpty()
             )
         }
+    }
+
+    // ------------------------------------------------------------------
+    // Phase 12: pool-PDF worksheet refs. Additive — JSON question/deck paths
+    // above are untouched. Everything here is null-safe: a missing or bad
+    // ref yields null (UI shows Failed state), never a throw.
+    // ------------------------------------------------------------------
+
+    /** Reference to a shared pool PDF from a chapter.json. */
+    data class PdfRef(val relativePath: String, val sha256: String?)
+
+    /** Max single-PDF bytes ever materialized from the bundled pack. */
+    const val MAX_PDF_BYTES: Int = 30 * 1024 * 1024
+
+    /** Pure parser: chapter.json text → PdfRef. Null when the chapter has no
+     *  pool-PDF worksheet (explicit-JSON chapters return null — by design). */
+    fun parsePdfRef(chapterJsonText: String): PdfRef? {
+        return try {
+            val o = JSONObject(chapterJsonText)
+            val rel = o.optString("worksheet_pdf", "").trim()
+            if (rel.isBlank()) null
+            else PdfRef(rel, o.optString("pdf_sha256", "").ifBlank { null })
+        } catch (_: Exception) { null }
+    }
+
+    /** Pure resolver: allow-listed refs only. Rejects absolute paths and any
+     *  `..` segment (zip-slip guard); anything else maps under pdf_pool/. */
+    fun resolvePdfRef(ref: PdfRef): String? {
+        val rel = ref.relativePath.trim().replace('\\', '/')
+        if (rel.isBlank() || rel.startsWith("/")) return null
+        if (rel.split("/").any { it == ".." || it.isBlank() }) return null
+        val base = rel.substringAfterLast("/")
+        if (base.isBlank() || !base.endsWith(".pdf", ignoreCase = true)) return null
+        return "pdf_pool/$base"
+    }
+
+    private fun sha256Hex(bytes: ByteArray): String {
+        val md = java.security.MessageDigest.getInstance("SHA-256")
+        return md.digest(bytes).joinToString("") { "%02x".format(it) }
+    }
+
+    private fun sha256FileHex(f: File): String? = try {
+        val md = java.security.MessageDigest.getInstance("SHA-256")
+        f.inputStream().use { ins ->
+            val buf = ByteArray(1 shl 20)
+            while (true) {
+                val n = ins.read(buf)
+                if (n <= 0) break
+                md.update(buf, 0, n)
+            }
+        }
+        md.digest().joinToString("") { "%02x".format(it) }
+    } catch (_: Exception) { null }
+
+    /** Worksheet pool PDF for a chapter (null = not on device anywhere).
+     *  Installed pack first, bundled .vachakpack second (materialized to
+     *  cacheDir/bundled_pdf/, capped, sha256-checked). Never throws. */
+    suspend fun openWorksheetPdf(context: Context, grade: Int, slug: String): File? =
+        withContext(Dispatchers.IO) {
+            openWorksheetPdfBlocking(context, grade, slug)
+        }
+
+    fun openWorksheetPdfBlocking(context: Context, grade: Int, slug: String): File? {
+        // 1. Installed pack on device.
+        try {
+            val root = resolveRootBlocking(context)
+            val dir = root?.let { chapterDirSync(it, grade, slug) }
+            if (dir != null) {
+                val chFile = File(dir, "chapter.json")
+                if (chFile.isFile) {
+                    val ref = runCatching { parsePdfRef(chFile.readText()) }.getOrNull()
+                    val rel = ref?.let { resolvePdfRef(it) }
+                    if (rel != null) {
+                        // Resolve strictly under the grade's pdf_pool dir —
+                        // the ref basename only, never a caller-built path.
+                        val poolFile = File(
+                            File(File(root, "class/$grade"), "pdf_pool"),
+                            rel.substringAfterLast("/")
+                        ).takeIf { it.isFile }
+                        if (poolFile != null) {
+                            val want = ref?.sha256
+                            if (want.isNullOrBlank() || sha256FileHex(poolFile) == want.lowercase()) {
+                                return poolFile
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (_: Exception) { }
+        // 2. Bundled .vachakpack asset (pre-install path): find the chapter's
+        // ref, then extract ONLY that pool PDF to cache (capped + hashed).
+        try {
+            val packs = context.assets.list("packs")?.toList().orEmpty()
+            val packFile = packs.firstOrNull { it.endsWith(".vachakpack") } ?: return null
+            var ref: PdfRef? = null
+            context.assets.open("packs/$packFile").use { raw ->
+                java.util.zip.ZipInputStream(raw).use { zin ->
+                    val prefix = "curriculum/class/$grade/chapters/$slug/chapter.json"
+                    var e = zin.nextEntry
+                    while (e != null) {
+                        if (!e.isDirectory && e.name == prefix) {
+                            val bytes = readEntryCapped(zin, 2 * 1024 * 1024)
+                            ref = bytes?.let {
+                                runCatching {
+                                    parsePdfRef(it.toString(Charsets.UTF_8))
+                                }.getOrNull()
+                            }
+                            break
+                        }
+                        zin.closeEntry()
+                        e = zin.nextEntry
+                    }
+                }
+            }
+            val rel = ref?.let { resolvePdfRef(it) } ?: return null
+            val wanted = "curriculum/class/$grade/$rel"
+            context.assets.open("packs/$packFile").use { raw ->
+                java.util.zip.ZipInputStream(raw).use { zin ->
+                    var e = zin.nextEntry
+                    while (e != null) {
+                        if (!e.isDirectory && e.name == wanted) {
+                            val bytes = readEntryCapped(zin, MAX_PDF_BYTES) ?: return null
+                            val wantSha = ref?.sha256
+                            if (!wantSha.isNullOrBlank() &&
+                                sha256Hex(bytes) != wantSha.lowercase()
+                            ) return null
+                            val out = File(File(context.cacheDir, "bundled_pdf"),
+                                "${grade}_${slug}_" + rel.substringAfterLast("/"))
+                            out.parentFile?.mkdirs()
+                            out.writeBytes(bytes)
+                            return out
+                        }
+                        zin.closeEntry()
+                        e = zin.nextEntry
+                    }
+                }
+            }
+        } catch (_: Exception) { }
+        // 3. Phase 15: direct APK assets (assets/pdf_pool/ + mapping.json) —
+        // independent of the zip-pack path, so pool PDFs open even when no
+        // usable pack is installed or the bundled pack is unreadable.
+        try {
+            val mapText = runCatching {
+                context.assets.open("pdf_pool/mapping.json").use {
+                    it.readBytes().toString(Charsets.UTF_8)
+                }
+            }.getOrNull() ?: return null
+            val entry = runCatching {
+                JSONObject(mapText).optJSONObject("$grade/$slug")
+            }.getOrNull()
+            val base = entry?.optString("file", "").orEmpty()
+            val wantSha = entry?.optString("sha256", "").orEmpty()
+            if (base.isBlank() || base.contains("..") || base.contains("/")) return null
+            val out = File(File(context.cacheDir, "bundled_pdf"), "direct_$base")
+            val ok = out.isFile && (wantSha.isBlank() || sha256FileHex(out) == wantSha.lowercase())
+            if (!ok) {
+                context.assets.open("pdf_pool/$base").use { ins ->
+                    val tmpBytes = ins.readBytes().take(MAX_PDF_BYTES + 1)
+                    if (tmpBytes.size > MAX_PDF_BYTES) return null
+                    if (!wantSha.isBlank() && sha256Hex(tmpBytes.toByteArray()) != wantSha.lowercase()) {
+                        return null
+                    }
+                    out.parentFile?.mkdirs()
+                    out.writeBytes(tmpBytes.toByteArray())
+                }
+            }
+            return out.takeIf { it.isFile }
+        } catch (_: Exception) { }
+        return null
     }
 
     /** Copy a bundled chapter (json + a bounded set of images) into cacheDir,
@@ -205,7 +379,14 @@ object PackContentReader {
                 }.orEmpty()
             } catch (_: Exception) { emptyList() }
             if (refs.isNotEmpty()) {
-                val wanted = refs.mapTo(mutableSetOf()) { "curriculum/class/$grade/$it" }
+                // Phase 12: refs may be chapter-dir-relative (converted
+                // pages/*.webp) or grade-root-relative (legacy assets) —
+                // fetch candidates for both layouts.
+                val wanted = mutableSetOf<String>()
+                refs.forEach {
+                    wanted += "curriculum/class/$grade/$it"
+                    wanted += "curriculum/class/$grade/chapters/$slug/$it"
+                }
                 context.assets.open("packs/$packFile").use { raw ->
                     java.util.zip.ZipInputStream(raw).use { zin ->
                         var e = zin.nextEntry
@@ -373,6 +554,49 @@ object PackContentReader {
                 }
             } catch (_: Exception) { null }
         }
+
+    /** Phase 12: worksheet question-image key guard (pure, JVM-testable).
+     *  Null = do not attempt decode (blank, absolute, or `..` traversal). */
+    fun questionImageKey(grade: Int, slug: String, imageRef: String?): String? {
+        val ref = imageRef?.trim()?.replace('\\', '/') ?: return null
+        if (ref.isBlank() || ref.startsWith("/")) return null
+        if (ref.split("/").any { it == ".." || it.isBlank() }) return null
+        return "$grade/$slug/$ref"
+    }
+
+    /** Decode a worksheet question's image_ref (chapter page art in webp
+     *  or APK flashcard art). Bounded (RGB_565, maxDim), null-on-miss —
+     *  mirrors decodeDeckImage discipline. Never throws. */
+    suspend fun decodeQuestionImage(
+        context: Context,
+        grade: Int,
+        slug: String,
+        imageRef: String?,
+        maxDim: Int = 512
+    ): Bitmap? = withContext(Dispatchers.IO) {
+        if (questionImageKey(grade, slug, imageRef) == null) return@withContext null
+        try {
+            val ref = imageRef!!.trim().replace('\\', '/')
+            if (ref.startsWith("flashcard/")) {
+                context.assets.open(ref).use { decodeStream(it, maxDim) }
+            } else {
+                // Installed chapter dir first (chapter-relative pages/ art).
+                val root = curriculumDir(context)
+                val dir = root?.let { chapterDirSync(it, grade, slug) }
+                val local = dir?.let { File(it, ref).takeIf { f -> f.isFile } }
+                if (local != null) {
+                    decodeImage(local, maxDim)
+                } else {
+                    // Bundled pack: materialize the chapter (bounded cache),
+                    // then read the ref chapter-relative.
+                    val cached = materializeBundledChapter(context, grade, slug)
+                    val cf = cached?.second?.let { File(it, ref).takeIf { f -> f.isFile } }
+                    if (cf != null) decodeImage(cf, maxDim)
+                    else bundledImageBytes(context, ref)?.let { decodeBytes(it, maxDim) }
+                }
+            }
+        } catch (_: Exception) { null }
+    }
 
     /** Stream a single image out of the bundled .vachakpack asset (pre-install
      *  path). Streams the zip sequentially and buffers ONLY the matching entry
@@ -562,6 +786,8 @@ object PackContentReader {
         /** Santali (Deva) opening line, Hindi opening line (often absent). */
         val titleSatDeva: String?,
         val titleHi: String?,
+        /** Phase 12 additive: pool-PDF worksheet file (null for JSON chapters). */
+        val worksheetPdf: File? = null,
         /** Plain-language reasons, e.g. "Worksheet file missing in pack". */
         val notices: List<String>
     )
@@ -575,61 +801,101 @@ object PackContentReader {
         meta: com.vachak.ui.navigation.PackChapter?
     ): ChapterBundle? = withContext(Dispatchers.IO) {
         try {
-            val notices = mutableListOf<String>()
             // 1. Installed side-loaded pack (disk reads, no zip).
-            try {
+            val installedNotices = mutableListOf<String>()
+            val installed: ChapterBundle? = try {
                 val root = resolveRootBlocking(context)
                 val dir = root?.let { chapterDirSync(it, grade, slug) }
                 if (dir != null) {
-                    return@withContext bundleFromDir(grade, slug, dir, root!!, BundleSource.INSTALLED, notices)
-                }
+                    bundleFromDir(grade, slug, dir, root!!, BundleSource.INSTALLED, installedNotices)
+                } else null
             } catch (t: Throwable) {
-                notices += "Installed pack unreadable (${t.javaClass.simpleName}) — trying bundled copy."
+                installedNotices += "Installed pack unreadable (${t.javaClass.simpleName}) — trying bundled copy."
+                null
             }
             // 2. Bundled .vachakpack asset: single zip pass for all 4 files.
-            try {
-                val bundled = readBundledChapterFiles(context, grade, slug, notices)
-                if (bundled != null) {
-                    val (chapterText, assignsText, wsText, deckText, imgRefs) = bundled
-                    val assignments = parseAssignsText(assignsText, notices)
-                    val questions = wsText?.let { parseWorksheetJsonSafe(it, notices) }.orEmpty()
-                    val cards = deckText?.let { parseDeckJsonSafe(it, notices) }.orEmpty()
+            val bundledNotices = mutableListOf<String>()
+            val bundled: ChapterBundle? = try {
+                val files = readBundledChapterFiles(context, grade, slug, bundledNotices)
+                if (files != null) {
+                    val (chapterText, assignsText, wsText, deckText, imgRefs) = files
+                    val assignments = parseAssignsText(assignsText, bundledNotices)
+                    val questions = wsText?.let { parseWorksheetJsonSafe(it, bundledNotices) }.orEmpty()
+                    val cards = deckText?.let { parseDeckJsonSafe(it, bundledNotices) }.orEmpty()
                     // Materialize images for the gallery (bounded, cached).
                     val cached = materializeBundledChapter(context, grade, slug)
-                    val images = cached?.let { (root, _) ->
+                    val images = cached?.let { (root, chapterDir) ->
                         imgRefs.mapNotNull { ref ->
                             runCatching {
-                                File(File(root, "class/$grade"), ref).takeIf { it.isFile }
+                                // Phase 12: chapter-dir first, legacy grade-root second.
+                                File(chapterDir, ref).takeIf { it.isFile }
+                                    ?: File(File(root, "class/$grade"), ref).takeIf { it.isFile }
                             }.getOrNull()
                         }
                     }.orEmpty()
                     if (images.isEmpty() && imgRefs.isNotEmpty()) {
-                        notices += "${imgRefs.size} illustrations listed but not unpacked yet."
+                        bundledNotices += "${imgRefs.size} illustrations listed but not unpacked yet."
                     }
                     val (sat, hi) = titleLines(chapterText)
-                    return@withContext ChapterBundle(
+                    // Phase 12: pool-PDF ref (null for explicit-JSON chapters).
+                    var worksheetPdf: File? = null
+                    if (parsePdfRef(chapterText.orEmpty()) != null) {
+                        worksheetPdf = runCatching {
+                            openWorksheetPdfBlocking(context, grade, slug)
+                        }.getOrNull()
+                        if (worksheetPdf == null) {
+                            bundledNotices += "Worksheet PDF not on device yet."
+                        }
+                    }
+                    ChapterBundle(
                         grade, slug, BundleSource.BUNDLED,
-                        assignments, questions, cards, images, sat, hi, notices
+                        assignments, questions, cards, images, sat, hi,
+                        worksheetPdf, bundledNotices
                     )
                 } else {
-                    notices += "Chapter files not found in the bundled pack."
+                    bundledNotices += "Chapter files not found in the bundled pack."
+                    null
                 }
             } catch (t: Throwable) {
-                notices += "Bundled pack unreadable (${t.javaClass.simpleName})."
+                bundledNotices += "Bundled pack unreadable (${t.javaClass.simpleName})."
+                null
             }
+            // Phase 14: richest source wins — a stale installed pack (thin
+            // placeholders, e.g. identical decks) never shadows newer bundled
+            // content. Tie goes to installed (stable, no re-download).
+            val winner = pickRicherBundle(installed, bundled)
+            if (winner != null) return@withContext winner
             // 3. Summary-only: chapter known from pack_summary, no content files.
             if (meta != null) {
+                val notices = (installedNotices + bundledNotices).toMutableList()
                 notices += "Full text unlocks when the content pack is installed."
                 return@withContext ChapterBundle(
                     grade, slug, BundleSource.SUMMARY_ONLY,
                     emptyList(), emptyList(), emptyList(), emptyList(),
-                    null, null, notices
+                    null, null, worksheetPdf = null, notices = notices
                 )
             }
             null
         } catch (t: Throwable) {
             VachakLog.e("Vachak-Pack", "loadChapterBundle($grade/$slug) failed", t)
             null
+        }
+    }
+
+    /** Phase 14: content score — pool PDF outweighs any placeholder counts so
+     *  real content always beats thin shadowing packs. */
+    private fun bundleScore(b: ChapterBundle?): Int {
+        if (b == null) return -1
+        return b.questions.size + b.cards.size + if (b.worksheetPdf != null) 1000 else 0
+    }
+
+    private fun pickRicherBundle(installed: ChapterBundle?, bundled: ChapterBundle?): ChapterBundle? {
+        val si = bundleScore(installed)
+        val sb = bundleScore(bundled)
+        return when {
+            si < 0 && sb < 0 -> null
+            sb > si -> bundled
+            else -> installed
         }
     }
 
@@ -659,7 +925,10 @@ object PackContentReader {
                         arr.getJSONObject(i).optString("asset", "")
                     }.mapNotNull { ref ->
                         if (ref.isBlank()) null
-                        else File(File(root, "class/$grade"), ref).takeIf { it.isFile }
+                        // Phase 12: chapter-dir-relative first (converted
+                        // pages/*.webp), then legacy grade-root-relative.
+                        else File(dir, ref).takeIf { it.isFile }
+                            ?: File(File(root, "class/$grade"), ref).takeIf { it.isFile }
                     }
                 }.orEmpty()
             }.onFailure { notices += "chapter.json is corrupt — details hidden." }
@@ -684,7 +953,27 @@ object PackContentReader {
         } else {
             notices += "No flashcard deck for this chapter in the installed pack."
         }
-        return ChapterBundle(grade, slug, source, assignments, questions, cards, images, sat, hi, notices)
+        // Phase 12: pool-PDF ref resolved strictly under class/{g}/pdf_pool.
+        var worksheetPdf: File? = null
+        val pdfRef: PdfRef? = runCatching {
+            parsePdfRef(File(dir, "chapter.json").readText())
+        }.getOrNull()
+        val pdfRel = pdfRef?.let { resolvePdfRef(it) }
+        if (pdfRef != null && pdfRel != null) {
+            val poolFile = File(
+                File(File(root, "class/$grade"), "pdf_pool"),
+                pdfRel.substringAfterLast("/")
+            ).takeIf { it.isFile }
+            if (poolFile != null &&
+                (pdfRef.sha256.isNullOrBlank() ||
+                    sha256FileHex(poolFile) == pdfRef.sha256.lowercase())
+            ) {
+                worksheetPdf = poolFile
+            } else {
+                notices += "Worksheet PDF listed but not verified on device — hidden."
+            }
+        }
+        return ChapterBundle(grade, slug, source, assignments, questions, cards, images, sat, hi, worksheetPdf, notices)
     }
 
     private data class BundledFiles(
@@ -866,6 +1155,122 @@ object PackContentReader {
             out
         } catch (t: Throwable) {
             VachakLog.e("Vachak-Pack", "readGradeTitleLines($grade) failed", t)
+            emptyMap()
+        }
+    }
+
+    /** Live per-chapter worksheet/deck counts + pool-PDF flag for a grade.
+     *  Installed pack first (direct small reads), bundled .vachakpack second
+     *  (ONE zip scan for all slugs). Missing chapters are simply absent —
+     *  callers fall back to pack_summary numbers. Nothing here throws. */
+    data class ChapterCounts(val questions: Int, val cards: Int, val hasPdf: Boolean)
+
+    suspend fun readGradeCounts(
+        context: Context,
+        grade: Int,
+        slugs: List<String>
+    ): Map<String, ChapterCounts> = withContext(Dispatchers.IO) {
+        val ctxJob = coroutineContext[Job]
+        try {
+            val installedMap = mutableMapOf<String, ChapterCounts>()
+            // Installed pack: direct small file reads.
+            try {
+                val root = resolveRootBlocking(context)
+                if (root != null) {
+                    slugs.forEach { slug ->
+                        runCatching {
+                            val dir = chapterDirSync(root, grade, slug)
+                            if (dir != null) {
+                                val ws = worksheetFile(dir, slug)
+                                    ?.let { parseWorksheetJson(it.readText()) }.orEmpty()
+                                val deck = deckFile(dir)
+                                    ?.let { parseDeckJson(it.readText()) }.orEmpty()
+                                val pdf = File(dir, "chapter.json")
+                                    .takeIf { it.isFile }
+                                    ?.let { parsePdfRef(it.readText()) != null }
+                                    ?: false
+                                installedMap[slug] = ChapterCounts(ws.size, deck.size, pdf)
+                            }
+                        }
+                    }
+                }
+            } catch (_: Throwable) { }
+            // Bundled pack: one scan for every slug (picks up whatever the
+            // installed pack lacks or shadows with thin placeholders).
+            val bundledMap = mutableMapOf<String, ChapterCounts>()
+            val packs = runCatching { context.assets.list("packs")?.toList().orEmpty() }.getOrDefault(emptyList())
+            val packFile = packs.firstOrNull { it.endsWith(".vachakpack") }
+            if (packFile != null) {
+                val wanted = slugs.toSet()
+                val wsText = mutableMapOf<String, String>()
+                val deckText = mutableMapOf<String, String>()
+                val pdfFlag = mutableMapOf<String, Boolean>()
+                fun done(slug: String) = slug in wsText && slug in deckText && slug in pdfFlag
+                try {
+                    context.assets.open("packs/$packFile").use { raw ->
+                        java.util.zip.ZipInputStream(raw).use { zin ->
+                            var e = zin.nextEntry
+                            while (e != null && wanted.any { !done(it) }) {
+                                if (ctxJob?.isActive == false) throw java.util.concurrent.CancellationException()
+                                if (!e.isDirectory) {
+                                    val hit = wanted.firstOrNull { slug ->
+                                        e.name.startsWith("curriculum/class/$grade/chapters/$slug/")
+                                    }
+                                    if (hit != null && !done(hit)) {
+                                        val tail = e.name.removePrefix(
+                                            "curriculum/class/$grade/chapters/$hit/")
+                                        val bytes = readEntryCapped(zin, 2 * 1024 * 1024)
+                                        if (bytes != null) {
+                                            val text = bytes.toString(Charsets.UTF_8)
+                                            when {
+                                                tail == "chapter.json" && hit !in pdfFlag ->
+                                                    pdfFlag[hit] = runCatching {
+                                                        parsePdfRef(text)
+                                                    }.getOrNull() != null
+                                                tail.startsWith("worksheets/") && tail.endsWith(".json") &&
+                                                    (hit !in wsText || tail.endsWith("ws_${hit}_bilingual.json")) ->
+                                                    wsText[hit] = text
+                                                tail.startsWith("flashcards/") && tail.endsWith(".json") &&
+                                                    hit !in deckText ->
+                                                    deckText[hit] = text
+                                            }
+                                        }
+                                    }
+                                }
+                                zin.closeEntry()
+                                e = zin.nextEntry
+                            }
+                        }
+                    }
+                } catch (_: Exception) { }
+                wanted.forEach { slug ->
+                    if (slug in wsText || slug in deckText || slug in pdfFlag) {
+                        val qs = wsText[slug]?.let {
+                            runCatching { parseWorksheetJson(it) }.getOrDefault(emptyList())
+                        }.orEmpty()
+                        val cs = deckText[slug]?.let {
+                            runCatching { parseDeckJson(it) }.getOrDefault(emptyList())
+                        }.orEmpty()
+                        bundledMap[slug] = ChapterCounts(qs.size, cs.size, pdfFlag[slug] == true)
+                    }
+                }
+            }
+            // Phase 14: richest source wins per slug (same rule as bundles).
+            fun score(c: ChapterCounts) = c.questions + c.cards + if (c.hasPdf) 1000 else 0
+            val out = mutableMapOf<String, ChapterCounts>()
+            slugs.forEach { slug ->
+                val a = installedMap[slug]
+                val b = bundledMap[slug]
+                out[slug] = when {
+                    a == null -> b
+                    b == null -> a
+                    score(b) > score(a) -> b
+                    else -> a
+                }.let { it ?: return@forEach }
+            }
+            out
+        } catch (t: Throwable) {
+            VachakLog.e("Vachak-Pack", "readGradeCounts($grade) failed", t)
             emptyMap()
         }
     }

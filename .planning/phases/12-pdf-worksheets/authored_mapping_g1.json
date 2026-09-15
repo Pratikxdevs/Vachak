@@ -1,0 +1,62 @@
+[
+ {
+  "cards": 30,
+  "chapter_sha256": "2c13f7950f3ee3e7e339f6d8b26c165919e439b63e8b26d4463b970e7913782d",
+  "flashcards_sha256": "523ef5ee695dae2a6d1cf07b83388b9a8281c74becd3e1edde6908ef289ebe4f",
+  "grade": 1,
+  "pages": 8,
+  "questions": 10,
+  "slug": "finding-furry-cat",
+  "source_dir": "/cz/Vachak/santali_organized/1/finding-furry-cat",
+  "status": "DRAFT",
+  "worksheets_sha256": "42262130fe92e5a4691f0598cf734db7e41b44313f08cd590dc98f1d75cd3dc3"
+ },
+ {
+  "cards": 30,
+  "chapter_sha256": "c5d7e373c473b3833e6c3cb81c0449105ad41fac1f2192088e54ebfece2d2a2c",
+  "flashcards_sha256": "2a4b5f0aab7137f56c37cec55363cac64266e3b0083d9564d87da6368ca48531",
+  "grade": 1,
+  "pages": 8,
+  "questions": 10,
+  "slug": "how-many-times",
+  "source_dir": "/cz/Vachak/santali_organized/1/how-many-times",
+  "status": "DRAFT",
+  "worksheets_sha256": "bb79d5c919698b30fd52d49609e541cd45d929e3ec3d0e97753bae78099d3f8c"
+ },
+ {
+  "cards": 30,
+  "chapter_sha256": "afec23a381ccf70e23fe1b51b6bea35983ec33d5dc2f7c2203609a357cd3d72f",
+  "flashcards_sha256": "9aa0cf6f51d9e437e4fd5b51af2bb91d2214472d88785a77fe6ddd3c55d1ea2a",
+  "grade": 1,
+  "pages": 8,
+  "questions": 10,
+  "slug": "santali-hindi-primer",
+  "source_dir": "/cz/Vachak/santali_organized/1/santali-hindi-primer",
+  "status": "DRAFT",
+  "worksheets_sha256": "9e371626c28727fcd4aff835343ddd547ee4a2a352391be31a2fc5b5a808ab8e"
+ },
+ {
+  "cards": 30,
+  "chapter_sha256": "c89057b4c244523a866c888bbfd26b338b7f77f42db94160362ed0d715f00c30",
+  "flashcards_sha256": "f4e097154855a0755b94cb932e453bc27ff56e715dda61af9c932640f0b5fee8",
+  "grade": 1,
+  "pages": 4,
+  "questions": 10,
+  "slug": "so-many-toys",
+  "source_dir": "/cz/Vachak/santali_organized/1/so-many-toys",
+  "status": "DRAFT",
+  "worksheets_sha256": "b8ecdf23397ceb44a259b8360b60b545f77f80c298eaa0d53c733bc5411ea229"
+ },
+ {
+  "cards": 30,
+  "chapter_sha256": "382ad97dfa0db1b58223da0e5586a38bb93a1d6b928770129b6454d1c58326a7",
+  "flashcards_sha256": "790c7663fd7fb1e057fa47714428b52aad6976862e98b51740fb7fd37549bbec",
+  "grade": 1,
+  "pages": 8,
+  "questions": 10,
+  "slug": "spend-my-day",
+  "source_dir": "/cz/Vachak/santali_organized/1/spend-my-day",
+  "status": "DRAFT",
+  "worksheets_sha256": "213266635942bf203b8618dbef3fca26669f6b3903a2bdc5a2343346bb28bb1b"
+ }
+]

@@ -29,9 +29,14 @@ import com.vachak.ui.theme.tabletHPad
  * one renderer, no duplicated logic, real pack data only.
  */
 
-/** Pack worksheet questions. Answers are auto-extracted: shown as unverified keys, never as truth. */
+/** Pack worksheet questions. */
 @Composable
-fun PackWorksheetView(questions: List<PackQuestionAlias>) {
+fun PackWorksheetView(
+    questions: List<PackQuestionAlias>,
+    grade: Int = -1,
+    slug: String = ""
+) {
+    val ctx = LocalContext.current
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = tabletHPad(), vertical = 16.dp),
@@ -46,19 +51,49 @@ fun PackWorksheetView(questions: List<PackQuestionAlias>) {
                         Surface(shape = RoundedCornerShape(50), color = VachakColors.SoftLavender) {
                             Text(q.type, modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp), style = MaterialTheme.typography.labelSmall, color = VachakColors.DeepLavender, fontWeight = FontWeight.SemiBold)
                         }
-                        if (q.needsReview.isNotEmpty()) {
-                            Text("needs review", style = MaterialTheme.typography.labelSmall, color = VachakColors.Amber, fontWeight = FontWeight.SemiBold)
+                    }
+                    // Phase 15: full-visibility preview — entire image fits
+                    // border-to-border (Fit, full width, tall cap).
+                    if (grade >= 1 && slug.isNotBlank() && !q.imageRef.isNullOrBlank()) {
+                        var thumb by remember(q.id) { mutableStateOf<android.graphics.Bitmap?>(null) }
+                        LaunchedEffect(q.id) {
+                            try {
+                                val bmp = PackContentReader.decodeQuestionImage(ctx, grade, slug, q.imageRef)
+                                thumb?.let { old -> runCatching { if (!old.isRecycled) old.recycle() } }
+                                thumb = bmp
+                            } catch (ce: kotlinx.coroutines.CancellationException) {
+                                throw ce
+                            } catch (_: Exception) {
+                                thumb = null
+                            }
+                        }
+                        DisposableEffect(q.id) {
+                            onDispose {
+                                thumb?.let { old -> runCatching { if (!old.isRecycled) old.recycle() } }
+                            }
+                        }
+                        thumb?.let { bmp ->
+                            if (!bmp.isRecycled) {
+                                Image(
+                                    bmp.asImageBitmap(),
+                                    contentDescription = null,
+                                    modifier = Modifier.fillMaxWidth().heightIn(max = 300.dp)
+                                        .clip(RoundedCornerShape(16.dp))
+                                        .border(1.dp, Color.Black.copy(alpha = 0.1f), RoundedCornerShape(16.dp)),
+                                    contentScale = androidx.compose.ui.layout.ContentScale.Fit
+                                )
+                            }
                         }
                     }
                     Text(q.prompt.ifBlank { q.id }, style = MaterialTheme.typography.bodyMedium, color = VachakColors.TextPrimary)
+                    if (!q.promptHi.isNullOrBlank()) {
+                        Text(q.promptHi, style = MaterialTheme.typography.bodySmall, color = VachakColors.TextSecondary)
+                    }
                     if (q.renderCount > 0) {
                         Text("Count objects: ${q.renderCount}", style = MaterialTheme.typography.bodySmall, color = VachakColors.TextSecondary)
                     }
-                    val ans = q.answer
-                    Text(
-                        if (!ans.isNullOrBlank()) "Key: $ans (auto-extracted, unverified)" else "Answer key pending speaker review",
-                        style = MaterialTheme.typography.bodySmall, color = VachakColors.TextSecondary
-                    )
+                    // Phase 14: practice sheet shows questions only — answer
+                    // keys stay in pack data, never on screen.
                 }
             }
         }
@@ -114,22 +149,30 @@ fun PackDeckView(grade: Int, cards: List<PackCardAlias>) {
                     if (flipped) "Ol Chiki" else "Santali (Deva)",
                     style = MaterialTheme.typography.labelMedium, color = VachakColors.TextSecondary
                 )
-                val face = if (flipped) card.target else card.frontDeva
-                if (face.isNullOrBlank()) {
-                    Text("Pending speaker review", style = MaterialTheme.typography.bodyMedium, color = VachakColors.Amber, fontWeight = FontWeight.SemiBold)
-                } else {
-                    Text(face, style = MaterialTheme.typography.headlineSmall, color = VachakColors.TextPrimary, fontWeight = FontWeight.Bold)
-                }
-                // Large art on top: full-bleed illustration, options/text below.
-                art?.let { bmp ->
-                    Image(
-                        bmp.asImageBitmap(),
-                        contentDescription = null,
-                        modifier = Modifier.fillMaxWidth().weight(1f, fill = false).heightIn(min = 160.dp, max = 280.dp)
-                            .clip(RoundedCornerShape(16.dp))
-                            .border(1.dp, Color.Black.copy(alpha = 0.1f), RoundedCornerShape(16.dp)),
-                        contentScale = androidx.compose.ui.layout.ContentScale.Fit
-                    )
+                // Phase 14: face scrolls internally so long prompts always fit
+                // the card on small tablets; tap-to-flip still works on tap.
+                Column(
+                    modifier = Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    val face = if (flipped) card.target else card.frontDeva
+                    if (face.isNullOrBlank()) {
+                        Text("—", style = MaterialTheme.typography.bodyMedium, color = VachakColors.TextSecondary)
+                    } else {
+                        Text(face, style = MaterialTheme.typography.headlineSmall, color = VachakColors.TextPrimary, fontWeight = FontWeight.Bold)
+                    }
+                    // Large art on top: full-bleed illustration, options/text below.
+                    art?.let { bmp ->
+                        Image(
+                            bmp.asImageBitmap(),
+                            contentDescription = null,
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 160.dp, max = 280.dp)
+                                .clip(RoundedCornerShape(16.dp))
+                                .border(1.dp, Color.Black.copy(alpha = 0.1f), RoundedCornerShape(16.dp)),
+                            contentScale = androidx.compose.ui.layout.ContentScale.Fit
+                        )
+                    }
                 }
                 Text(
                     if (flipped) "Tap to see Santali" else "Tap to flip",

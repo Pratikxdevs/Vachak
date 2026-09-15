@@ -57,9 +57,10 @@ fun loadPackSummary(context: Context): List<PackGrade>? {
                     )
                 )
             }
-            // Dedupe by slug (shared Class 1-2 sources repeat) and sort for a
-            // stable chapter list — every consumer sees one row per chapter.
-            val deduped = titles.distinctBy { it.slug }.sortedBy { it.title }
+            // Dedupe by slug (shared Class 1-2 sources repeat). Pack order is
+            // preserved (demo_set.json wired order) — never re-sorted, so
+            // grade pages list chapters exactly as the pack builder scoped.
+            val deduped = titles.distinctBy { it.slug }
             out.add(
                 PackGrade(
                     grade = g.getInt("grade"),
